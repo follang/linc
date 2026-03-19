@@ -13,3 +13,4 @@
 - [End-To-End Workflows](./110_workflows.md)
 - [JSON Compatibility](./120_json_compatibility.md)
 - [Error Surface](./130_error_surface.md)
+- [Error Taxonomy](./140_error_taxonomy.md)

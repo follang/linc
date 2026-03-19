@@ -1,15 +1,40 @@
 use std::fmt;
 use std::path::PathBuf;
 
+/// Crate-wide typed error surface.
+///
+/// Current state:
+///
+/// - JSON/schema transport already uses `BicError`
+/// - several operational APIs still return `Result<_, String>`
+///
+/// Intended taxonomy:
+///
+/// - scan/configuration failures
+/// - preprocessing and parse failures
+/// - probe execution failures
+/// - artifact inspection failures
+/// - serialization/schema failures
+///
+/// Validation findings are intentionally *not* modeled as `BicError`.
+/// They are returned as structured report data instead.
 #[derive(Debug)]
 pub enum BicError {
+    /// A scan-like operation was invoked without any entry headers.
     NoHeaders,
+    /// A compiler/preprocessor invocation failed before a usable translation unit was produced.
     PreprocessorFailed { command: String, stderr: String },
+    /// Source parsing failed after preprocessing.
     ParseFailed { source: String },
+    /// An I/O failure occurred while reading or writing an input/output boundary.
     Io(std::io::Error),
+    /// Serialization or deserialization failed.
     Serialization(String),
+    /// Artifact inspection failed for a specific path.
     SymbolRead { path: PathBuf, reason: String },
+    /// An artifact format was recognized as unsupported for the attempted operation.
     UnsupportedFormat { path: PathBuf, format: String },
+    /// The serialized package uses a schema newer than this build supports.
     SchemaVersion { found: u32, supported: u32 },
 }
 
