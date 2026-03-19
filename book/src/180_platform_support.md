@@ -39,6 +39,7 @@ That includes:
 - object/archive/shared-library inspection
 - dependency-edge capture from shared libraries
 - validation against discovered symbols
+- direct matrix tests for ELF object, static-library, and shared-library format/capability expectations
 
 For current production-oriented internal use, ELF should be treated as the primary supported
 native-artifact environment.

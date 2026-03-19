@@ -674,6 +674,76 @@ mod tests {
     }
 
     #[test]
+    fn linux_elf_support_matrix_formats_roundtrip() {
+        for fmt in [
+            ArtifactFormat::ElfObject,
+            ArtifactFormat::ElfStaticLibrary,
+            ArtifactFormat::ElfSharedLibrary,
+        ] {
+            let json = serde_json::to_string(&fmt).unwrap();
+            let parsed: ArtifactFormat = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, fmt);
+        }
+    }
+
+    #[test]
+    fn linux_elf_support_matrix_capabilities_match_expectations() {
+        let cases = [
+            (
+                ArtifactFormat::ElfObject,
+                ArtifactKind::Object,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+                Vec::<String>::new(),
+            ),
+            (
+                ArtifactFormat::ElfStaticLibrary,
+                ArtifactKind::StaticLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+                Vec::<String>::new(),
+            ),
+            (
+                ArtifactFormat::ElfSharedLibrary,
+                ArtifactKind::SharedLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+                vec!["libc.so.6".to_string()],
+            ),
+        ];
+
+        for (format, kind, capabilities, dependency_edges) in cases {
+            let inv = SymbolInventory {
+                artifact_path: format!("{:?}", format),
+                format,
+                platform: ArtifactPlatform::Elf,
+                kind,
+                capabilities,
+                dependency_edges,
+                symbols: Vec::new(),
+            };
+
+            assert_eq!(inv.platform, ArtifactPlatform::Elf);
+            assert!(inv.capabilities.exports_symbols);
+            assert_eq!(
+                inv.capabilities.imports_symbols,
+                matches!(inv.kind, ArtifactKind::SharedLibrary | ArtifactKind::Executable)
+            );
+            if inv.kind == ArtifactKind::SharedLibrary {
+                assert!(!inv.dependency_edges.is_empty());
+            } else {
+                assert!(inv.dependency_edges.is_empty());
+            }
+        }
+    }
+
+    #[test]
     fn inspect_nonexistent_file() {
         let result = inspect_file("/nonexistent/path.o");
         assert!(matches!(result.unwrap_err(), BicError::SymbolRead { .. }));
