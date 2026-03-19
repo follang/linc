@@ -10,6 +10,9 @@ pub enum ArtifactFormat {
     ElfObject,
     ElfStaticLibrary,
     ElfSharedLibrary,
+    MachOObject,
+    MachODylib,
+    MachOStaticLibrary,
     Unknown(String),
 }
 
@@ -94,6 +97,8 @@ fn inspect_archive(
 ) -> Result<SymbolInventory, String> {
     let mut symbols = Vec::new();
     let mut seen = std::collections::HashSet::new();
+    let mut is_macho = false;
+    let mut format_detected = false;
 
     for member in archive.members() {
         let member = member.map_err(|e| format!("failed to read archive member: {}", e))?;
@@ -102,6 +107,10 @@ fn inspect_archive(
             .map_err(|e| format!("failed to read archive member data: {}", e))?;
 
         if let Ok(obj) = object::File::parse(member_data) {
+            if !format_detected {
+                is_macho = obj.format() == object::BinaryFormat::MachO;
+                format_detected = true;
+            }
             for sym in extract_symbols_from_object(&obj) {
                 if seen.insert(sym.name.clone()) {
                     symbols.push(sym);
@@ -110,34 +119,58 @@ fn inspect_archive(
         }
     }
 
+    let format = if is_macho {
+        ArtifactFormat::MachOStaticLibrary
+    } else {
+        ArtifactFormat::ElfStaticLibrary
+    };
+
     Ok(SymbolInventory {
         artifact_path,
-        format: ArtifactFormat::ElfStaticLibrary,
+        format,
         symbols,
     })
 }
 
 fn classify_format(obj: &object::File<'_>) -> ArtifactFormat {
     use object::ObjectKind;
-    match obj.kind() {
-        ObjectKind::Executable | ObjectKind::Dynamic => ArtifactFormat::ElfSharedLibrary,
-        ObjectKind::Relocatable => ArtifactFormat::ElfObject,
-        other => ArtifactFormat::Unknown(format!("{:?}", other)),
+    let kind = obj.kind();
+    match obj.format() {
+        object::BinaryFormat::Elf => match kind {
+            ObjectKind::Executable | ObjectKind::Dynamic => ArtifactFormat::ElfSharedLibrary,
+            ObjectKind::Relocatable => ArtifactFormat::ElfObject,
+            other => ArtifactFormat::Unknown(format!("Elf {:?}", other)),
+        },
+        object::BinaryFormat::MachO => match kind {
+            ObjectKind::Executable | ObjectKind::Dynamic => ArtifactFormat::MachODylib,
+            ObjectKind::Relocatable => ArtifactFormat::MachOObject,
+            other => ArtifactFormat::Unknown(format!("MachO {:?}", other)),
+        },
+        other => ArtifactFormat::Unknown(format!("{:?} {:?}", other, kind)),
     }
 }
 
 fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
     use object::ObjectSection;
 
+    let is_macho = obj.format() == object::BinaryFormat::MachO;
     let mut symbols = Vec::new();
 
     // Check both regular and dynamic symbol tables
     let iter = obj.symbols().chain(obj.dynamic_symbols());
     for sym in iter {
         // Skip unnamed symbols and undefined symbols
-        let name = match sym.name() {
-            Ok(n) if !n.is_empty() => n.to_string(),
+        let raw_name = match sym.name() {
+            Ok(n) if !n.is_empty() => n,
             _ => continue,
+        };
+
+        // Mach-O prefixes C symbols with '_'; strip it for consistency
+        // with C identifier names used in header declarations.
+        let name = if is_macho {
+            raw_name.strip_prefix('_').unwrap_or(raw_name).to_string()
+        } else {
+            raw_name.to_string()
         };
 
         // Keep defined symbols (have a section) or global undefined symbols
@@ -162,6 +195,24 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
                     1 => SymbolBinding::Global,
                     2 => SymbolBinding::Weak,
                     _ => SymbolBinding::Unknown,
+                };
+                (vis, bind)
+            }
+            object::SymbolFlags::MachO { n_desc } => {
+                // Mach-O visibility: use ObjectSymbol::scope() for portable detection
+                let vis = match sym.scope() {
+                    object::SymbolScope::Dynamic => SymbolVisibility::Default,
+                    object::SymbolScope::Linkage => SymbolVisibility::Hidden, // private external
+                    object::SymbolScope::Compilation => SymbolVisibility::Hidden, // local
+                    _ => SymbolVisibility::Unknown,
+                };
+                let bind = if n_desc & 0x0080 != 0 {
+                    // N_WEAK_DEF
+                    SymbolBinding::Weak
+                } else if sym.is_global() {
+                    SymbolBinding::Global
+                } else {
+                    SymbolBinding::Local
                 };
                 (vis, bind)
             }
@@ -194,6 +245,163 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Build a minimal valid Mach-O 64-bit (x86_64) relocatable object with
+    /// a single global function symbol `_foo` in a `__TEXT,__text` section.
+    fn minimal_macho_object() -> Vec<u8> {
+        let mut d = Vec::new();
+
+        let header_size: usize = 32;
+        let seg_cmd_size: usize = 72 + 80; // LC_SEGMENT_64 + 1 section_64
+        let symtab_cmd_size: usize = 24;
+        let cmds_size = seg_cmd_size + symtab_cmd_size; // 176
+        let text_offset = header_size + cmds_size; // 208
+        let text_size: usize = 4;
+        let symtab_offset = text_offset + text_size; // 212
+        let nsyms: u32 = 1;
+        let nlist_size: usize = 16;
+        let strtab_offset = symtab_offset + (nsyms as usize * nlist_size); // 228
+        let strtab: &[u8] = b"\0_foo\0";
+        let strtab_size = strtab.len(); // 6
+
+        // --- mach_header_64 (32 bytes) ---
+        d.extend_from_slice(&0xFEEDFACFu32.to_le_bytes()); // magic
+        d.extend_from_slice(&0x01000007u32.to_le_bytes()); // cputype: CPU_TYPE_X86_64
+        d.extend_from_slice(&0x00000003u32.to_le_bytes()); // cpusubtype: CPU_SUBTYPE_ALL
+        d.extend_from_slice(&0x00000001u32.to_le_bytes()); // filetype: MH_OBJECT
+        d.extend_from_slice(&2u32.to_le_bytes());           // ncmds
+        d.extend_from_slice(&(cmds_size as u32).to_le_bytes());
+        d.extend_from_slice(&0u32.to_le_bytes());           // flags
+        d.extend_from_slice(&0u32.to_le_bytes());           // reserved
+
+        // --- LC_SEGMENT_64 (72 bytes base) ---
+        d.extend_from_slice(&0x19u32.to_le_bytes());        // cmd: LC_SEGMENT_64
+        d.extend_from_slice(&(seg_cmd_size as u32).to_le_bytes());
+        d.extend_from_slice(&[0u8; 16]);                    // segname (empty)
+        d.extend_from_slice(&0u64.to_le_bytes());           // vmaddr
+        d.extend_from_slice(&(text_size as u64).to_le_bytes()); // vmsize
+        d.extend_from_slice(&(text_offset as u64).to_le_bytes()); // fileoff
+        d.extend_from_slice(&(text_size as u64).to_le_bytes()); // filesize
+        d.extend_from_slice(&0x07u32.to_le_bytes());        // maxprot: rwx
+        d.extend_from_slice(&0x05u32.to_le_bytes());        // initprot: rx
+        d.extend_from_slice(&1u32.to_le_bytes());           // nsects
+        d.extend_from_slice(&0u32.to_le_bytes());           // flags
+
+        // --- section_64 (80 bytes) ---
+        let mut sectname = [0u8; 16];
+        sectname[..6].copy_from_slice(b"__text");
+        d.extend_from_slice(&sectname);
+        let mut segname = [0u8; 16];
+        segname[..6].copy_from_slice(b"__TEXT");
+        d.extend_from_slice(&segname);
+        d.extend_from_slice(&0u64.to_le_bytes());           // addr
+        d.extend_from_slice(&(text_size as u64).to_le_bytes()); // size
+        d.extend_from_slice(&(text_offset as u32).to_le_bytes()); // offset
+        d.extend_from_slice(&0u32.to_le_bytes());           // align
+        d.extend_from_slice(&0u32.to_le_bytes());           // reloff
+        d.extend_from_slice(&0u32.to_le_bytes());           // nreloc
+        d.extend_from_slice(&0x80000400u32.to_le_bytes()); // flags: S_REGULAR|PURE_INSTRUCTIONS|SOME_INSTRUCTIONS
+        d.extend_from_slice(&0u32.to_le_bytes());           // reserved1
+        d.extend_from_slice(&0u32.to_le_bytes());           // reserved2
+        d.extend_from_slice(&0u32.to_le_bytes());           // reserved3
+
+        // --- LC_SYMTAB (24 bytes) ---
+        d.extend_from_slice(&0x02u32.to_le_bytes());        // cmd: LC_SYMTAB
+        d.extend_from_slice(&(symtab_cmd_size as u32).to_le_bytes());
+        d.extend_from_slice(&(symtab_offset as u32).to_le_bytes());
+        d.extend_from_slice(&nsyms.to_le_bytes());
+        d.extend_from_slice(&(strtab_offset as u32).to_le_bytes());
+        d.extend_from_slice(&(strtab_size as u32).to_le_bytes());
+
+        // --- __text section data ---
+        assert_eq!(d.len(), text_offset);
+        d.extend_from_slice(&[0xC3, 0x90, 0x90, 0x90]); // ret, nop, nop, nop
+
+        // --- nlist_64 symbol entry (16 bytes) ---
+        assert_eq!(d.len(), symtab_offset);
+        d.extend_from_slice(&1u32.to_le_bytes());           // n_strx -> "_foo"
+        d.push(0x0F); // n_type: N_SECT (0x0E) | N_EXT (0x01)
+        d.push(0x01); // n_sect: 1 (first section, 1-based)
+        d.extend_from_slice(&0u16.to_le_bytes());           // n_desc
+        d.extend_from_slice(&0u64.to_le_bytes());           // n_value
+
+        // --- string table ---
+        assert_eq!(d.len(), strtab_offset);
+        d.extend_from_slice(strtab);
+
+        d
+    }
+
+    /// Build a Mach-O 64-bit object with a weak function symbol `_weak_fn`.
+    fn macho_object_with_weak_symbol() -> Vec<u8> {
+        let mut d = minimal_macho_object();
+        // Patch nlist_64 n_desc to N_WEAK_DEF (0x0080)
+        // nlist_64: n_strx(4) + n_type(1) + n_sect(1) + n_desc(2) + n_value(8)
+        // n_desc is at symtab_offset + 6 = 212 + 6 = 218
+        let n_desc_offset = 212 + 6;
+        d[n_desc_offset] = 0x80; // low byte of n_desc = 0x0080
+        d[n_desc_offset + 1] = 0x00;
+        // Also patch the string table to say "_weak_fn" instead of "_foo"
+        let strtab_offset = 228;
+        // Replace "\0_foo\0" with "\0_weak_fn\0" — need to extend
+        d.truncate(strtab_offset);
+        d.extend_from_slice(b"\0_weak_fn\0");
+        // Update strsize in LC_SYMTAB (at offset 0xCC = 204)
+        let new_strsize = 10u32; // "\0_weak_fn\0".len()
+        d[204..208].copy_from_slice(&new_strsize.to_le_bytes());
+        d
+    }
+
+    #[test]
+    fn macho_format_variants_serde() {
+        for fmt in [
+            ArtifactFormat::MachOObject,
+            ArtifactFormat::MachODylib,
+            ArtifactFormat::MachOStaticLibrary,
+        ] {
+            let json = serde_json::to_string(&fmt).unwrap();
+            let fmt2: ArtifactFormat = serde_json::from_str(&json).unwrap();
+            assert_eq!(fmt, fmt2);
+        }
+    }
+
+    #[test]
+    fn inspect_macho_object() {
+        let data = minimal_macho_object();
+        let inv = inspect_bytes(&data, "test.o".into()).unwrap();
+        assert_eq!(inv.format, ArtifactFormat::MachOObject);
+        // Leading '_' should be stripped
+        assert!(inv.has_symbol("foo"), "symbols: {:?}", inv.symbols);
+        assert!(!inv.has_symbol("_foo"), "underscore should be stripped");
+        assert_eq!(inv.function_names(), vec!["foo"]);
+    }
+
+    #[test]
+    fn macho_symbol_visibility_and_binding() {
+        let data = minimal_macho_object();
+        let inv = inspect_bytes(&data, "test.o".into()).unwrap();
+        let sym = inv.symbols.iter().find(|s| s.name == "foo").unwrap();
+        assert_eq!(sym.visibility, SymbolVisibility::Default);
+        assert_eq!(sym.binding, SymbolBinding::Global);
+        assert!(sym.is_function);
+    }
+
+    #[test]
+    fn macho_weak_symbol_detected() {
+        let data = macho_object_with_weak_symbol();
+        let inv = inspect_bytes(&data, "test.o".into()).unwrap();
+        let sym = inv.symbols.iter().find(|s| s.name == "weak_fn").unwrap();
+        assert_eq!(sym.binding, SymbolBinding::Weak);
+        assert!(sym.is_function);
+    }
+
+    #[test]
+    fn macho_section_name() {
+        let data = minimal_macho_object();
+        let inv = inspect_bytes(&data, "test.o".into()).unwrap();
+        let sym = inv.symbols.iter().find(|s| s.name == "foo").unwrap();
+        assert_eq!(sym.section.as_deref(), Some("__text"));
+    }
 
     #[test]
     fn symbol_inventory_has_symbol() {
