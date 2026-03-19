@@ -21,6 +21,13 @@ struct FolLayout {
 }
 
 #[derive(Debug, Deserialize)]
+struct FolAbiSensitiveBindingInput {
+    schema_version: u32,
+    items: Vec<Value>,
+    layouts: Vec<FolLayout>,
+}
+
+#[derive(Debug, Deserialize)]
 struct FolNativeBundle {
     package: FolNativePackage,
     validation: FolValidationReport,
@@ -102,6 +109,27 @@ fn fol_acceptance_binding_scan_flow_stays_consumable() {
     assert!(consumed.items.iter().any(|item| item.get("TypeAlias").is_some()));
     assert!(consumed.layouts.iter().any(|layout| layout.name == "struct packed_flags" && layout.size > 0));
     assert!(consumed.layouts.iter().any(|layout| layout.name == "enum widget_mode" && layout.size > 0));
+}
+
+#[test]
+fn fol_acceptance_layout_backed_binding_flow_stays_consumable() {
+    let header =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/fixtures/typedef_layout_bridge.h");
+    let result = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .probe_type_layout("widget_t")
+        .probe_type_layout("mode_t")
+        .process()
+        .unwrap();
+
+    let json = serde_json::to_string(&result.package).unwrap();
+    let consumed: FolAbiSensitiveBindingInput = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(consumed.schema_version, bic::SCHEMA_VERSION);
+    assert!(consumed.items.iter().any(|item| item.get("TypeAlias").is_some()));
+    assert!(consumed.items.iter().any(|item| item.get("Variable").is_some()));
+    assert!(consumed.layouts.iter().any(|layout| layout.name == "widget_t" && layout.size > 0));
+    assert!(consumed.layouts.iter().any(|layout| layout.name == "mode_t" && layout.size > 0));
 }
 
 #[test]
