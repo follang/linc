@@ -21,3 +21,4 @@
 - [Stable Usage Patterns](./190_stable_usage_patterns.md)
 - [`fol` Integration Guide](./200_fol_integration.md)
 - [Macro Semantics](./210_macro_semantics.md)
+- [Support Tiers](./220_support_tiers.md)
