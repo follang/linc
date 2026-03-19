@@ -9,4 +9,5 @@
 - [Link Surface](./070_link_surface.md)
 - [Macros And Layouts](./080_macros_and_layouts.md)
 - [Validation](./090_validation.md)
+- [API Contract](./100_api_contract.md)
 - [End-To-End Workflows](./110_workflows.md)

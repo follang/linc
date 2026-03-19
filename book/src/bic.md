@@ -100,11 +100,13 @@ If you are new to the repository, read the book in this order:
 5. Link Surface
 6. Symbol Inventories
 7. Validation
-8. End-to-End Workflows
+8. API Contract
+9. End-to-End Workflows
 
 If you only want to integrate `bic` into another tool, focus on:
 
 - [Header Processing](./020_headers.md)
 - [IR Model](./030_ir.md)
 - [Link Surface](./070_link_surface.md)
+- [API Contract](./100_api_contract.md)
 - [End-to-End Workflows](./110_workflows.md)

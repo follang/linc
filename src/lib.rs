@@ -1,3 +1,67 @@
+//! `bic` is a library crate for C interop analysis.
+//!
+//! The crate root is the preferred public entry point for downstream users.
+//! The goal is to keep common workflows available from the root while allowing
+//! advanced consumers to opt into lower-level modules when necessary.
+//!
+//! # Public API Tiers
+//!
+//! The current library surface is intentionally split into practical stability tiers.
+//! This is a documentation contract first; later slices in `PLAN.md` will tighten
+//! that contract further.
+//!
+//! ## Preferred Root-Level API
+//!
+//! New downstream users should start with these root-level APIs:
+//!
+//! - [`HeaderConfig`] for raw-header scanning
+//! - [`PreprocessedInput`] for already-preprocessed source
+//! - [`BindingPackage`] and the other re-exported IR types for serialized machine contracts
+//! - [`to_json`] and [`from_json`] for JSON transport
+//! - [`probe_type_layouts`] for compiler-assisted ABI layout probing
+//! - [`inspect_symbols`] for native artifact inventory when the `symbols` feature is enabled
+//! - [`validate`] and [`validate_many`] for declaration-vs-artifact validation when the
+//!   `symbols` feature is enabled
+//! - [`emit_rust_ffi`] for baseline Rust FFI emission when the `codegen` feature is enabled
+//!
+//! These root-level APIs are the intended long-term consumer surface.
+//!
+//! ## Advanced But Less Stable Module APIs
+//!
+//! The following modules are public because they are useful, but downstream users
+//! should treat them as more implementation-shaped than the root-level contract:
+//!
+//! - [`extract`]
+//! - [`probe`]
+//! - [`raw_headers`]
+//! - [`symbols`]
+//! - [`validate`]
+//!
+//! They are suitable for advanced integrations, but they are not yet as curated
+//! as the crate-root re-exports.
+//!
+//! ## Implementation-Oriented Modules
+//!
+//! These modules are public today but should be treated as lower-level support surfaces:
+//!
+//! - [`diagnostics`]
+//! - [`error`]
+//! - [`ir`]
+//! - [`line_markers`]
+//! - [`preprocess`]
+//!
+//! Downstream users may use them, but should prefer the crate-root re-exports and
+//! higher-level entry points unless they have a specific need for module-level control.
+//!
+//! # Library Usage Guidance
+//!
+//! `bic` is intentionally a library, not an executable product. The recommended
+//! usage pattern is:
+//!
+//! 1. produce a [`BindingPackage`] by scanning headers or parsing preprocessed input
+//! 2. optionally enrich the package with layout evidence or symbol inventories
+//! 3. serialize and hand the resulting values to downstream build/generation tooling
+//!
 pub mod diagnostics;
 pub mod error;
 pub mod extract;
