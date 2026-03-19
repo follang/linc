@@ -28,3 +28,4 @@
 - [Cross-Repo Versioning](./260_cross_repo_versioning.md)
 - [Reproducibility](./270_reproducibility.md)
 - [Link Resolution Boundary](./280_link_resolution_boundary.md)
+- [Release Checklist](./290_release_checklist.md)
