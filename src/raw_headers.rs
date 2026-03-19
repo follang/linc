@@ -1426,6 +1426,39 @@ mod tests {
     }
 
     #[test]
+    fn parse_macro_regression_fixture_preserves_real_library_style_macros() {
+        let macros = parse_macro_definitions(include_str!(
+            "../test/contracts/macro_regression_fixture.txt"
+        ));
+
+        assert!(macros.iter().any(|m| {
+            m.name == "ZLIB_VERSION"
+                && m.category == MacroCategory::BindableConstant
+                && m.value == Some(MacroValue::String("1.3.1".into()))
+        }));
+        assert!(macros.iter().any(|m| {
+            m.name == "PNG_LIBPNG_VER_STRING"
+                && m.category == MacroCategory::BindableConstant
+                && m.value == Some(MacroValue::String("1.6.43".into()))
+        }));
+        assert!(macros.iter().any(|m| {
+            m.name == "PNG_SETJMP_SUPPORTED"
+                && m.category == MacroCategory::ConfigurationFlag
+                && m.value == Some(MacroValue::Integer(1))
+        }));
+        assert!(macros.iter().any(|m| {
+            m.name == "PNGAPI"
+                && m.category == MacroCategory::AbiAffecting
+                && m.form == MacroForm::ObjectLike
+        }));
+        assert!(macros.iter().any(|m| {
+            m.name == "PNG_UNUSED"
+                && m.category == MacroCategory::Unsupported
+                && m.form == MacroForm::FunctionLike
+        }));
+    }
+
+    #[test]
     fn flavor_to_pac_conversion() {
         assert_eq!(Flavor::GnuC11.to_pac(), pac::driver::Flavor::GnuC11);
         assert_eq!(Flavor::ClangC11.to_pac(), pac::driver::Flavor::ClangC11);
