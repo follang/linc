@@ -122,6 +122,10 @@ pub struct RoutineAbiEvidence {
     pub expected_parameter_count: Option<usize>,
     #[serde(default)]
     pub observed_parameter_count: Option<usize>,
+    #[serde(default)]
+    pub expected_return_size: Option<u64>,
+    #[serde(default)]
+    pub observed_return_size: Option<u64>,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -228,6 +232,7 @@ pub fn validate_many(
                 None,
                 Some(FunctionAbiHint {
                     parameter_count: Some(f.parameters.len()),
+                    return_size: expected_abi_size(package, &f.return_type),
                 }),
             ),
             BindingItem::Variable(v) => (
@@ -365,22 +370,42 @@ pub fn validate_many(
             None
         };
         let routine_abi = if status == MatchStatus::Matched && expect_function {
-            function_hint
+            let expected_hint = function_hint.as_ref();
+            let observed_hint = candidates
+                .first()
+                .and_then(|(_, symbol)| symbol.function_abi.as_ref());
+            let parameter_count = expected_hint
                 .and_then(|expected| expected.parameter_count)
-                .zip(
-                    candidates
-                        .first()
-                        .and_then(|(_, symbol)| symbol.function_abi.as_ref())
-                        .and_then(|observed| observed.parameter_count),
-                )
-                .map(|(expected_parameter_count, observed_parameter_count)| {
-                    any_abi_shape_evidence = true;
-                    if expected_parameter_count != observed_parameter_count {
+                .zip(observed_hint.and_then(|observed| observed.parameter_count));
+            let return_size = expected_hint
+                .and_then(|expected| expected.return_size)
+                .zip(observed_hint.and_then(|observed| observed.return_size));
+            if parameter_count.is_some() || return_size.is_some() {
+                any_abi_shape_evidence = true;
+            }
+            parameter_count
+                .or_else(|| return_size.map(|_| (0, 0)))
+                .map(|_| {
+                    if parameter_count
+                        .is_some_and(|(expected_parameter_count, observed_parameter_count)| {
+                            expected_parameter_count != observed_parameter_count
+                        })
+                        || return_size
+                            .is_some_and(|(expected_return_size, observed_return_size)| {
+                                expected_return_size != observed_return_size
+                            })
+                    {
                         status = MatchStatus::AbiShapeMismatch;
                     }
                     RoutineAbiEvidence {
-                        expected_parameter_count: Some(expected_parameter_count),
-                        observed_parameter_count: Some(observed_parameter_count),
+                        expected_parameter_count: parameter_count
+                            .map(|(expected_parameter_count, _)| expected_parameter_count),
+                        observed_parameter_count: parameter_count
+                            .map(|(_, observed_parameter_count)| observed_parameter_count),
+                        expected_return_size: return_size
+                            .map(|(expected_return_size, _)| expected_return_size),
+                        observed_return_size: return_size
+                            .map(|(_, observed_return_size)| observed_return_size),
                     }
                 })
         } else {
@@ -1331,6 +1356,7 @@ mod tests {
                 archive_member: None,
                 function_abi: Some(FunctionAbiHint {
                     parameter_count: Some(2),
+                    return_size: Some(4),
                 }),
             }],
         };
@@ -1365,6 +1391,8 @@ mod tests {
             Some(RoutineAbiEvidence {
                 expected_parameter_count: Some(2),
                 observed_parameter_count: Some(2),
+                expected_return_size: Some(4),
+                observed_return_size: Some(4),
             })
         );
         assert!(report.phases[2].completed);
@@ -1397,6 +1425,7 @@ mod tests {
                 archive_member: None,
                 function_abi: Some(FunctionAbiHint {
                     parameter_count: Some(1),
+                    return_size: Some(4),
                 }),
             }],
         };
@@ -1432,9 +1461,69 @@ mod tests {
             Some(RoutineAbiEvidence {
                 expected_parameter_count: Some(2),
                 observed_parameter_count: Some(1),
+                expected_return_size: Some(4),
+                observed_return_size: Some(4),
             })
         );
         assert!(report.phases[2].completed);
+    }
+
+    #[test]
+    fn function_return_size_mismatch_is_reported_as_abi_shape_mismatch() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "status".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: Some(".text".into()),
+                archive_member: None,
+                function_abi: Some(FunctionAbiHint {
+                    parameter_count: Some(0),
+                    return_size: Some(8),
+                }),
+            }],
+        };
+        let pkg = BindingPackage {
+            source_path: None,
+            items: vec![BindingItem::Function(FunctionBinding {
+                name: "status".into(),
+                calling_convention: CallingConvention::C,
+                parameters: Vec::new(),
+                return_type: BindingType::Int,
+                variadic: false,
+                source_offset: None,
+            })],
+            diagnostics: Vec::new(),
+            ..BindingPackage::new()
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::AbiShapeMismatch);
+        assert_eq!(
+            report.entries[0].evidence.routine_abi,
+            Some(RoutineAbiEvidence {
+                expected_parameter_count: Some(0),
+                observed_parameter_count: Some(0),
+                expected_return_size: Some(4),
+                observed_return_size: Some(8),
+            })
+        );
     }
 
     #[test]

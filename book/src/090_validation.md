@@ -82,8 +82,11 @@ For variable declarations, `Matched` may now carry positive ABI-shape evidence w
 can compare an observed symbol size against an inferred expected size.
 
 For function declarations, `Matched` may now also carry positive routine ABI evidence when
-the provider inventory exposes a conservative parameter-count hint and that count agrees with
-the extracted declaration.
+the provider inventory exposes conservative routine hints and they agree with the extracted
+declaration. Today that starts with:
+
+- parameter count
+- primitive return-size shape where both sides expose a trustworthy size
 
 ### `AbiShapeMismatch`
 
@@ -94,7 +97,8 @@ This is intentionally limited today:
 
 - it only applies where artifact metadata exposes a usable size
 - it only applies where `bic` can infer an expected size conservatively
-- routine checks currently start with parameter-count evidence rather than full signature proof
+- routine checks are still conservative: they currently cover parameter count and primitive
+  return-size shape, not full calling-convention or register-level proof
 
 ### `Missing`
 

@@ -90,6 +90,8 @@ fn default_symbol_direction() -> SymbolDirection {
 pub struct FunctionAbiHint {
     #[serde(default)]
     pub parameter_count: Option<usize>,
+    #[serde(default)]
+    pub return_size: Option<u64>,
 }
 
 /// One discovered symbol entry.
