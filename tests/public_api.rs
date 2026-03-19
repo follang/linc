@@ -211,6 +211,8 @@ fn routine_abi_evidence_root_type_roundtrip() {
         observed_parameter_count: Some(2),
         expected_return_size: Some(4),
         observed_return_size: Some(4),
+        expected_parameter_sizes: vec![Some(4), Some(4)],
+        observed_parameter_sizes: vec![Some(4), Some(4)],
     };
     let json = serde_json::to_string(&evidence).unwrap();
     let decoded: RoutineAbiEvidence = serde_json::from_str(&json).unwrap();

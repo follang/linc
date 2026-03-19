@@ -126,6 +126,10 @@ pub struct RoutineAbiEvidence {
     pub expected_return_size: Option<u64>,
     #[serde(default)]
     pub observed_return_size: Option<u64>,
+    #[serde(default)]
+    pub expected_parameter_sizes: Vec<Option<u64>>,
+    #[serde(default)]
+    pub observed_parameter_sizes: Vec<Option<u64>>,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -233,6 +237,11 @@ pub fn validate_many(
                 Some(FunctionAbiHint {
                     parameter_count: Some(f.parameters.len()),
                     return_size: expected_abi_size(package, &f.return_type),
+                    parameter_sizes: f
+                        .parameters
+                        .iter()
+                        .map(|parameter| expected_abi_size(package, &parameter.ty))
+                        .collect(),
                 }),
             ),
             BindingItem::Variable(v) => (
@@ -380,11 +389,29 @@ pub fn validate_many(
             let return_size = expected_hint
                 .and_then(|expected| expected.return_size)
                 .zip(observed_hint.and_then(|observed| observed.return_size));
+            let parameter_sizes = match (expected_hint, observed_hint) {
+                (Some(expected), Some(observed))
+                    if !expected.parameter_sizes.is_empty()
+                        && expected.parameter_sizes.len() == observed.parameter_sizes.len()
+                        && expected.parameter_sizes.iter().any(|size| size.is_some())
+                        && observed.parameter_sizes.iter().any(|size| size.is_some()) =>
+                {
+                    Some((
+                        expected.parameter_sizes.clone(),
+                        observed.parameter_sizes.clone(),
+                    ))
+                }
+                _ => None,
+            };
             if parameter_count.is_some() || return_size.is_some() {
+                any_abi_shape_evidence = true;
+            }
+            if parameter_sizes.is_some() {
                 any_abi_shape_evidence = true;
             }
             parameter_count
                 .or_else(|| return_size.map(|_| (0, 0)))
+                .or_else(|| parameter_sizes.as_ref().map(|_| (0, 0)))
                 .map(|_| {
                     if parameter_count
                         .is_some_and(|(expected_parameter_count, observed_parameter_count)| {
@@ -394,6 +421,18 @@ pub fn validate_many(
                             .is_some_and(|(expected_return_size, observed_return_size)| {
                                 expected_return_size != observed_return_size
                             })
+                        || parameter_sizes.as_ref().is_some_and(|(expected, observed)| {
+                            expected
+                                .iter()
+                                .zip(observed.iter())
+                                .any(|(expected_size, observed_size)| {
+                                    expected_size
+                                        .zip(*observed_size)
+                                        .is_some_and(|(expected_size, observed_size)| {
+                                            expected_size != observed_size
+                                        })
+                                })
+                        })
                     {
                         status = MatchStatus::AbiShapeMismatch;
                     }
@@ -406,6 +445,14 @@ pub fn validate_many(
                             .map(|(expected_return_size, _)| expected_return_size),
                         observed_return_size: return_size
                             .map(|(_, observed_return_size)| observed_return_size),
+                        expected_parameter_sizes: parameter_sizes
+                            .as_ref()
+                            .map(|(expected, _)| expected.clone())
+                            .unwrap_or_default(),
+                        observed_parameter_sizes: parameter_sizes
+                            .as_ref()
+                            .map(|(_, observed)| observed.clone())
+                            .unwrap_or_default(),
                     }
                 })
         } else {
@@ -1357,6 +1404,7 @@ mod tests {
                 function_abi: Some(FunctionAbiHint {
                     parameter_count: Some(2),
                     return_size: Some(4),
+                    parameter_sizes: vec![Some(4), Some(4)],
                 }),
             }],
         };
@@ -1393,6 +1441,8 @@ mod tests {
                 observed_parameter_count: Some(2),
                 expected_return_size: Some(4),
                 observed_return_size: Some(4),
+                expected_parameter_sizes: vec![Some(4), Some(4)],
+                observed_parameter_sizes: vec![Some(4), Some(4)],
             })
         );
         assert!(report.phases[2].completed);
@@ -1426,6 +1476,7 @@ mod tests {
                 function_abi: Some(FunctionAbiHint {
                     parameter_count: Some(1),
                     return_size: Some(4),
+                    parameter_sizes: vec![Some(4)],
                 }),
             }],
         };
@@ -1463,6 +1514,8 @@ mod tests {
                 observed_parameter_count: Some(1),
                 expected_return_size: Some(4),
                 observed_return_size: Some(4),
+                expected_parameter_sizes: Vec::new(),
+                observed_parameter_sizes: Vec::new(),
             })
         );
         assert!(report.phases[2].completed);
@@ -1496,6 +1549,7 @@ mod tests {
                 function_abi: Some(FunctionAbiHint {
                     parameter_count: Some(0),
                     return_size: Some(8),
+                    parameter_sizes: Vec::new(),
                 }),
             }],
         };
@@ -1522,6 +1576,78 @@ mod tests {
                 observed_parameter_count: Some(0),
                 expected_return_size: Some(4),
                 observed_return_size: Some(8),
+                expected_parameter_sizes: Vec::new(),
+                observed_parameter_sizes: Vec::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn function_parameter_size_mismatch_is_reported_as_abi_shape_mismatch() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "mix".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: Some(".text".into()),
+                archive_member: None,
+                function_abi: Some(FunctionAbiHint {
+                    parameter_count: Some(2),
+                    return_size: Some(4),
+                    parameter_sizes: vec![Some(4), Some(8)],
+                }),
+            }],
+        };
+        let pkg = BindingPackage {
+            source_path: None,
+            items: vec![BindingItem::Function(FunctionBinding {
+                name: "mix".into(),
+                calling_convention: CallingConvention::C,
+                parameters: vec![
+                    ParameterBinding {
+                        name: Some("left".into()),
+                        ty: BindingType::Int,
+                    },
+                    ParameterBinding {
+                        name: Some("right".into()),
+                        ty: BindingType::Float,
+                    },
+                ],
+                return_type: BindingType::Int,
+                variadic: false,
+                source_offset: None,
+            })],
+            diagnostics: Vec::new(),
+            ..BindingPackage::new()
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::AbiShapeMismatch);
+        assert_eq!(
+            report.entries[0].evidence.routine_abi,
+            Some(RoutineAbiEvidence {
+                expected_parameter_count: Some(2),
+                observed_parameter_count: Some(2),
+                expected_return_size: Some(4),
+                observed_return_size: Some(4),
+                expected_parameter_sizes: vec![Some(4), Some(4)],
+                observed_parameter_sizes: vec![Some(4), Some(8)],
             })
         );
     }

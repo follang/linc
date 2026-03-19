@@ -87,6 +87,7 @@ declaration. Today that starts with:
 
 - parameter count
 - primitive return-size shape where both sides expose a trustworthy size
+- by-value parameter-size shape where both sides expose trustworthy sizes
 
 ### `AbiShapeMismatch`
 
@@ -97,8 +98,9 @@ This is intentionally limited today:
 
 - it only applies where artifact metadata exposes a usable size
 - it only applies where `bic` can infer an expected size conservatively
-- routine checks are still conservative: they currently cover parameter count and primitive
-  return-size shape, not full calling-convention or register-level proof
+- routine checks are still conservative: they currently cover parameter count, primitive
+  return-size shape, and by-value parameter-size shape, not full calling-convention or
+  register-level proof
 
 ### `Missing`
 

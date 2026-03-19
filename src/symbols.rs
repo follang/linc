@@ -92,6 +92,8 @@ pub struct FunctionAbiHint {
     pub parameter_count: Option<usize>,
     #[serde(default)]
     pub return_size: Option<u64>,
+    #[serde(default)]
+    pub parameter_sizes: Vec<Option<u64>>,
 }
 
 /// One discovered symbol entry.
