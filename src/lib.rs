@@ -62,6 +62,30 @@
 //! 2. optionally enrich the package with layout evidence or symbol inventories
 //! 3. serialize and hand the resulting values to downstream build/generation tooling
 //!
+//! # Current Error-Surface Inventory
+//!
+//! The long-term goal is a fully typed public error surface built around [`BicError`].
+//! That work is not complete yet.
+//!
+//! Today, the remaining public APIs that still return `Result<_, String>` are:
+//!
+//! - [`extract_from_source`]
+//! - [`probe_type_layouts`]
+//! - [`HeaderConfig::process`]
+//! - [`inspect_symbols`]
+//!
+//! Those APIs are still usable, but downstream users should treat their exact error
+//! strings as transitional rather than a stable matching contract.
+//!
+//! The preferred stability boundary today is:
+//!
+//! - typed data structures on success
+//! - diagnostics carried in returned packages and reports
+//! - `BicError` for JSON and schema transport concerns
+//!
+//! Future plan slices will convert the remaining string-based operational failures
+//! into typed crate errors.
+//!
 pub mod diagnostics;
 pub mod error;
 pub mod extract;

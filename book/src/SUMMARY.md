@@ -12,3 +12,4 @@
 - [API Contract](./100_api_contract.md)
 - [End-To-End Workflows](./110_workflows.md)
 - [JSON Compatibility](./120_json_compatibility.md)
+- [Error Surface](./130_error_surface.md)
