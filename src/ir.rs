@@ -76,6 +76,16 @@ pub struct MacroBinding {
     pub value: Option<MacroValue>,
 }
 
+impl MacroBinding {
+    pub fn is_unsupported_function_like(&self) -> bool {
+        self.category == MacroCategory::Unsupported && self.form == MacroForm::FunctionLike
+    }
+
+    pub fn is_unsupported_object_like(&self) -> bool {
+        self.category == MacroCategory::Unsupported && self.form == MacroForm::ObjectLike
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypeLayout {
     pub name: String,
@@ -961,6 +971,33 @@ mod tests {
         assert_eq!(decoded[0].category, MacroCategory::BindableConstant);
         assert_eq!(decoded[0].form, MacroForm::ObjectLike);
         assert_eq!(decoded[0].value, None);
+    }
+
+    #[test]
+    fn macro_binding_distinguishes_unsupported_forms() {
+        let function_like = MacroBinding {
+            name: "LOG".into(),
+            body: "fmt".into(),
+            function_like: true,
+            form: MacroForm::FunctionLike,
+            kind: MacroKind::Other,
+            category: MacroCategory::Unsupported,
+            value: None,
+        };
+        let object_like = MacroBinding {
+            name: "INTERNAL_SENTINEL".into(),
+            body: "((void*)0)".into(),
+            function_like: false,
+            form: MacroForm::ObjectLike,
+            kind: MacroKind::Other,
+            category: MacroCategory::Unsupported,
+            value: None,
+        };
+
+        assert!(function_like.is_unsupported_function_like());
+        assert!(!function_like.is_unsupported_object_like());
+        assert!(object_like.is_unsupported_object_like());
+        assert!(!object_like.is_unsupported_function_like());
     }
 
     #[test]

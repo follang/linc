@@ -67,6 +67,13 @@ The first stable rule is:
 
 That means a macro being captured does not automatically make it a good codegen target.
 
+For unsupported macros specifically, consumers can now distinguish:
+
+- unsupported function-like macros
+- unsupported object-like macros
+
+That matters because those two cases often need different fallback handling in generators.
+
 ## Consumer Guidance
 
 For now, downstream consumers should:
