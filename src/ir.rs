@@ -62,10 +62,28 @@ pub enum LinkLibraryKind {
     Dynamic,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LinkResolutionMode {
+    #[default]
+    Default,
+    PreferStatic,
+    PreferDynamic,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LinkRequirementSource {
+    #[default]
+    Declared,
+    Inferred,
+    Discovered,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LinkLibrary {
     pub name: String,
     pub kind: LinkLibraryKind,
+    #[serde(default)]
+    pub source: LinkRequirementSource,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,10 +97,14 @@ pub enum LinkArtifactKind {
 pub struct LinkArtifact {
     pub path: String,
     pub kind: LinkArtifactKind,
+    #[serde(default)]
+    pub source: LinkRequirementSource,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BindingLinkSurface {
+    #[serde(default)]
+    pub preferred_mode: LinkResolutionMode,
     #[serde(default)]
     pub include_paths: Vec<String>,
     #[serde(default)]
@@ -425,15 +447,18 @@ mod tests {
             align: 8,
         }];
         pkg.link = BindingLinkSurface {
+            preferred_mode: LinkResolutionMode::PreferDynamic,
             include_paths: vec!["/usr/include".into()],
             library_paths: vec!["/usr/lib".into()],
             libraries: vec![LinkLibrary {
                 name: "z".into(),
                 kind: LinkLibraryKind::Dynamic,
+                source: LinkRequirementSource::Declared,
             }],
             artifacts: vec![LinkArtifact {
                 path: "/usr/lib/libz.so".into(),
                 kind: LinkArtifactKind::SharedLibrary,
+                source: LinkRequirementSource::Discovered,
             }],
         };
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
@@ -590,31 +615,54 @@ mod tests {
     #[test]
     fn link_library_serialization_roundtrip() {
         let link = BindingLinkSurface {
+            preferred_mode: LinkResolutionMode::PreferStatic,
             include_paths: vec!["include".into()],
             library_paths: vec!["lib".into()],
             libraries: vec![
                 LinkLibrary {
                     name: "ssl".into(),
                     kind: LinkLibraryKind::Default,
+                    source: LinkRequirementSource::Declared,
                 },
                 LinkLibrary {
                     name: "crypto".into(),
                     kind: LinkLibraryKind::Static,
+                    source: LinkRequirementSource::Inferred,
                 },
             ],
             artifacts: vec![
                 LinkArtifact {
                     path: "libssl.a".into(),
                     kind: LinkArtifactKind::StaticLibrary,
+                    source: LinkRequirementSource::Discovered,
                 },
                 LinkArtifact {
                     path: "plugin.o".into(),
                     kind: LinkArtifactKind::Object,
+                    source: LinkRequirementSource::Declared,
                 },
             ],
         };
         let json = serde_json::to_string(&link).unwrap();
         let decoded: BindingLinkSurface = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, link);
+    }
+
+    #[test]
+    fn binding_link_surface_defaults_on_old_json() {
+        let json = r#"{
+            "include_paths": ["include"],
+            "library_paths": ["lib"],
+            "libraries": [
+                { "name": "ssl", "kind": "Dynamic" }
+            ],
+            "artifacts": [
+                { "path": "native/libssl.so", "kind": "SharedLibrary" }
+            ]
+        }"#;
+        let decoded: BindingLinkSurface = serde_json::from_str(json).unwrap();
+        assert_eq!(decoded.preferred_mode, LinkResolutionMode::Default);
+        assert_eq!(decoded.libraries[0].source, LinkRequirementSource::Declared);
+        assert_eq!(decoded.artifacts[0].source, LinkRequirementSource::Declared);
     }
 }

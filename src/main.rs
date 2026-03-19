@@ -87,6 +87,12 @@ fn run_scan(args: &[String]) -> Result<(), String> {
                 i += 1;
                 cfg = cfg.flavor(parse_header_flavor(required_value(args, i, "--flavor")?)?);
             }
+            "--prefer-static" => {
+                cfg = cfg.prefer_static_linking();
+            }
+            "--prefer-dynamic" => {
+                cfg = cfg.prefer_dynamic_linking();
+            }
             "--probe-type" => {
                 i += 1;
                 cfg = cfg.probe_type_layout(required_value(args, i, "--probe-type")?);
@@ -356,6 +362,8 @@ fn usage() -> String {
         "  --link-shared-artifact <path>",
         "  --compiler <cmd>",
         "  --flavor <gnu|clang|std>",
+        "  --prefer-static",
+        "  --prefer-dynamic",
         "  --probe-type <name>",
         "  --no-origin-filter",
         "",

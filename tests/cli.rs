@@ -67,6 +67,7 @@ fn cli_scan_emits_inputs_and_link_metadata() {
             "build/plugin.o",
             "--link-static-artifact",
             "lib/libcrypto.a",
+            "--prefer-static",
             "--probe-type",
             "value_t",
             "--no-origin-filter",
@@ -81,9 +82,12 @@ fn cli_scan_emits_inputs_and_link_metadata() {
     assert_eq!(json["inputs"]["entry_headers"].as_array().unwrap().len(), 1);
     assert_eq!(json["inputs"]["include_dirs"][0], dir.to_str().unwrap());
     assert_eq!(json["link"]["library_paths"][0], dir.to_str().unwrap());
+    assert_eq!(json["link"]["preferred_mode"], "PreferStatic");
     assert_eq!(json["link"]["libraries"][0]["name"], "m");
+    assert_eq!(json["link"]["libraries"][0]["source"], "Declared");
     assert_eq!(json["link"]["artifacts"][0]["path"], "build/plugin.o");
     assert_eq!(json["link"]["artifacts"][0]["kind"], "Object");
+    assert_eq!(json["link"]["artifacts"][0]["source"], "Declared");
     assert_eq!(json["link"]["artifacts"][1]["path"], "lib/libcrypto.a");
     assert_eq!(json["link"]["artifacts"][1]["kind"], "StaticLibrary");
     assert!(json["macros"]
@@ -228,13 +232,18 @@ fn cli_link_plan_emits_link_surface_json() {
             "inputs": {},
             "macros": [],
             "link": {
+                "preferred_mode": "PreferDynamic",
                 "include_paths": ["include"],
                 "library_paths": ["lib"],
                 "libraries": [
-                    { "name": "ssl", "kind": "Dynamic" }
+                    { "name": "ssl", "kind": "Dynamic", "source": "Inferred" }
                 ],
                 "artifacts": [
-                    { "path": "native/libcrypto.a", "kind": "StaticLibrary" }
+                    {
+                        "path": "native/libcrypto.a",
+                        "kind": "StaticLibrary",
+                        "source": "Discovered"
+                    }
                 ]
             },
             "source_path": "api.h",
@@ -254,12 +263,15 @@ fn cli_link_plan_emits_link_surface_json() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["preferred_mode"], "PreferDynamic");
     assert_eq!(json["include_paths"][0], "include");
     assert_eq!(json["library_paths"][0], "lib");
     assert_eq!(json["libraries"][0]["name"], "ssl");
     assert_eq!(json["libraries"][0]["kind"], "Dynamic");
+    assert_eq!(json["libraries"][0]["source"], "Inferred");
     assert_eq!(json["artifacts"][0]["path"], "native/libcrypto.a");
     assert_eq!(json["artifacts"][0]["kind"], "StaticLibrary");
+    assert_eq!(json["artifacts"][0]["source"], "Discovered");
 
     std::fs::remove_dir_all(&dir).ok();
 }

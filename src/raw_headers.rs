@@ -6,7 +6,8 @@ use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::extract::Extractor;
 use crate::ir::{
     BindingDefine, BindingInputs, BindingLinkSurface, BindingPackage, BindingTarget, LinkArtifact,
-    LinkArtifactKind, LinkLibrary, LinkLibraryKind, MacroBinding, MacroKind,
+    LinkArtifactKind, LinkLibrary, LinkLibraryKind, LinkRequirementSource, LinkResolutionMode,
+    MacroBinding, MacroKind,
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
 use crate::probe::probe_type_layouts;
@@ -19,6 +20,7 @@ pub struct HeaderConfig {
     pub defines: Vec<(String, Option<String>)>,
     pub link_libraries: Vec<LinkLibrary>,
     pub link_artifacts: Vec<LinkArtifact>,
+    pub preferred_link_mode: LinkResolutionMode,
     pub probe_types: Vec<String>,
     pub compiler: Option<String>,
     pub flavor: Option<Flavor>,
@@ -65,6 +67,7 @@ impl HeaderConfig {
             defines: Vec::new(),
             link_libraries: Vec::new(),
             link_artifacts: Vec::new(),
+            preferred_link_mode: LinkResolutionMode::Default,
             probe_types: Vec::new(),
             compiler: None,
             flavor: None,
@@ -96,6 +99,7 @@ impl HeaderConfig {
         self.link_libraries.push(LinkLibrary {
             name: name.into(),
             kind: LinkLibraryKind::Default,
+            source: LinkRequirementSource::Declared,
         });
         self
     }
@@ -104,6 +108,7 @@ impl HeaderConfig {
         self.link_libraries.push(LinkLibrary {
             name: name.into(),
             kind: LinkLibraryKind::Static,
+            source: LinkRequirementSource::Declared,
         });
         self
     }
@@ -112,6 +117,7 @@ impl HeaderConfig {
         self.link_libraries.push(LinkLibrary {
             name: name.into(),
             kind: LinkLibraryKind::Dynamic,
+            source: LinkRequirementSource::Declared,
         });
         self
     }
@@ -120,6 +126,7 @@ impl HeaderConfig {
         self.link_artifacts.push(LinkArtifact {
             path: path.into().display().to_string(),
             kind: LinkArtifactKind::Object,
+            source: LinkRequirementSource::Declared,
         });
         self
     }
@@ -128,6 +135,7 @@ impl HeaderConfig {
         self.link_artifacts.push(LinkArtifact {
             path: path.into().display().to_string(),
             kind: LinkArtifactKind::StaticLibrary,
+            source: LinkRequirementSource::Declared,
         });
         self
     }
@@ -136,7 +144,18 @@ impl HeaderConfig {
         self.link_artifacts.push(LinkArtifact {
             path: path.into().display().to_string(),
             kind: LinkArtifactKind::SharedLibrary,
+            source: LinkRequirementSource::Declared,
         });
+        self
+    }
+
+    pub fn prefer_static_linking(mut self) -> Self {
+        self.preferred_link_mode = LinkResolutionMode::PreferStatic;
+        self
+    }
+
+    pub fn prefer_dynamic_linking(mut self) -> Self {
+        self.preferred_link_mode = LinkResolutionMode::PreferDynamic;
         self
     }
 
@@ -346,6 +365,7 @@ impl HeaderConfig {
 
     fn binding_link_surface(&self) -> BindingLinkSurface {
         BindingLinkSurface {
+            preferred_mode: self.preferred_link_mode,
             include_paths: self
                 .include_dirs
                 .iter()
@@ -543,6 +563,7 @@ mod tests {
             .link_object_file("build/plugin.o")
             .link_static_artifact("native/libfoo.a")
             .link_shared_artifact("native/libfoo.so")
+            .prefer_static_linking()
             .probe_type_layout("struct foo")
             .compiler("gcc")
             .flavor(Flavor::GnuC11);
@@ -553,6 +574,7 @@ mod tests {
         assert_eq!(cfg.defines.len(), 2);
         assert_eq!(cfg.link_libraries.len(), 3);
         assert_eq!(cfg.link_artifacts.len(), 3);
+        assert_eq!(cfg.preferred_link_mode, LinkResolutionMode::PreferStatic);
         assert_eq!(cfg.probe_types.len(), 1);
         assert_eq!(cfg.compiler.as_deref(), Some("gcc"));
         assert_eq!(cfg.flavor, Some(Flavor::GnuC11));
@@ -575,6 +597,7 @@ mod tests {
             .define("FOO", Some("1".into()))
             .link_shared_lib("ssl")
             .link_shared_artifact("/usr/local/lib/libssl.so")
+            .prefer_dynamic_linking()
             .probe_type_layout("size_t");
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -584,6 +607,7 @@ mod tests {
         assert_eq!(cfg2.library_dirs.len(), 1);
         assert_eq!(cfg2.link_libraries.len(), 1);
         assert_eq!(cfg2.link_artifacts.len(), 1);
+        assert_eq!(cfg2.preferred_link_mode, LinkResolutionMode::PreferDynamic);
         assert_eq!(cfg2.probe_types.len(), 1);
     }
 
@@ -620,6 +644,7 @@ mod tests {
             .define("FOO", Some("1".into()))
             .link_static_lib("crypto")
             .link_static_artifact("lib/libcrypto.a")
+            .prefer_static_linking()
             .probe_type_layout("struct widget");
 
         let target = cfg.binding_target();
@@ -633,12 +658,15 @@ mod tests {
         assert_eq!(inputs.defines.len(), 1);
         assert_eq!(link.include_paths, vec!["include".to_string()]);
         assert_eq!(link.library_paths, vec!["lib".to_string()]);
+        assert_eq!(link.preferred_mode, LinkResolutionMode::PreferStatic);
         assert_eq!(link.libraries.len(), 1);
         assert_eq!(link.libraries[0].name, "crypto");
         assert_eq!(link.libraries[0].kind, LinkLibraryKind::Static);
+        assert_eq!(link.libraries[0].source, LinkRequirementSource::Declared);
         assert_eq!(link.artifacts.len(), 1);
         assert_eq!(link.artifacts[0].path, "lib/libcrypto.a");
         assert_eq!(link.artifacts[0].kind, LinkArtifactKind::StaticLibrary);
+        assert_eq!(link.artifacts[0].source, LinkRequirementSource::Declared);
         assert_eq!(cfg.probe_types, vec!["struct widget".to_string()]);
     }
 
