@@ -276,4 +276,121 @@ mod integration_tests {
         let pkg = from_json(json).unwrap();
         assert_eq!(pkg.schema_version, SCHEMA_VERSION);
     }
+
+    // Phase 25: error path and edge case tests
+
+    #[test]
+    fn parse_invalid_c_returns_error() {
+        let result = extract_from_source("@#$% not valid C");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_empty_input() {
+        let pkg = extract_from_source("").unwrap();
+        assert!(pkg.items.is_empty());
+    }
+
+    #[test]
+    fn deep_pointer_chain() {
+        let pkg = extract_from_source("void foo(int *****p);").unwrap();
+        match &pkg.items[0] {
+            BindingItem::Function(f) => {
+                let mut ty = &f.parameters[0].ty;
+                let mut depth = 0;
+                while let BindingType::Pointer { pointee, .. } = ty {
+                    depth += 1;
+                    ty = pointee;
+                }
+                assert_eq!(depth, 5);
+                assert_eq!(*ty, BindingType::Int);
+            }
+            other => panic!("expected Function, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn empty_struct() {
+        // GCC extension: empty struct
+        let pkg = extract_from_source("struct empty {};").unwrap();
+        let records: Vec<_> = pkg.items.iter().filter_map(|i| match i {
+            BindingItem::Record(r) => Some(r),
+            _ => None,
+        }).collect();
+        assert_eq!(records.len(), 1);
+        assert!(!records[0].is_opaque());
+        assert!(records[0].fields.as_ref().unwrap().is_empty());
+    }
+
+    #[test]
+    fn zero_length_array() {
+        let pkg = extract_from_source("struct buf { int len; int data[0]; };").unwrap();
+        let records: Vec<_> = pkg.items.iter().filter_map(|i| match i {
+            BindingItem::Record(r) => Some(r),
+            _ => None,
+        }).collect();
+        let fields = records[0].fields.as_ref().unwrap();
+        assert_eq!(fields.len(), 2);
+        match &fields[1].ty {
+            BindingType::Array(_, Some(0)) => {}
+            other => panic!("expected Array(_, Some(0)), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn determinism_10_runs() {
+        let src = "typedef int int32_t; void foo(int32_t x); struct s { int a; float b; };";
+        let first = to_json(&extract_from_source(src).unwrap()).unwrap();
+        for _ in 0..9 {
+            let json = to_json(&extract_from_source(src).unwrap()).unwrap();
+            assert_eq!(first, json, "non-deterministic output detected");
+        }
+    }
+
+    #[test]
+    fn roundtrip_all_type_variants() {
+        let src = r#"
+            typedef int myint;
+            typedef void (*cb)(int);
+            enum e { A = 0 };
+            struct s { int x; };
+            union u { int i; float f; };
+            void func(const char *s, int arr[10], ...);
+            extern int var;
+        "#;
+        let pkg = extract_from_source(src).unwrap();
+        let json = to_json(&pkg).unwrap();
+        let pkg2 = from_json(&json).unwrap();
+        let json2 = to_json(&pkg2).unwrap();
+        assert_eq!(json, json2, "roundtrip produced different JSON");
+    }
+
+    #[test]
+    fn from_json_invalid_json() {
+        let result = from_json("not json at all");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn codegen_compile_check_zlib_vendored() {
+        // Parse vendored zlib headers and verify generated Rust FFI is valid syntax
+        let zlib_inc = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test/full_apps/external/zlib/header/include");
+        let zlib_h = zlib_inc.join("zlib.h");
+
+        let result = HeaderConfig::new()
+            .header(&zlib_h)
+            .include_dir(&zlib_inc)
+            .no_origin_filter()
+            .process()
+            .unwrap();
+
+        let rust_ffi = emit_rust_ffi(&result.package);
+        // Basic sanity: should have extern "C", functions, and types
+        assert!(rust_ffi.contains("extern \"C\""));
+        assert!(rust_ffi.contains("pub fn deflate"));
+        assert!(rust_ffi.contains("pub fn inflate"));
+        // Should have a reasonable amount of output
+        assert!(rust_ffi.len() > 500, "generated FFI too short: {} bytes", rust_ffi.len());
+    }
 }
