@@ -97,3 +97,7 @@ This chapter sets the semantic policy before those richer representations arrive
 The regression suite now also carries a checked-in macro fixture with real-library-style constant,
 configuration, ABI-affecting, and function-like forms so classification changes stay pinned to
 representative native headers.
+
+For downstream auditing, `BindingPackage.effective_macro_environment` now exposes the filtered
+configuration/ABI-affecting subset directly, along with whatever provenance evidence was captured
+for those macros.

@@ -9,8 +9,8 @@ use crate::ir::{
     BindingDefine, BindingInputs, BindingItem, BindingItemKind, BindingLinkSurface,
     BindingPackage, BindingTarget, DeclarationProvenance, LinkArtifact, LinkArtifactKind,
     LinkFramework, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource,
-    LinkResolutionMode, MacroBinding, MacroCategory, MacroForm, MacroKind, MacroProvenance,
-    MacroValue, NativeSurfaceKind,
+    LinkResolutionMode, MacroBinding, MacroCategory, MacroEnvironmentEntry, MacroForm, MacroKind,
+    MacroProvenance, MacroValue, NativeSurfaceKind,
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
 use crate::probe::probe_type_layouts;
@@ -595,6 +595,8 @@ impl HeaderConfig {
                     .map(|p| p.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
+                let effective_macro_environment =
+                    build_effective_macro_environment(&macros, &macro_provenance);
 
                 let mut package = BindingPackage {
                     source_path: Some(source_desc),
@@ -602,6 +604,7 @@ impl HeaderConfig {
                     inputs: self.binding_inputs(),
                     macros,
                     macro_provenance,
+                    effective_macro_environment,
                     link: self.binding_link_surface(),
                     items,
                     diagnostics,
@@ -868,6 +871,32 @@ fn build_item_provenance(
                 source_offset,
                 source_origin: source_offset.map(|offset| origin_map.origin_at(offset)),
                 source_location: source_offset.and_then(|offset| origin_map.location_at(offset)),
+            }
+        })
+        .collect()
+}
+
+fn build_effective_macro_environment(
+    macros: &[MacroBinding],
+    provenance: &[MacroProvenance],
+) -> Vec<MacroEnvironmentEntry> {
+    macros
+        .iter()
+        .enumerate()
+        .filter(|(_, binding)| {
+            matches!(
+                binding.category,
+                MacroCategory::ConfigurationFlag | MacroCategory::AbiAffecting
+            )
+        })
+        .map(|(index, binding)| {
+            let provenance = provenance.get(index);
+            MacroEnvironmentEntry {
+                macro_name: binding.name.clone(),
+                category: binding.category.clone(),
+                value: binding.value.clone(),
+                source_origin: provenance.and_then(|prov| prov.source_origin.clone()),
+                source_location: provenance.and_then(|prov| prov.source_location.clone()),
             }
         })
         .collect()
@@ -1746,6 +1775,17 @@ int compute(int x);
             .any(|prov| prov.macro_name == "API_LEVEL"
                 && prov.source_origin == Some(crate::SourceOrigin::Entry)
                 && prov.source_location.is_some()));
+        assert!(result
+            .package
+            .effective_macro_environment
+            .iter()
+            .any(|entry| entry.macro_name == "HAVE_ZLIB"
+                && entry.category == MacroCategory::ConfigurationFlag));
+        assert!(!result
+            .package
+            .effective_macro_environment
+            .iter()
+            .any(|entry| entry.macro_name == "API_NAME"));
 
         cleanup(&dir);
     }

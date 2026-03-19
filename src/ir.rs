@@ -117,6 +117,19 @@ pub struct MacroProvenance {
     pub source_location: Option<SourceLocation>,
 }
 
+/// Filtered macro environment entry intended for ABI/configuration auditing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MacroEnvironmentEntry {
+    pub macro_name: String,
+    pub category: MacroCategory,
+    #[serde(default)]
+    pub value: Option<MacroValue>,
+    #[serde(default)]
+    pub source_origin: Option<SourceOrigin>,
+    #[serde(default)]
+    pub source_location: Option<SourceLocation>,
+}
+
 /// Compiler-probed layout evidence for a named type.
 ///
 /// Invariant: `name` is the consumer-visible identity key and `size`/`align` are only present when
@@ -263,6 +276,8 @@ pub struct BindingPackage {
     pub provenance: Vec<DeclarationProvenance>,
     #[serde(default)]
     pub macro_provenance: Vec<MacroProvenance>,
+    #[serde(default)]
+    pub effective_macro_environment: Vec<MacroEnvironmentEntry>,
     pub source_path: Option<String>,
     pub items: Vec<BindingItem>,
     pub diagnostics: Vec<Diagnostic>,
@@ -288,6 +303,7 @@ impl BindingPackage {
             link: BindingLinkSurface::default(),
             provenance: Vec::new(),
             macro_provenance: Vec::new(),
+            effective_macro_environment: Vec::new(),
             source_path: None,
             items: Vec::new(),
             diagnostics: Vec::new(),
@@ -669,6 +685,7 @@ mod tests {
         assert_eq!(pkg.link, BindingLinkSurface::default());
         assert!(pkg.provenance.is_empty());
         assert!(pkg.macro_provenance.is_empty());
+        assert!(pkg.effective_macro_environment.is_empty());
     }
 
     #[test]
