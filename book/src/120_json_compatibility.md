@@ -107,6 +107,38 @@ For `fol` specifically, this means:
 - the package should be treated as a versioned data contract
 - any new relied-on field should be documented explicitly before it becomes part of the stable integration contract
 
+## Producer Guidance
+
+If a library or build step produces `BindingPackage` JSON for other tools, it should:
+
+1. preserve `schema_version` exactly
+2. treat additive/defaultable fields as the preferred way to evolve the payload
+3. avoid changing the meaning of an existing field without explicit schema review
+4. avoid using `bic_version` as a substitute for wire compatibility
+5. keep compatibility fixtures in sync with any newly relied-on field
+
+This matters because the producer side can break consumers long before deserialization fails.
+
+## Recommended Consumer Posture
+
+The safest downstream posture is:
+
+- reject payloads whose `schema_version` is newer than the consumer understands
+- accept older payloads only when missing data is intentionally defaultable
+- rely on documented container semantics first
+- treat newer additive metadata as optional until it is explicitly required by the integration contract
+
+## Additive Evolution Checklist
+
+Before a new field becomes part of the practical contract, ask:
+
+1. can older payloads omit it safely?
+2. does it have a clear default meaning?
+3. would an older consumer misinterpret the payload if it ignored this field?
+4. does downstream tooling plan to rely on it immediately?
+
+If the answer to item 3 is yes, the change is probably not just additive growth.
+
 ## Current Limitations
 
 This compatibility policy is still early.

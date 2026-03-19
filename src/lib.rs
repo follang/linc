@@ -139,6 +139,12 @@
 //! - `SCHEMA_VERSION` intentionally remains `1` for now because recent changes have been
 //!   additive/defaultable rather than a reviewed breaking wire-format step
 //!
+//! Producer/consumer compatibility expectations are:
+//!
+//! - producers should prefer additive, defaultable growth over silent semantic rewrites
+//! - consumers should gate compatibility on `schema_version`, not `bic_version`
+//! - future schema versions should be rejected rather than guessed at
+//!
 //! # Current Failure Model
 //!
 //! The library currently distinguishes three kinds of outcomes:
