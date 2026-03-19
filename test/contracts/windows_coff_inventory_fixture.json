@@ -1,12 +1,10 @@
 {
   "artifact_path": "demo.lib",
-  "format": {
-    "Unknown": "coff-object-fixture"
-  },
-  "platform": "Unknown",
+  "format": "CoffObject",
+  "platform": "Windows",
   "kind": "Object",
   "capabilities": {
-    "exports_symbols": false,
+    "exports_symbols": true,
     "imports_symbols": false
   },
   "dependency_edges": [],
@@ -14,6 +12,7 @@
     {
       "name": "demo_init",
       "raw_name": "_demo_init@4",
+      "direction": "Exported",
       "visibility": "Unknown",
       "is_function": true,
       "binding": "Unknown",

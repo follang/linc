@@ -12,8 +12,8 @@ not the same claim.
 | header scanning | usable | usable with Apple-specific link metadata support | limited by missing Windows-native completion work |
 | macro capture | usable | usable | mostly compiler-dependent, not yet fully characterized |
 | layout probing | usable with GCC/Clang-style toolchains | usable with Clang-style toolchains | not yet a completed support target |
-| symbol inventory | usable | partial but present | not production-ready |
-| validation | usable where symbol inventory is usable | partial | not production-ready |
+| symbol inventory | usable | partial but present | present for COFF objects, import libraries, and PE binaries, but still not production-ready |
+| validation | usable where symbol inventory is usable | partial | limited; supported inventory classes are tested but the Windows linker model is still incomplete |
 | link-surface metadata | usable | usable, including frameworks | partial, especially around Windows-native link forms |
 
 ## What "Usable" Means Here
@@ -74,15 +74,24 @@ Windows-native artifact support should currently be read as incomplete.
 
 That means downstream consumers should not yet assume:
 
-- import-library inspection parity
+- full import-library inspection parity
 - robust decoration handling across Windows-native conventions
 - production-ready validation against the Windows linker model
 
 This is a roadmap gap, not just a documentation gap.
 
-The regression corpus now also carries checked-in platform artifact fixtures for Linux and macOS,
-plus an explicit Windows-gap fixture. That gives downstream consumers a stable contract snapshot
-for the current support boundary even before full COFF/PE inventory support lands.
+What is now explicitly covered:
+
+- COFF object inventory classification
+- Windows import-library classification
+- PE executable / PE dynamic-library inventory classification
+- checked-in Windows artifact fixture coverage
+
+What is still not done:
+
+- deep ABI-aware Windows validation
+- loader/forwarder completeness
+- production-grade decoration and provider-resolution behavior across the whole Windows toolchain surface
 
 ## Recommended Production Posture
 

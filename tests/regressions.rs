@@ -186,16 +186,14 @@ fn regression_macos_artifact_fixture_stays_consumable() {
 }
 
 #[test]
-fn regression_windows_artifact_gap_fixture_stays_consumable() {
+fn regression_windows_artifact_fixture_stays_consumable() {
     let inventory: SymbolInventory = serde_json::from_str(include_str!(
         "../test/contracts/windows_coff_inventory_fixture.json"
     ))
     .unwrap();
-    assert_eq!(inventory.platform, ArtifactPlatform::Unknown);
-    assert_eq!(
-        inventory.format,
-        ArtifactFormat::Unknown("coff-object-fixture".into())
-    );
+    assert_eq!(inventory.platform, ArtifactPlatform::Windows);
+    assert_eq!(inventory.format, ArtifactFormat::CoffObject);
+    assert!(inventory.capabilities.exports_symbols);
     assert_eq!(inventory.symbols[0].raw_name.as_deref(), Some("_demo_init@4"));
 }
 

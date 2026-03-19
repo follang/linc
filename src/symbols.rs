@@ -1151,6 +1151,77 @@ mod tests {
     }
 
     #[test]
+    fn windows_coff_pe_support_matrix_formats_roundtrip() {
+        for fmt in [
+            ArtifactFormat::CoffObject,
+            ArtifactFormat::CoffImportLibrary,
+            ArtifactFormat::PeExecutable,
+            ArtifactFormat::PeDynamicLibrary,
+        ] {
+            let json = serde_json::to_string(&fmt).unwrap();
+            let parsed: ArtifactFormat = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, fmt);
+        }
+    }
+
+    #[test]
+    fn windows_coff_pe_support_matrix_capabilities_match_expectations() {
+        let cases = [
+            (
+                ArtifactFormat::CoffObject,
+                ArtifactKind::Object,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+            ),
+            (
+                ArtifactFormat::CoffImportLibrary,
+                ArtifactKind::ImportLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: false,
+                    imports_symbols: true,
+                },
+            ),
+            (
+                ArtifactFormat::PeExecutable,
+                ArtifactKind::Executable,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+            ),
+            (
+                ArtifactFormat::PeDynamicLibrary,
+                ArtifactKind::SharedLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+            ),
+        ];
+
+        for (format, kind, capabilities) in cases {
+            let inv = SymbolInventory {
+                artifact_path: format!("{:?}", format),
+                format,
+                platform: ArtifactPlatform::Windows,
+                kind,
+                capabilities,
+                dependency_edges: Vec::new(),
+                symbols: Vec::new(),
+            };
+
+            assert_eq!(inv.platform, ArtifactPlatform::Windows);
+            assert_eq!(inv.capabilities.exports_symbols, inv.kind != ArtifactKind::ImportLibrary);
+            assert_eq!(
+                inv.capabilities.imports_symbols,
+                inv.kind != ArtifactKind::Object
+            );
+        }
+    }
+
+    #[test]
     fn inspect_nonexistent_file() {
         let result = inspect_file("/nonexistent/path.o");
         assert!(matches!(result.unwrap_err(), BicError::SymbolRead { .. }));
