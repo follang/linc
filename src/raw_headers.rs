@@ -118,8 +118,26 @@ impl HeaderConfig {
         self
     }
 
+    pub fn headers<I, P>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<PathBuf>,
+    {
+        self.entry_headers.extend(paths.into_iter().map(Into::into));
+        self
+    }
+
     pub fn include_dir(mut self, path: impl Into<PathBuf>) -> Self {
         self.include_dirs.push(path.into());
+        self
+    }
+
+    pub fn include_dirs<I, P>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<PathBuf>,
+    {
+        self.include_dirs.extend(paths.into_iter().map(Into::into));
         self
     }
 
@@ -128,13 +146,41 @@ impl HeaderConfig {
         self
     }
 
+    pub fn framework_dirs<I, P>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<PathBuf>,
+    {
+        self.framework_dirs.extend(paths.into_iter().map(Into::into));
+        self
+    }
+
     pub fn library_dir(mut self, path: impl Into<PathBuf>) -> Self {
         self.library_dirs.push(path.into());
         self
     }
 
+    pub fn library_dirs<I, P>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: Into<PathBuf>,
+    {
+        self.library_dirs.extend(paths.into_iter().map(Into::into));
+        self
+    }
+
     pub fn define(mut self, name: impl Into<String>, value: Option<String>) -> Self {
         self.defines.push((name.into(), value));
+        self
+    }
+
+    pub fn defines<I, N>(mut self, defines: I) -> Self
+    where
+        I: IntoIterator<Item = (N, Option<String>)>,
+        N: Into<String>,
+    {
+        self.defines
+            .extend(defines.into_iter().map(|(name, value)| (name.into(), value)));
         self
     }
 
@@ -236,8 +282,27 @@ impl HeaderConfig {
         self
     }
 
+    pub fn target_constraints<I, S>(mut self, constraints: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.platform_constraints
+            .extend(constraints.into_iter().map(Into::into));
+        self
+    }
+
     pub fn probe_type_layout(mut self, name: impl Into<String>) -> Self {
         self.probe_types.push(name.into());
+        self
+    }
+
+    pub fn probe_type_layouts<I, S>(mut self, names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.probe_types.extend(names.into_iter().map(Into::into));
         self
     }
 
@@ -761,6 +826,56 @@ mod tests {
         assert_eq!(cfg2.preferred_link_mode, LinkResolutionMode::PreferDynamic);
         assert_eq!(cfg2.platform_constraints, vec!["macos".to_string()]);
         assert_eq!(cfg2.probe_types.len(), 1);
+    }
+
+    #[test]
+    fn bulk_config_builders_append_in_declared_order() {
+        let cfg = HeaderConfig::new()
+            .headers(["a.h", "b.h"])
+            .include_dirs(["/usr/include", "/usr/local/include"])
+            .framework_dirs(["/System/Library/Frameworks", "/Library/Frameworks"])
+            .library_dirs(["/usr/lib", "/usr/local/lib"])
+            .defines([
+                ("DEBUG", None),
+                ("VERSION", Some("2".to_string())),
+            ])
+            .target_constraints(["linux", "x86_64"])
+            .probe_type_layouts(["size_t", "struct stat"]);
+
+        assert_eq!(
+            cfg.entry_headers,
+            vec![PathBuf::from("a.h"), PathBuf::from("b.h")]
+        );
+        assert_eq!(
+            cfg.include_dirs,
+            vec![PathBuf::from("/usr/include"), PathBuf::from("/usr/local/include")]
+        );
+        assert_eq!(
+            cfg.framework_dirs,
+            vec![
+                PathBuf::from("/System/Library/Frameworks"),
+                PathBuf::from("/Library/Frameworks")
+            ]
+        );
+        assert_eq!(
+            cfg.library_dirs,
+            vec![PathBuf::from("/usr/lib"), PathBuf::from("/usr/local/lib")]
+        );
+        assert_eq!(
+            cfg.defines,
+            vec![
+                ("DEBUG".to_string(), None),
+                ("VERSION".to_string(), Some("2".to_string()))
+            ]
+        );
+        assert_eq!(
+            cfg.platform_constraints,
+            vec!["linux".to_string(), "x86_64".to_string()]
+        );
+        assert_eq!(
+            cfg.probe_types,
+            vec!["size_t".to_string(), "struct stat".to_string()]
+        );
     }
 
     #[test]
