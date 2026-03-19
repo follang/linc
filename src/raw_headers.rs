@@ -4,14 +4,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::extract::Extractor;
-use crate::ir::BindingPackage;
+use crate::ir::{
+    BindingDefine, BindingInputs, BindingLinkSurface, BindingPackage, BindingTarget, LinkLibrary,
+    LinkLibraryKind,
+};
 use crate::line_markers::{FileOriginMap, OriginFilter};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderConfig {
     pub entry_headers: Vec<PathBuf>,
     pub include_dirs: Vec<PathBuf>,
+    pub library_dirs: Vec<PathBuf>,
     pub defines: Vec<(String, Option<String>)>,
+    pub link_libraries: Vec<LinkLibrary>,
     pub compiler: Option<String>,
     pub flavor: Option<Flavor>,
     #[serde(skip)]
@@ -53,7 +58,9 @@ impl HeaderConfig {
         Self {
             entry_headers: Vec::new(),
             include_dirs: Vec::new(),
+            library_dirs: Vec::new(),
             defines: Vec::new(),
+            link_libraries: Vec::new(),
             compiler: None,
             flavor: None,
             origin_filter: Some(OriginFilter::default()),
@@ -70,8 +77,37 @@ impl HeaderConfig {
         self
     }
 
+    pub fn library_dir(mut self, path: impl Into<PathBuf>) -> Self {
+        self.library_dirs.push(path.into());
+        self
+    }
+
     pub fn define(mut self, name: impl Into<String>, value: Option<String>) -> Self {
         self.defines.push((name.into(), value));
+        self
+    }
+
+    pub fn link_lib(mut self, name: impl Into<String>) -> Self {
+        self.link_libraries.push(LinkLibrary {
+            name: name.into(),
+            kind: LinkLibraryKind::Default,
+        });
+        self
+    }
+
+    pub fn link_static_lib(mut self, name: impl Into<String>) -> Self {
+        self.link_libraries.push(LinkLibrary {
+            name: name.into(),
+            kind: LinkLibraryKind::Static,
+        });
+        self
+    }
+
+    pub fn link_shared_lib(mut self, name: impl Into<String>) -> Self {
+        self.link_libraries.push(LinkLibrary {
+            name: name.into(),
+            kind: LinkLibraryKind::Dynamic,
+        });
         self
     }
 
@@ -143,6 +179,9 @@ impl HeaderConfig {
 
                 let mut package = BindingPackage {
                     source_path: Some(source_desc),
+                    target: self.binding_target(),
+                    inputs: self.binding_inputs(),
+                    link: self.binding_link_surface(),
                     items,
                     diagnostics,
                     ..BindingPackage::new()
@@ -232,12 +271,108 @@ impl HeaderConfig {
         }
     }
 
+    fn binding_target(&self) -> BindingTarget {
+        let compiler_command = self.compiler_command();
+        BindingTarget {
+            target_triple: detect_target_triple(&compiler_command),
+            compiler_command: Some(compiler_command.clone()),
+            compiler_version: detect_compiler_version(&compiler_command),
+            flavor: Some(self.flavor_label()),
+        }
+    }
+
+    fn binding_inputs(&self) -> BindingInputs {
+        BindingInputs {
+            entry_headers: self
+                .entry_headers
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect(),
+            include_dirs: self
+                .include_dirs
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect(),
+            defines: self
+                .defines
+                .iter()
+                .map(|(name, value)| BindingDefine {
+                    name: name.clone(),
+                    value: value.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    fn binding_link_surface(&self) -> BindingLinkSurface {
+        BindingLinkSurface {
+            include_paths: self
+                .include_dirs
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect(),
+            library_paths: self
+                .library_dirs
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect(),
+            libraries: self.link_libraries.clone(),
+        }
+    }
+
     fn describe_invocation(&self, config: &pac::driver::Config, input: &Path) -> (String, Vec<String>) {
         let command = config.cpp_command.clone();
         let mut args = config.cpp_options.clone();
         args.push(input.display().to_string());
         (command, args)
     }
+
+    fn compiler_command(&self) -> String {
+        let flavor = self.flavor.unwrap_or(Flavor::GnuC11);
+        self.compiler
+            .clone()
+            .unwrap_or_else(|| match flavor {
+                Flavor::ClangC11 => "clang".into(),
+                _ => "gcc".into(),
+            })
+    }
+
+    fn flavor_label(&self) -> String {
+        match self.flavor.unwrap_or(Flavor::GnuC11) {
+            Flavor::GnuC11 => "gnu-c11".into(),
+            Flavor::ClangC11 => "clang-c11".into(),
+            Flavor::StdC11 => "std-c11".into(),
+        }
+    }
+}
+
+fn detect_target_triple(compiler_command: &str) -> Option<String> {
+    let output = std::process::Command::new(compiler_command)
+        .arg("-dumpmachine")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let triple = String::from_utf8(output.stdout).ok()?;
+    let triple = triple.trim();
+    if triple.is_empty() {
+        None
+    } else {
+        Some(triple.to_string())
+    }
+}
+
+fn detect_compiler_version(compiler_command: &str) -> Option<String> {
+    let output = std::process::Command::new(compiler_command)
+        .arg("--version")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    stdout.lines().next().map(str::to_string).filter(|line| !line.is_empty())
 }
 
 impl Default for HeaderConfig {
@@ -269,14 +404,20 @@ mod tests {
         let cfg = HeaderConfig::new()
             .header("foo.h")
             .include_dir("/usr/include")
+            .library_dir("/usr/lib")
             .define("DEBUG", None)
             .define("VERSION", Some("2".into()))
+            .link_lib("m")
+            .link_static_lib("z")
+            .link_shared_lib("ssl")
             .compiler("gcc")
             .flavor(Flavor::GnuC11);
 
         assert_eq!(cfg.entry_headers.len(), 1);
         assert_eq!(cfg.include_dirs.len(), 1);
+        assert_eq!(cfg.library_dirs.len(), 1);
         assert_eq!(cfg.defines.len(), 2);
+        assert_eq!(cfg.link_libraries.len(), 3);
         assert_eq!(cfg.compiler.as_deref(), Some("gcc"));
         assert_eq!(cfg.flavor, Some(Flavor::GnuC11));
     }
@@ -294,12 +435,16 @@ mod tests {
         let cfg = HeaderConfig::new()
             .header("test.h")
             .include_dir("/usr/local/include")
-            .define("FOO", Some("1".into()));
+            .library_dir("/usr/local/lib")
+            .define("FOO", Some("1".into()))
+            .link_shared_lib("ssl");
 
         let json = serde_json::to_string(&cfg).unwrap();
         let cfg2: HeaderConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(cfg2.entry_headers.len(), 1);
         assert_eq!(cfg2.defines.len(), 1);
+        assert_eq!(cfg2.library_dirs.len(), 1);
+        assert_eq!(cfg2.link_libraries.len(), 1);
     }
 
     #[test]
@@ -327,6 +472,31 @@ mod tests {
     }
 
     #[test]
+    fn binding_metadata_from_config_keeps_scan_and_link_inputs() {
+        let cfg = HeaderConfig::new()
+            .header("api.h")
+            .include_dir("include")
+            .library_dir("lib")
+            .define("FOO", Some("1".into()))
+            .link_static_lib("crypto");
+
+        let target = cfg.binding_target();
+        let inputs = cfg.binding_inputs();
+        let link = cfg.binding_link_surface();
+
+        assert_eq!(target.compiler_command.as_deref(), Some("gcc"));
+        assert_eq!(target.flavor.as_deref(), Some("gnu-c11"));
+        assert_eq!(inputs.entry_headers, vec!["api.h".to_string()]);
+        assert_eq!(inputs.include_dirs, vec!["include".to_string()]);
+        assert_eq!(inputs.defines.len(), 1);
+        assert_eq!(link.include_paths, vec!["include".to_string()]);
+        assert_eq!(link.library_paths, vec!["lib".to_string()]);
+        assert_eq!(link.libraries.len(), 1);
+        assert_eq!(link.libraries[0].name, "crypto");
+        assert_eq!(link.libraries[0].kind, LinkLibraryKind::Static);
+    }
+
+    #[test]
     fn flavor_to_pac_conversion() {
         assert_eq!(Flavor::GnuC11.to_pac(), pac::driver::Flavor::GnuC11);
         assert_eq!(Flavor::ClangC11.to_pac(), pac::driver::Flavor::ClangC11);
@@ -347,6 +517,8 @@ mod tests {
 
         assert!(!result.report.command.is_empty());
         assert!(!result.report.preprocessed_source.is_empty());
+        assert_eq!(result.package.inputs.entry_headers.len(), 1);
+        assert_eq!(result.package.target.compiler_command.as_deref(), Some("gcc"));
 
         let funcs: Vec<_> = result.package.items.iter().filter_map(|i| match i {
             BindingItem::Function(f) => Some(f),

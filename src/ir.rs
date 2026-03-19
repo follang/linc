@@ -4,12 +4,59 @@ use crate::diagnostics::Diagnostic;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct BindingTarget {
+    pub target_triple: Option<String>,
+    pub compiler_command: Option<String>,
+    pub compiler_version: Option<String>,
+    pub flavor: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BindingDefine {
+    pub name: String,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct BindingInputs {
+    pub entry_headers: Vec<String>,
+    pub include_dirs: Vec<String>,
+    pub defines: Vec<BindingDefine>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LinkLibraryKind {
+    Default,
+    Static,
+    Dynamic,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LinkLibrary {
+    pub name: String,
+    pub kind: LinkLibraryKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct BindingLinkSurface {
+    pub include_paths: Vec<String>,
+    pub library_paths: Vec<String>,
+    pub libraries: Vec<LinkLibrary>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindingPackage {
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
     #[serde(default = "default_bic_version")]
     pub bic_version: String,
+    #[serde(default)]
+    pub target: BindingTarget,
+    #[serde(default)]
+    pub inputs: BindingInputs,
+    #[serde(default)]
+    pub link: BindingLinkSurface,
     pub source_path: Option<String>,
     pub items: Vec<BindingItem>,
     pub diagnostics: Vec<Diagnostic>,
@@ -28,6 +75,9 @@ impl BindingPackage {
         Self {
             schema_version: SCHEMA_VERSION,
             bic_version: env!("CARGO_PKG_VERSION").to_string(),
+            target: BindingTarget::default(),
+            inputs: BindingInputs::default(),
+            link: BindingLinkSurface::default(),
             source_path: None,
             items: Vec::new(),
             diagnostics: Vec::new(),
@@ -225,6 +275,9 @@ mod tests {
         assert!(pkg.items.is_empty());
         assert!(pkg.diagnostics.is_empty());
         assert!(pkg.source_path.is_none());
+        assert_eq!(pkg.target, BindingTarget::default());
+        assert_eq!(pkg.inputs, BindingInputs::default());
+        assert_eq!(pkg.link, BindingLinkSurface::default());
     }
 
     #[test]
@@ -290,6 +343,28 @@ mod tests {
     fn ir_serialization_roundtrip() {
         let mut pkg = BindingPackage::new();
         pkg.source_path = Some("test.h".into());
+        pkg.target = BindingTarget {
+            target_triple: Some("x86_64-unknown-linux-gnu".into()),
+            compiler_command: Some("gcc".into()),
+            compiler_version: Some("gcc (GCC) 13.2.0".into()),
+            flavor: Some("gnu-c11".into()),
+        };
+        pkg.inputs = BindingInputs {
+            entry_headers: vec!["test.h".into()],
+            include_dirs: vec!["/usr/include".into()],
+            defines: vec![BindingDefine {
+                name: "DEBUG".into(),
+                value: Some("1".into()),
+            }],
+        };
+        pkg.link = BindingLinkSurface {
+            include_paths: vec!["/usr/include".into()],
+            library_paths: vec!["/usr/lib".into()],
+            libraries: vec![LinkLibrary {
+                name: "z".into(),
+                kind: LinkLibraryKind::Dynamic,
+            }],
+        };
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "size_t".into(),
             target: BindingType::ULong,
@@ -310,6 +385,21 @@ mod tests {
         let json = serde_json::to_string_pretty(&pkg).unwrap();
         let pkg2: BindingPackage = serde_json::from_str(&json).unwrap();
         assert_eq!(pkg, pkg2);
+    }
+
+    #[test]
+    fn binding_package_defaults_on_old_json() {
+        let json = r#"{
+            "schema_version": 1,
+            "bic_version": "0.1.0",
+            "source_path": "legacy.h",
+            "items": [],
+            "diagnostics": []
+        }"#;
+        let pkg: BindingPackage = serde_json::from_str(json).unwrap();
+        assert_eq!(pkg.target, BindingTarget::default());
+        assert_eq!(pkg.inputs, BindingInputs::default());
+        assert_eq!(pkg.link, BindingLinkSurface::default());
     }
 
     #[test]
@@ -369,5 +459,26 @@ mod tests {
             BindingType::Pointer { const_pointee, .. } => assert!(const_pointee),
             _ => panic!("expected pointer"),
         }
+    }
+
+    #[test]
+    fn link_library_serialization_roundtrip() {
+        let link = BindingLinkSurface {
+            include_paths: vec!["include".into()],
+            library_paths: vec!["lib".into()],
+            libraries: vec![
+                LinkLibrary {
+                    name: "ssl".into(),
+                    kind: LinkLibraryKind::Default,
+                },
+                LinkLibrary {
+                    name: "crypto".into(),
+                    kind: LinkLibraryKind::Static,
+                },
+            ],
+        };
+        let json = serde_json::to_string(&link).unwrap();
+        let decoded: BindingLinkSurface = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, link);
     }
 }
