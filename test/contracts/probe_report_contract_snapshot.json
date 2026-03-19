@@ -15,6 +15,7 @@
       "record_completeness": null,
       "enum_underlying_size": null,
       "enum_is_signed": null,
+      "fields": [],
       "layout": { "name": "size_t", "size": 8, "align": 8 }
     }
   ],

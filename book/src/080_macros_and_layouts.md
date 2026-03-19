@@ -117,6 +117,8 @@ Each `ProbeSubjectReport` keeps:
 - record completeness when the subject is a record
 - the measured `TypeLayout`
 
+For record subjects, `fields` may also preserve named field offsets as compiler-measured evidence.
+
 The older `layouts` array is still preserved as a flattened compatibility surface.
 
 Current confidence/completeness semantics are intentionally conservative:

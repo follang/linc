@@ -210,7 +210,7 @@ pub use link_plan::{
 pub use preprocess::PreprocessedInput;
 pub use probe::{
     probe_type_layouts, AbiProbeReport, ProbeConfidence, ProbeSubjectKind, ProbeSubjectReport,
-    RecordCompleteness,
+    ProbedFieldLayout, RecordCompleteness,
 };
 pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]

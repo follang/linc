@@ -15,6 +15,10 @@
       "record_completeness": "Complete",
       "enum_underlying_size": null,
       "enum_is_signed": null,
+      "fields": [
+        { "name": "a", "offset_bytes": 0 },
+        { "name": "b", "offset_bytes": 8 }
+      ],
       "layout": { "name": "struct widget", "size": 24, "align": 8 }
     },
     {
@@ -24,6 +28,7 @@
       "record_completeness": null,
       "enum_underlying_size": 4,
       "enum_is_signed": true,
+      "fields": [],
       "layout": { "name": "enum widget_mode", "size": 4, "align": 4 }
     }
   ],

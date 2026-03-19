@@ -2,8 +2,8 @@ use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     EvidenceKind, FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory,
     MacroForm, MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence,
-    ProbeSubjectKind, ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout,
-    ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
+    ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout, RecordCompleteness, TypeAliasBinding,
+    TypeLayout, ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
     ValidationPhaseReport, ValidationSummary, probe_type_layouts,
 };
 
@@ -103,6 +103,7 @@ fn abi_probe_report_root_types_roundtrip() {
             record_completeness: None,
             enum_underlying_size: None,
             enum_is_signed: None,
+            fields: Vec::new(),
             layout: TypeLayout {
                 name: "size_t".into(),
                 size: 8,
@@ -130,6 +131,10 @@ fn probe_subject_report_supports_record_completeness_metadata() {
         record_completeness: Some(RecordCompleteness::Complete),
         enum_underlying_size: None,
         enum_is_signed: None,
+        fields: vec![ProbedFieldLayout {
+            name: "x".into(),
+            offset_bytes: Some(0),
+        }],
         layout: TypeLayout {
             name: "struct widget".into(),
             size: 16,
@@ -151,6 +156,7 @@ fn probe_subject_report_supports_enum_representation_metadata() {
         record_completeness: None,
         enum_underlying_size: Some(4),
         enum_is_signed: Some(true),
+        fields: Vec::new(),
         layout: TypeLayout {
             name: "enum mode".into(),
             size: 4,

@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
+use pac::ast::TranslationUnit;
 use serde::{Deserialize, Serialize};
 
 use crate::error::BicError;
-use crate::ir::{BindingTarget, TypeLayout};
+use crate::extract::Extractor;
+use crate::ir::{BindingItem, BindingTarget, TypeLayout};
 use crate::raw_headers::{Flavor, HeaderConfig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,7 +37,16 @@ pub struct ProbeSubjectReport {
     pub enum_underlying_size: Option<u64>,
     #[serde(default)]
     pub enum_is_signed: Option<bool>,
+    #[serde(default)]
+    pub fields: Vec<ProbedFieldLayout>,
     pub layout: TypeLayout,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProbedFieldLayout {
+    pub name: String,
+    #[serde(default)]
+    pub offset_bytes: Option<u64>,
 }
 
 /// Result of an ABI layout probe run.
@@ -63,12 +74,13 @@ pub fn probe_type_layouts(
     }
 
     let compiler = compiler_command(config);
+    let field_specs = collect_record_field_specs(config);
     let temp_root = temp_probe_root();
     std::fs::create_dir_all(&temp_root)?;
     let source_path = temp_root.join("probe.c");
     let exe_path = temp_root.join("probe-bin");
 
-    std::fs::write(&source_path, build_probe_source(config, type_names))?;
+    std::fs::write(&source_path, build_probe_source(config, type_names, &field_specs))?;
 
     let mut compile = std::process::Command::new(&compiler);
     compile.arg("-std=c11");
@@ -134,6 +146,7 @@ pub fn probe_type_layouts(
             record_completeness: classify_record_completeness(type_name.as_ref()),
             enum_underlying_size: parsed.enum_underlying_size,
             enum_is_signed: parsed.enum_is_signed,
+            fields: parsed.fields.clone(),
             layout: parsed.layout.clone(),
         })
         .collect();
@@ -184,7 +197,11 @@ fn compiler_command(config: &HeaderConfig) -> String {
         })
 }
 
-fn build_probe_source(config: &HeaderConfig, type_names: &[impl AsRef<str>]) -> String {
+fn build_probe_source(
+    config: &HeaderConfig,
+    type_names: &[impl AsRef<str>],
+    field_specs: &std::collections::BTreeMap<String, Vec<String>>,
+) -> String {
     let mut source = String::from("#include <stdio.h>\n#include <stddef.h>\n");
     for header in &config.entry_headers {
         source.push_str(&format!("#include \"{}\"\n", header.display()));
@@ -195,13 +212,22 @@ fn build_probe_source(config: &HeaderConfig, type_names: &[impl AsRef<str>]) -> 
         let literal = c_string_literal(raw);
         match classify_probe_subject(raw) {
             ProbeSubjectKind::Enum => source.push_str(&format!(
-                "    printf(\"%s\\t%zu\\t%zu\\t%zu\\t%d\\n\", \"{}\", sizeof({}), _Alignof({}), sizeof({}), (({})-1) < (({})0) ? 1 : 0);\n",
+                "    printf(\"L\\t%s\\t%zu\\t%zu\\t%zu\\t%d\\n\", \"{}\", sizeof({}), _Alignof({}), sizeof({}), (({})-1) < (({})0) ? 1 : 0);\n",
                 literal, raw, raw, raw, raw, raw
             )),
             _ => source.push_str(&format!(
-                "    printf(\"%s\\t%zu\\t%zu\\t%s\\t%s\\n\", \"{}\", sizeof({}), _Alignof({}), \"-\", \"-\");\n",
+                "    printf(\"L\\t%s\\t%zu\\t%zu\\t%s\\t%s\\n\", \"{}\", sizeof({}), _Alignof({}), \"-\", \"-\");\n",
                 literal, raw, raw
             )),
+        }
+        if let Some(fields) = field_specs.get(raw) {
+            for field_name in fields {
+                let field_literal = c_string_literal(field_name);
+                source.push_str(&format!(
+                    "    printf(\"F\\t%s\\t%s\\t%zu\\n\", \"{}\", \"{}\", offsetof({}, {}));\n",
+                    literal, field_literal, raw, field_name
+                ));
+            }
         }
     }
     source.push_str("    return 0;\n}\n");
@@ -217,67 +243,241 @@ struct ParsedProbeLayout {
     layout: TypeLayout,
     enum_underlying_size: Option<u64>,
     enum_is_signed: Option<bool>,
+    fields: Vec<ProbedFieldLayout>,
 }
 
 fn parse_layout_output(stdout: &str) -> Result<Vec<ParsedProbeLayout>, BicError> {
-    stdout
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            let mut parts = line.split('\t');
-            let name = parts
-                .next()
-                .ok_or_else(|| BicError::ProbeOutput {
-                    reason: format!("invalid probe output line: {}", line),
-                })?;
-            let size = parts
-                .next()
-                .ok_or_else(|| BicError::ProbeOutput {
-                    reason: format!("invalid probe output line: {}", line),
-                })?
-                .parse::<u64>()
-                .map_err(|e| BicError::ProbeOutput {
-                    reason: format!("invalid size in probe output '{}': {}", line, e),
-                })?;
-            let align = parts
-                .next()
-                .ok_or_else(|| BicError::ProbeOutput {
-                    reason: format!("invalid probe output line: {}", line),
-                })?
-                .parse::<u64>()
-                .map_err(|e| BicError::ProbeOutput {
-                    reason: format!("invalid align in probe output '{}': {}", line, e),
-                })?;
-            let enum_underlying_size = match parts.next() {
-                Some("-") | None => None,
-                Some(value) => Some(value.parse::<u64>().map_err(|e| BicError::ProbeOutput {
-                    reason: format!("invalid enum size in probe output '{}': {}", line, e),
-                })?),
-            };
-            let enum_is_signed = match parts.next() {
-                Some("-") | None => None,
-                Some("0") => Some(false),
-                Some("1") => Some(true),
-                Some(value) => {
-                    return Err(BicError::ProbeOutput {
+    let mut entries = Vec::<ParsedProbeLayout>::new();
+    let mut entry_indexes = std::collections::HashMap::<String, usize>::new();
+    for line in stdout.lines().filter(|line| !line.trim().is_empty()) {
+        let mut parts = line.split('\t');
+        match parts.next() {
+            Some("L") => {
+                let name = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid probe output line: {}", line),
+                    })?;
+                let size = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid probe output line: {}", line),
+                    })?
+                    .parse::<u64>()
+                    .map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid size in probe output '{}': {}", line, e),
+                    })?;
+                let align = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid probe output line: {}", line),
+                    })?
+                    .parse::<u64>()
+                    .map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid align in probe output '{}': {}", line, e),
+                    })?;
+                let enum_underlying_size = match parts.next() {
+                    Some("-") | None => None,
+                    Some(value) => Some(value.parse::<u64>().map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid enum size in probe output '{}': {}", line, e),
+                    })?),
+                };
+                let enum_is_signed = match parts.next() {
+                    Some("-") | None => None,
+                    Some("0") => Some(false),
+                    Some("1") => Some(true),
+                    Some(value) => {
+                        return Err(BicError::ProbeOutput {
+                            reason: format!(
+                                "invalid enum signedness in probe output '{}': {}",
+                                line, value
+                            ),
+                        })
+                    }
+                };
+                entry_indexes.insert(name.to_string(), entries.len());
+                entries.push(ParsedProbeLayout {
+                    layout: TypeLayout {
+                        name: name.to_string(),
+                        size,
+                        align,
+                    },
+                    enum_underlying_size,
+                    enum_is_signed,
+                    fields: Vec::new(),
+                });
+            }
+            Some("F") => {
+                let subject = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid field probe output line: {}", line),
+                    })?;
+                let field_name = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid field probe output line: {}", line),
+                    })?;
+                let offset_bytes = parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid field probe output line: {}", line),
+                    })?
+                    .parse::<u64>()
+                    .map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid field offset in probe output '{}': {}", line, e),
+                    })?;
+                let entry = entry_indexes
+                    .get(subject)
+                    .copied()
+                    .and_then(|index| entries.get_mut(index))
+                    .ok_or_else(|| BicError::ProbeOutput {
                         reason: format!(
-                            "invalid enum signedness in probe output '{}': {}",
-                            line, value
+                            "field probe output '{}' referenced unknown subject '{}'",
+                            line, subject
                         ),
-                    })
-                }
+                    })?;
+                entry.fields.push(ProbedFieldLayout {
+                    name: field_name.to_string(),
+                    offset_bytes: Some(offset_bytes),
+                });
+            }
+            Some(other) => {
+                let mut legacy_parts = line.split('\t');
+                let name = if other == line {
+                    other
+                } else {
+                    legacy_parts
+                        .next()
+                        .ok_or_else(|| BicError::ProbeOutput {
+                            reason: format!("invalid probe output line: {}", line),
+                        })?
+                };
+                let size = legacy_parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid probe output line: {}", line),
+                    })?
+                    .parse::<u64>()
+                    .map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid size in probe output '{}': {}", line, e),
+                    })?;
+                let align = legacy_parts
+                    .next()
+                    .ok_or_else(|| BicError::ProbeOutput {
+                        reason: format!("invalid probe output line: {}", line),
+                    })?
+                    .parse::<u64>()
+                    .map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid align in probe output '{}': {}", line, e),
+                    })?;
+                let enum_underlying_size = match legacy_parts.next() {
+                    Some("-") | None => None,
+                    Some(value) => Some(value.parse::<u64>().map_err(|e| BicError::ProbeOutput {
+                        reason: format!("invalid enum size in probe output '{}': {}", line, e),
+                    })?),
+                };
+                let enum_is_signed = match legacy_parts.next() {
+                    Some("-") | None => None,
+                    Some("0") => Some(false),
+                    Some("1") => Some(true),
+                    Some(value) => {
+                        return Err(BicError::ProbeOutput {
+                            reason: format!(
+                                "invalid enum signedness in probe output '{}': {}",
+                                line, value
+                            ),
+                        })
+                    }
+                };
+                entry_indexes.insert(name.to_string(), entries.len());
+                entries.push(ParsedProbeLayout {
+                    layout: TypeLayout {
+                        name: name.to_string(),
+                        size,
+                        align,
+                    },
+                    enum_underlying_size,
+                    enum_is_signed,
+                    fields: Vec::new(),
+                });
+            }
+            None => {}
+        }
+    }
+    Ok(entries)
+}
+
+fn collect_record_field_specs(
+    config: &HeaderConfig,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    let unit = match parse_probe_translation_unit(config) {
+        Some(unit) => unit,
+        None => return std::collections::BTreeMap::new(),
+    };
+    let extractor = Extractor::new();
+    let (items, _) = extractor.extract(&unit);
+    let mut fields = std::collections::BTreeMap::new();
+    for item in items {
+        if let BindingItem::Record(record) = item {
+            let key = match (record.kind, record.name.as_deref()) {
+                (_, None) => continue,
+                (crate::ir::RecordKind::Struct, Some(name)) => format!("struct {}", name),
+                (crate::ir::RecordKind::Union, Some(name)) => format!("union {}", name),
             };
-            Ok(ParsedProbeLayout {
-                layout: TypeLayout {
-                    name: name.to_string(),
-                    size,
-                    align,
-                },
-                enum_underlying_size,
-                enum_is_signed,
-            })
-        })
-        .collect()
+            let named_fields = record
+                .fields
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|field| field.name.is_some() && field.bit_width.is_none())
+                .filter_map(|field| field.name)
+                .collect::<Vec<_>>();
+            if !named_fields.is_empty() {
+                fields.insert(key, named_fields);
+            }
+        }
+    }
+    fields
+}
+
+fn parse_probe_translation_unit(config: &HeaderConfig) -> Option<TranslationUnit> {
+    let combined = config
+        .entry_headers
+        .iter()
+        .map(|header| format!("#include \"{}\"\n", header.display()))
+        .collect::<String>();
+    let tmp_root = temp_probe_root().join("parse");
+    std::fs::create_dir_all(&tmp_root).ok()?;
+    let tmp_file = tmp_root.join("_bic_probe_fields.c");
+    std::fs::write(&tmp_file, combined).ok()?;
+    let compiler = compiler_command(config);
+    let flavor = config.flavor.unwrap_or(Flavor::GnuC11);
+    let mut cpp_options = vec!["-E".to_string()];
+    for dir in &config.include_dirs {
+        cpp_options.push(format!("-I{}", dir.display()));
+    }
+    for (name, value) in &config.defines {
+        match value {
+            Some(value) => cpp_options.push(format!("-D{}={}", name, value)),
+            None => cpp_options.push(format!("-D{}", name)),
+        }
+    }
+    let result = pac::driver::parse(
+        &pac::driver::Config {
+            cpp_command: compiler,
+            cpp_options,
+            flavor: match flavor {
+                Flavor::GnuC11 => pac::driver::Flavor::GnuC11,
+                Flavor::ClangC11 => pac::driver::Flavor::ClangC11,
+                Flavor::StdC11 => pac::driver::Flavor::StdC11,
+            },
+        },
+        &tmp_file,
+    )
+    .ok()
+    .map(|parsed| parsed.unit);
+    cleanup_probe_root(&tmp_root);
+    result
 }
 
 fn temp_probe_root() -> PathBuf {
@@ -318,6 +518,7 @@ mod tests {
                     },
                     enum_underlying_size: None,
                     enum_is_signed: None,
+                    fields: Vec::new(),
                 },
                 ParsedProbeLayout {
                     layout: TypeLayout {
@@ -327,6 +528,7 @@ mod tests {
                     },
                     enum_underlying_size: None,
                     enum_is_signed: None,
+                    fields: Vec::new(),
                 },
             ]
         );
@@ -359,6 +561,10 @@ mod tests {
             report.subjects[1].record_completeness,
             Some(RecordCompleteness::Complete)
         );
+        assert_eq!(report.subjects[1].fields.len(), 2);
+        assert_eq!(report.subjects[1].fields[0].name, "a");
+        assert_eq!(report.subjects[1].fields[0].offset_bytes, Some(0));
+        assert_eq!(report.subjects[1].fields[1].name, "b");
         assert!(report.layouts.iter().any(|layout| {
             layout.name == "value_t" && layout.size >= 4 && layout.align >= 4
         }));
@@ -410,6 +616,7 @@ mod tests {
                 record_completeness: None,
                 enum_underlying_size: None,
                 enum_is_signed: None,
+                fields: Vec::new(),
                 layout: TypeLayout {
                     name: "size_t".into(),
                     size: 8,
@@ -436,6 +643,7 @@ mod tests {
         assert_eq!(report.target.compiler_command.as_deref(), Some("clang"));
         assert_eq!(report.subjects.len(), 1);
         assert_eq!(report.subjects[0].name, "size_t");
+        assert!(report.subjects[0].fields.is_empty());
         assert_eq!(report.layouts.len(), 1);
     }
 
@@ -486,6 +694,7 @@ mod tests {
         let report: AbiProbeReport = serde_json::from_str(json).unwrap();
         assert_eq!(report.subjects[0].confidence, ProbeConfidence::MeasuredLayout);
         assert_eq!(report.subjects[0].record_completeness, None);
+        assert!(report.subjects[0].fields.is_empty());
     }
 
     #[test]
@@ -495,6 +704,19 @@ mod tests {
         assert_eq!(parsed[0].layout.name, "enum mode");
         assert_eq!(parsed[0].enum_underlying_size, Some(4));
         assert_eq!(parsed[0].enum_is_signed, Some(true));
+        assert!(parsed[0].fields.is_empty());
+    }
+
+    #[test]
+    fn parse_layout_output_captures_field_offsets() {
+        let parsed = parse_layout_output(
+            "L\tstruct widget\t16\t8\t-\t-\nF\tstruct widget\tx\t0\nF\tstruct widget\ty\t8\n",
+        )
+        .unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].fields.len(), 2);
+        assert_eq!(parsed[0].fields[0].name, "x");
+        assert_eq!(parsed[0].fields[0].offset_bytes, Some(0));
     }
 
     #[test]
