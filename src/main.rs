@@ -87,6 +87,10 @@ fn run_scan(args: &[String]) -> Result<(), String> {
                 i += 1;
                 cfg = cfg.flavor(parse_header_flavor(required_value(args, i, "--flavor")?)?);
             }
+            "--probe-type" => {
+                i += 1;
+                cfg = cfg.probe_type_layout(required_value(args, i, "--probe-type")?);
+            }
             "--no-origin-filter" => {
                 cfg = cfg.no_origin_filter();
             }
@@ -352,6 +356,7 @@ fn usage() -> String {
         "  --link-shared-artifact <path>",
         "  --compiler <cmd>",
         "  --flavor <gnu|clang|std>",
+        "  --probe-type <name>",
         "  --no-origin-filter",
         "",
         "scan-preprocessed options:",

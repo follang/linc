@@ -49,6 +49,13 @@ pub struct MacroBinding {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeLayout {
+    pub name: String,
+    pub size: u64,
+    pub align: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LinkLibraryKind {
     Default,
     Static,
@@ -99,6 +106,8 @@ pub struct BindingPackage {
     #[serde(default)]
     pub macros: Vec<MacroBinding>,
     #[serde(default)]
+    pub layouts: Vec<TypeLayout>,
+    #[serde(default)]
     pub link: BindingLinkSurface,
     pub source_path: Option<String>,
     pub items: Vec<BindingItem>,
@@ -121,6 +130,7 @@ impl BindingPackage {
             target: BindingTarget::default(),
             inputs: BindingInputs::default(),
             macros: Vec::new(),
+            layouts: Vec::new(),
             link: BindingLinkSurface::default(),
             source_path: None,
             items: Vec::new(),
@@ -322,6 +332,7 @@ mod tests {
         assert_eq!(pkg.target, BindingTarget::default());
         assert_eq!(pkg.inputs, BindingInputs::default());
         assert!(pkg.macros.is_empty());
+        assert!(pkg.layouts.is_empty());
         assert_eq!(pkg.link, BindingLinkSurface::default());
     }
 
@@ -408,6 +419,11 @@ mod tests {
             function_like: false,
             kind: MacroKind::Integer,
         }];
+        pkg.layouts = vec![TypeLayout {
+            name: "size_t".into(),
+            size: 8,
+            align: 8,
+        }];
         pkg.link = BindingLinkSurface {
             include_paths: vec!["/usr/include".into()],
             library_paths: vec!["/usr/lib".into()],
@@ -455,6 +471,7 @@ mod tests {
         assert_eq!(pkg.target, BindingTarget::default());
         assert_eq!(pkg.inputs, BindingInputs::default());
         assert!(pkg.macros.is_empty());
+        assert!(pkg.layouts.is_empty());
         assert_eq!(pkg.link, BindingLinkSurface::default());
     }
 
@@ -474,6 +491,7 @@ mod tests {
         assert_eq!(pkg.target, BindingTarget::default());
         assert_eq!(pkg.inputs, BindingInputs::default());
         assert!(pkg.macros.is_empty());
+        assert!(pkg.layouts.is_empty());
         assert_eq!(pkg.link, BindingLinkSurface::default());
     }
 
@@ -496,6 +514,18 @@ mod tests {
         let json = serde_json::to_string(&macros).unwrap();
         let decoded: Vec<MacroBinding> = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, macros);
+    }
+
+    #[test]
+    fn type_layout_serialization_roundtrip() {
+        let layouts = vec![TypeLayout {
+            name: "struct widget".into(),
+            size: 16,
+            align: 8,
+        }];
+        let json = serde_json::to_string(&layouts).unwrap();
+        let decoded: Vec<TypeLayout> = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, layouts);
     }
 
     #[test]

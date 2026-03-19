@@ -2,14 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::ir::TypeLayout;
 use crate::raw_headers::{Flavor, HeaderConfig};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TypeLayout {
-    pub name: String,
-    pub size: u64,
-    pub align: u64,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AbiProbeReport {

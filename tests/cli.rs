@@ -46,7 +46,7 @@ fn cli_scan_emits_inputs_and_link_metadata() {
     let header = dir.join("api.h");
     std::fs::write(
         &header,
-        "#define API_LEVEL 1\n#define API_NAME \"demo\"\nint add(int a, int b);\n",
+        "#define API_LEVEL 1\n#define API_NAME \"demo\"\ntypedef unsigned int value_t;\nint add(int a, int b);\n",
     )
     .unwrap();
 
@@ -67,6 +67,8 @@ fn cli_scan_emits_inputs_and_link_metadata() {
             "build/plugin.o",
             "--link-static-artifact",
             "lib/libcrypto.a",
+            "--probe-type",
+            "value_t",
             "--no-origin-filter",
         ])
         .output()
@@ -94,7 +96,15 @@ fn cli_scan_emits_inputs_and_link_metadata() {
         .unwrap()
         .iter()
         .any(|m| m["name"] == "API_NAME" && m["kind"] == "String"));
-    assert_eq!(json["items"].as_array().unwrap().len(), 1);
+    assert!(json["layouts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|layout| layout["name"] == "value_t"));
+    let items = json["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2);
+    assert!(items.iter().any(|item| item["TypeAlias"]["name"] == "value_t"));
+    assert!(items.iter().any(|item| item["Function"]["name"] == "add"));
 
     std::fs::remove_dir_all(&dir).ok();
 }

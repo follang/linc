@@ -24,12 +24,12 @@ pub use ir::{
     BindingDefine, BindingInputs, BindingItem, BindingLinkSurface, BindingPackage, BindingTarget,
     BindingType, CallingConvention, EnumBinding, EnumVariant, FieldBinding, FunctionBinding,
     LinkArtifact, LinkArtifactKind, LinkLibrary, LinkLibraryKind, MacroBinding, MacroKind,
-    ParameterBinding, RecordBinding, RecordKind, TypeAliasBinding, UnsupportedItem,
+    ParameterBinding, RecordBinding, RecordKind, TypeAliasBinding, TypeLayout, UnsupportedItem,
     VariableBinding, SCHEMA_VERSION,
 };
 pub use line_markers::{FileOriginMap, OriginFilter, SourceOrigin};
 pub use preprocess::PreprocessedInput;
-pub use probe::{probe_type_layouts, AbiProbeReport, TypeLayout};
+pub use probe::{probe_type_layouts, AbiProbeReport};
 pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]
 pub use symbols::{

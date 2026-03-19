@@ -9,6 +9,7 @@ use crate::ir::{
     LinkArtifactKind, LinkLibrary, LinkLibraryKind, MacroBinding, MacroKind,
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
+use crate::probe::probe_type_layouts;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderConfig {
@@ -18,6 +19,7 @@ pub struct HeaderConfig {
     pub defines: Vec<(String, Option<String>)>,
     pub link_libraries: Vec<LinkLibrary>,
     pub link_artifacts: Vec<LinkArtifact>,
+    pub probe_types: Vec<String>,
     pub compiler: Option<String>,
     pub flavor: Option<Flavor>,
     #[serde(skip)]
@@ -63,6 +65,7 @@ impl HeaderConfig {
             defines: Vec::new(),
             link_libraries: Vec::new(),
             link_artifacts: Vec::new(),
+            probe_types: Vec::new(),
             compiler: None,
             flavor: None,
             origin_filter: Some(OriginFilter::default()),
@@ -134,6 +137,11 @@ impl HeaderConfig {
             path: path.into().display().to_string(),
             kind: LinkArtifactKind::SharedLibrary,
         });
+        self
+    }
+
+    pub fn probe_type_layout(mut self, name: impl Into<String>) -> Self {
+        self.probe_types.push(name.into());
         self
     }
 
@@ -214,6 +222,10 @@ impl HeaderConfig {
                     diagnostics,
                     ..BindingPackage::new()
                 };
+
+                if !self.probe_types.is_empty() {
+                    package.layouts = probe_type_layouts(self, &self.probe_types)?.layouts;
+                }
 
                 // Apply origin filtering if configured
                 if let Some(ref filter) = self.origin_filter {
@@ -531,6 +543,7 @@ mod tests {
             .link_object_file("build/plugin.o")
             .link_static_artifact("native/libfoo.a")
             .link_shared_artifact("native/libfoo.so")
+            .probe_type_layout("struct foo")
             .compiler("gcc")
             .flavor(Flavor::GnuC11);
 
@@ -540,6 +553,7 @@ mod tests {
         assert_eq!(cfg.defines.len(), 2);
         assert_eq!(cfg.link_libraries.len(), 3);
         assert_eq!(cfg.link_artifacts.len(), 3);
+        assert_eq!(cfg.probe_types.len(), 1);
         assert_eq!(cfg.compiler.as_deref(), Some("gcc"));
         assert_eq!(cfg.flavor, Some(Flavor::GnuC11));
     }
@@ -560,7 +574,8 @@ mod tests {
             .library_dir("/usr/local/lib")
             .define("FOO", Some("1".into()))
             .link_shared_lib("ssl")
-            .link_shared_artifact("/usr/local/lib/libssl.so");
+            .link_shared_artifact("/usr/local/lib/libssl.so")
+            .probe_type_layout("size_t");
 
         let json = serde_json::to_string(&cfg).unwrap();
         let cfg2: HeaderConfig = serde_json::from_str(&json).unwrap();
@@ -569,6 +584,7 @@ mod tests {
         assert_eq!(cfg2.library_dirs.len(), 1);
         assert_eq!(cfg2.link_libraries.len(), 1);
         assert_eq!(cfg2.link_artifacts.len(), 1);
+        assert_eq!(cfg2.probe_types.len(), 1);
     }
 
     #[test]
@@ -603,7 +619,8 @@ mod tests {
             .library_dir("lib")
             .define("FOO", Some("1".into()))
             .link_static_lib("crypto")
-            .link_static_artifact("lib/libcrypto.a");
+            .link_static_artifact("lib/libcrypto.a")
+            .probe_type_layout("struct widget");
 
         let target = cfg.binding_target();
         let inputs = cfg.binding_inputs();
@@ -622,6 +639,7 @@ mod tests {
         assert_eq!(link.artifacts.len(), 1);
         assert_eq!(link.artifacts[0].path, "lib/libcrypto.a");
         assert_eq!(link.artifacts[0].kind, LinkArtifactKind::StaticLibrary);
+        assert_eq!(cfg.probe_types, vec!["struct widget".to_string()]);
     }
 
     #[test]
@@ -824,6 +842,38 @@ int compute(int x);
             .macros
             .iter()
             .any(|m| m.name == "API_NAME" && m.kind == MacroKind::String));
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    #[ignore] // Requires gcc/clang
+    fn process_attaches_requested_type_layouts() {
+        let dir = setup_test_dir("t");
+        let header = dir.join("layout.h");
+        std::fs::write(
+            &header,
+            "typedef unsigned int value_t;\nstruct widget { int a; double b; };\n",
+        )
+        .unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("value_t")
+            .probe_type_layout("struct widget")
+            .process()
+            .unwrap();
+
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "value_t"));
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "struct widget"));
 
         cleanup(&dir);
     }
