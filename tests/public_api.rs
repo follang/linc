@@ -1,7 +1,7 @@
 use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
-    MacroKind, MacroValue, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
+    MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
     ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationDeclaration,
     ValidationEntry, ValidationEvidence, ValidationPhase, ValidationPhaseReport, probe_type_layouts,
 };
@@ -187,9 +187,17 @@ fn validation_entry_root_types_roundtrip() {
             provider_artifacts: vec!["libc.so".into()],
             raw_symbol_names: vec!["_malloc".into()],
             visibility: Some(bic::SymbolVisibility::Default),
+            confidence: MatchConfidence::High,
         },
     };
     let json = serde_json::to_string(&entry).unwrap();
     let decoded: ValidationEntry = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, entry);
+}
+
+#[test]
+fn match_confidence_root_type_roundtrip() {
+    let json = serde_json::to_string(&MatchConfidence::Medium).unwrap();
+    let decoded: MatchConfidence = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, MatchConfidence::Medium);
 }

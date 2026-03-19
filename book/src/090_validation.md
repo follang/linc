@@ -141,8 +141,18 @@ Each `ValidationEntry` preserves:
 - `provider_artifacts`
 - `raw_symbol_names`
 - observed `visibility`
+- `confidence`
 
 The older `matches` list remains available as the flatter compatibility surface.
+
+## Confidence
+
+Validation confidence is currently a policy-friendly summary of the available symbol evidence:
+
+- `High`: direct visible provider of the expected kind
+- `Medium`: provider exists, but only as a weak symbol
+- `Low`: partial or conflicting evidence exists
+- `None`: no provider evidence was found
 
 ## How To Read A Report
 

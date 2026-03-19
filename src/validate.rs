@@ -50,6 +50,8 @@ pub struct ValidationEvidence {
     #[serde(default)]
     pub raw_symbol_names: Vec<String>,
     pub visibility: Option<SymbolVisibility>,
+    #[serde(default = "default_match_confidence")]
+    pub confidence: MatchConfidence,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -57,6 +59,14 @@ pub struct ValidationEntry {
     pub declaration: ValidationDeclaration,
     pub status: MatchStatus,
     pub evidence: ValidationEvidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MatchConfidence {
+    High,
+    Medium,
+    Low,
+    None,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -74,6 +84,8 @@ pub struct SymbolMatch {
     pub visibility: Option<SymbolVisibility>,
     #[serde(default)]
     pub provider_artifacts: Vec<String>,
+    #[serde(default = "default_match_confidence")]
+    pub confidence: MatchConfidence,
 }
 
 /// Aggregate validation report for a package against one or more inventories.
@@ -225,6 +237,17 @@ pub fn validate_many(
                 (status, None)
             }
         };
+        let confidence = match status {
+            MatchStatus::Matched => MatchConfidence::High,
+            MatchStatus::WeakMatch => MatchConfidence::Medium,
+            MatchStatus::DecorationMismatch
+            | MatchStatus::Hidden
+            | MatchStatus::DuplicateProviders
+            | MatchStatus::UnresolvedDeclaredLinkInputs
+            | MatchStatus::NotAFunction
+            | MatchStatus::NotAVariable => MatchConfidence::Low,
+            MatchStatus::Missing => MatchConfidence::None,
+        };
 
         matches.push(SymbolMatch {
             name: name.clone(),
@@ -232,6 +255,7 @@ pub fn validate_many(
             status: status.clone(),
             visibility: visibility.clone(),
             provider_artifacts: provider_artifacts.clone(),
+            confidence: confidence.clone(),
         });
         entries.push(ValidationEntry {
             declaration: ValidationDeclaration {
@@ -243,6 +267,7 @@ pub fn validate_many(
                 provider_artifacts,
                 raw_symbol_names,
                 visibility,
+                confidence,
             },
         });
     }
@@ -269,6 +294,10 @@ fn default_validation_phases() -> Vec<ValidationPhaseReport> {
             completed: false,
         },
     ]
+}
+
+fn default_match_confidence() -> MatchConfidence {
+    MatchConfidence::None
 }
 
 fn format_provider(inventory: &SymbolInventory, symbol: &crate::symbols::SymbolEntry) -> String {
@@ -584,6 +613,37 @@ mod tests {
             report.entries[0].evidence.visibility,
             Some(SymbolVisibility::Default)
         );
+        assert_eq!(report.entries[0].evidence.confidence, MatchConfidence::High);
+        assert_eq!(report.matches[0].confidence, MatchConfidence::High);
+    }
+
+    #[test]
+    fn weak_matches_are_marked_with_medium_confidence() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "foo".into(),
+                raw_name: None,
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Weak,
+                size: None,
+                section: None,
+                archive_member: None,
+            }],
+        };
+        let pkg = make_package(&["foo"]);
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].confidence, MatchConfidence::Medium);
+        assert_eq!(report.entries[0].evidence.confidence, MatchConfidence::Medium);
     }
 
     #[test]
