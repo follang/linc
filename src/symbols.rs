@@ -16,6 +16,7 @@ pub enum ArtifactFormat {
     MachODylib,
     MachOStaticLibrary,
     CoffObject,
+    CoffImportLibrary,
     PeExecutable,
     PeDynamicLibrary,
     Unknown(String),
@@ -35,6 +36,7 @@ pub enum ArtifactPlatform {
 pub enum ArtifactKind {
     Object,
     StaticLibrary,
+    ImportLibrary,
     SharedLibrary,
     Executable,
     Unknown,
@@ -165,6 +167,7 @@ fn inspect_archive(
     let mut symbols = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let mut is_macho = false;
+    let mut is_coff = false;
     let mut format_detected = false;
 
     for member in archive.members() {
@@ -183,6 +186,7 @@ fn inspect_archive(
         if let Ok(obj) = object::File::parse(member_data) {
             if !format_detected {
                 is_macho = obj.format() == object::BinaryFormat::MachO;
+                is_coff = obj.format() == object::BinaryFormat::Coff;
                 format_detected = true;
             }
             for mut sym in extract_symbols_from_object(&obj) {
@@ -194,28 +198,57 @@ fn inspect_archive(
         }
     }
 
-    let format = if is_macho {
-        ArtifactFormat::MachOStaticLibrary
+    let (format, platform, kind, capabilities) = if is_macho {
+        (
+            ArtifactFormat::MachOStaticLibrary,
+            ArtifactPlatform::MachO,
+            ArtifactKind::StaticLibrary,
+            ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+        )
+    } else if is_coff && is_probable_import_library(&artifact_path, &symbols) {
+        (
+            ArtifactFormat::CoffImportLibrary,
+            ArtifactPlatform::Windows,
+            ArtifactKind::ImportLibrary,
+            ArtifactCapabilities {
+                exports_symbols: false,
+                imports_symbols: true,
+            },
+        )
     } else {
-        ArtifactFormat::ElfStaticLibrary
+        (
+            ArtifactFormat::ElfStaticLibrary,
+            ArtifactPlatform::Elf,
+            ArtifactKind::StaticLibrary,
+            ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+        )
     };
 
     Ok(SymbolInventory {
         artifact_path,
         format,
-        platform: if is_macho {
-            ArtifactPlatform::MachO
-        } else {
-            ArtifactPlatform::Elf
-        },
-        kind: ArtifactKind::StaticLibrary,
-        capabilities: ArtifactCapabilities {
-            exports_symbols: true,
-            imports_symbols: false,
-        },
+        platform,
+        kind,
+        capabilities,
         dependency_edges: Vec::new(),
         symbols,
     })
+}
+
+fn is_probable_import_library(artifact_path: &str, symbols: &[SymbolEntry]) -> bool {
+    artifact_path.ends_with(".lib")
+        && symbols.iter().any(|symbol| {
+            symbol
+                .raw_name
+                .as_deref()
+                .is_some_and(|raw_name| raw_name.starts_with("__imp_"))
+        })
 }
 
 fn detect_dependency_edges(artifact_path: &str, obj: &object::File<'_>) -> Vec<String> {
@@ -526,6 +559,7 @@ mod tests {
             ArtifactFormat::MachODylib,
             ArtifactFormat::MachOStaticLibrary,
             ArtifactFormat::CoffObject,
+            ArtifactFormat::CoffImportLibrary,
             ArtifactFormat::PeExecutable,
             ArtifactFormat::PeDynamicLibrary,
         ] {
@@ -867,6 +901,34 @@ mod tests {
         assert_eq!(inv.symbols[0].name, "demo_init");
         assert_eq!(inv.symbols[0].raw_name.as_deref(), Some("_demo_init@8"));
         assert_eq!(inv.symbols[0].archive_member.as_deref(), Some("demo.obj"));
+    }
+
+    #[test]
+    fn windows_import_library_fixture_is_consumable() {
+        let json = include_str!("../test/contracts/windows_import_library_fixture.json");
+        let inv: SymbolInventory = serde_json::from_str(json).unwrap();
+        assert_eq!(inv.format, ArtifactFormat::CoffImportLibrary);
+        assert_eq!(inv.platform, ArtifactPlatform::Windows);
+        assert_eq!(inv.kind, ArtifactKind::ImportLibrary);
+        assert!(!inv.capabilities.exports_symbols);
+        assert!(inv.capabilities.imports_symbols);
+        assert_eq!(inv.symbols[0].raw_name.as_deref(), Some("__imp_demo_init"));
+    }
+
+    #[test]
+    fn import_library_detection_uses_windows_lib_heuristics() {
+        let symbols = vec![SymbolEntry {
+            name: "demo_init".into(),
+            raw_name: Some("__imp_demo_init".into()),
+            visibility: SymbolVisibility::Unknown,
+            is_function: true,
+            binding: SymbolBinding::Unknown,
+            size: None,
+            section: Some(".idata".into()),
+            archive_member: Some("demo_import.obj".into()),
+        }];
+        assert!(is_probable_import_library("demo.lib", &symbols));
+        assert!(!is_probable_import_library("libdemo.a", &symbols));
     }
 
     #[test]

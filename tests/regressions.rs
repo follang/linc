@@ -198,3 +198,15 @@ fn regression_windows_artifact_gap_fixture_stays_consumable() {
     );
     assert_eq!(inventory.symbols[0].raw_name.as_deref(), Some("_demo_init@4"));
 }
+
+#[test]
+fn regression_windows_import_library_fixture_stays_consumable() {
+    let inventory: SymbolInventory = serde_json::from_str(include_str!(
+        "../test/contracts/windows_import_library_fixture.json"
+    ))
+    .unwrap();
+    assert_eq!(inventory.platform, ArtifactPlatform::Windows);
+    assert_eq!(inventory.format, ArtifactFormat::CoffImportLibrary);
+    assert_eq!(inventory.kind, ArtifactKind::ImportLibrary);
+    assert!(inventory.capabilities.imports_symbols);
+}
