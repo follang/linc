@@ -17,6 +17,7 @@ pub enum MatchStatus {
     NotAVariable,
     Hidden,
     WeakMatch,
+    DuplicateProviders,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -123,6 +124,17 @@ pub fn validate_many(
                         } else {
                             (MatchStatus::NotAVariable, Some(visible[0].1.visibility.clone()))
                         }
+                    } else if typed
+                        .iter()
+                        .map(|(inventory, symbol)| format_provider(inventory, symbol))
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        > 1
+                    {
+                        (
+                            MatchStatus::DuplicateProviders,
+                            Some(typed[0].1.visibility.clone()),
+                        )
                     } else if typed[0].1.binding == SymbolBinding::Weak {
                         (MatchStatus::WeakMatch, Some(typed[0].1.visibility.clone()))
                     } else {
@@ -335,6 +347,51 @@ mod tests {
         assert_eq!(foo.provider_artifacts, vec!["test.o".to_string()]);
         assert_eq!(bar.status, MatchStatus::Matched);
         assert_eq!(bar.provider_artifacts, vec!["libbar.a:bar.o".to_string()]);
+    }
+
+    #[test]
+    fn validate_many_reports_duplicate_providers() {
+        let pkg = make_package(&["foo"]);
+        let inv1 = SymbolInventory {
+            artifact_path: "libfoo_one.a".into(),
+            format: ArtifactFormat::ElfStaticLibrary,
+            symbols: vec![SymbolEntry {
+                name: "foo".into(),
+                raw_name: Some("foo".into()),
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: None,
+                archive_member: Some("foo1.o".into()),
+            }],
+        };
+        let inv2 = SymbolInventory {
+            artifact_path: "libfoo_two.a".into(),
+            format: ArtifactFormat::ElfStaticLibrary,
+            symbols: vec![SymbolEntry {
+                name: "foo".into(),
+                raw_name: Some("foo".into()),
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: None,
+                archive_member: Some("foo2.o".into()),
+            }],
+        };
+
+        let report = validate_many(&pkg, &[inv1, inv2]);
+        assert_eq!(report.matches.len(), 1);
+        let foo = &report.matches[0];
+        assert_eq!(foo.status, MatchStatus::DuplicateProviders);
+        assert_eq!(
+            foo.provider_artifacts,
+            vec![
+                "libfoo_one.a:foo1.o".to_string(),
+                "libfoo_two.a:foo2.o".to_string()
+            ]
+        );
     }
 
     // --- Phase 12 tests ---
