@@ -32,7 +32,15 @@ impl Extractor {
             ExternalDeclaration::FunctionDefinition(fdef) => {
                 self.extract_function_definition(&fdef.node, fdef.span.start);
             }
-            ExternalDeclaration::StaticAssert(_) => {}
+            ExternalDeclaration::StaticAssert(_) => {
+                self.diagnostics.push(
+                    Diagnostic::warning(
+                        DiagnosticKind::DeclarationPartial,
+                        "_Static_assert ignored".to_string(),
+                    )
+                    .with_location(None, ext_decl.span.start),
+                );
+            }
         }
     }
 
@@ -68,7 +76,6 @@ impl Extractor {
                 self.extract_function_declaration(
                     &decl.specifiers,
                     &declarator.node,
-                    is_extern,
                     offset,
                 );
             } else {
@@ -175,7 +182,6 @@ impl Extractor {
         &mut self,
         specifiers: &[Node<DeclarationSpecifier>],
         declarator: &Declarator,
-        _is_extern: bool,
         offset: usize,
     ) {
         let name = match self.declarator_name(declarator) {
@@ -579,7 +585,9 @@ impl Extractor {
                         variadic,
                     };
                 }
-                _ => {}
+                // KRFunction, Block handled by emit_derived_diagnostics
+                DerivedDeclarator::KRFunction(_)
+                | DerivedDeclarator::Block(_) => {}
             }
         }
 
@@ -613,7 +621,12 @@ impl Extractor {
         // what we need. The pointee const comes from the base specifiers.
         // We'll pass that through from the caller. For the simple wrapping here,
         // we just create non-const pointers and let the caller override.
-        for _is_ptr_const in &pointers {
+        // Pointers wrap inside-out. For multi-level pointers like `int **p`,
+        // pointers[0] is the innermost pointer (closest to base type).
+        // pointer qualifier Const means the pointer itself is const (`int * const p`),
+        // which doesn't affect Rust FFI. The pointee constness comes from
+        // the base specifiers and is handled by the caller via mark_innermost_pointer_const.
+        for _ptr_self_const in &pointers {
             ty = BindingType::Pointer {
                 pointee: Box::new(ty),
                 const_pointee: false,
@@ -753,8 +766,63 @@ impl Extractor {
                     }
                     _ => {}
                 },
-                DeclarationSpecifier::TypeQualifier(tq) => {
-                    if tq.node == TypeQualifier::Atomic {
+                DeclarationSpecifier::Function(fs) => match &fs.node {
+                    FunctionSpecifier::Inline => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("inline specifier ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                    FunctionSpecifier::Noreturn => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("_Noreturn specifier ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                },
+                DeclarationSpecifier::Alignment(_) => {
+                    self.diagnostics.push(
+                        Diagnostic::warning(
+                            DiagnosticKind::DeclarationPartial,
+                            format!("_Alignas specifier ignored on '{}'", item_name),
+                        )
+                        .with_item(item_name)
+                        .with_location(None, offset),
+                    );
+                }
+                DeclarationSpecifier::StorageClass(sc) => match &sc.node {
+                    StorageClassSpecifier::ThreadLocal => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("_Thread_local ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                    StorageClassSpecifier::Register => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("register storage class ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                    _ => {}
+                },
+                DeclarationSpecifier::TypeQualifier(tq) => match &tq.node {
+                    TypeQualifier::Atomic => {
                         self.diagnostics.push(
                             Diagnostic::warning(
                                 DiagnosticKind::DeclarationPartial,
@@ -764,7 +832,29 @@ impl Extractor {
                             .with_location(None, offset),
                         );
                     }
-                }
+                    TypeQualifier::Restrict => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("restrict qualifier ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                    TypeQualifier::Volatile => {
+                        self.diagnostics.push(
+                            Diagnostic::warning(
+                                DiagnosticKind::DeclarationPartial,
+                                format!("volatile qualifier ignored on '{}'", item_name),
+                            )
+                            .with_item(item_name)
+                            .with_location(None, offset),
+                        );
+                    }
+                    // Const is handled in type resolution, not a diagnostic
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -857,6 +947,7 @@ fn eval_const_expr(expr: &Expression) -> Option<i128> {
                 UnaryOperator::Minus => Some(-inner),
                 UnaryOperator::Plus => Some(inner),
                 UnaryOperator::Complement => Some(!inner),
+                UnaryOperator::Negate => Some(if inner == 0 { 1 } else { 0 }),
                 _ => None,
             }
         }
@@ -874,8 +965,32 @@ fn eval_const_expr(expr: &Expression) -> Option<i128> {
                 BinaryOperator::BitwiseAnd => Some(lhs & rhs),
                 BinaryOperator::BitwiseOr => Some(lhs | rhs),
                 BinaryOperator::BitwiseXor => Some(lhs ^ rhs),
+                BinaryOperator::Equals => Some(if lhs == rhs { 1 } else { 0 }),
+                BinaryOperator::NotEquals => Some(if lhs != rhs { 1 } else { 0 }),
+                BinaryOperator::Less => Some(if lhs < rhs { 1 } else { 0 }),
+                BinaryOperator::Greater => Some(if lhs > rhs { 1 } else { 0 }),
+                BinaryOperator::LessOrEqual => Some(if lhs <= rhs { 1 } else { 0 }),
+                BinaryOperator::GreaterOrEqual => Some(if lhs >= rhs { 1 } else { 0 }),
+                BinaryOperator::LogicalAnd => Some(if lhs != 0 && rhs != 0 { 1 } else { 0 }),
+                BinaryOperator::LogicalOr => Some(if lhs != 0 || rhs != 0 { 1 } else { 0 }),
                 _ => None,
             }
+        }
+        Expression::Conditional(c) => {
+            let cond = eval_const_expr(&c.node.condition.node)?;
+            if cond != 0 {
+                eval_const_expr(&c.node.then_expression.node)
+            } else {
+                eval_const_expr(&c.node.else_expression.node)
+            }
+        }
+        Expression::Cast(c) => {
+            // Evaluate the inner expression, ignore the cast type
+            eval_const_expr(&c.node.expression.node)
+        }
+        Expression::Comma(parts) => {
+            // C comma operator: evaluate all, return last
+            parts.last().and_then(|e| eval_const_expr(&e.node))
         }
         _ => None,
     }
@@ -1254,5 +1369,108 @@ mod tests {
         let json1 = serde_json::to_string(&pkg1).unwrap();
         let json2 = serde_json::to_string(&pkg2).unwrap();
         assert_eq!(json1, json2);
+    }
+
+    // Phase 17: qualifier/specifier diagnostics
+
+    #[test]
+    fn diag_volatile_qualifier() {
+        let pkg = extract("volatile int flag(void);");
+        let diags: Vec<_> = pkg.diagnostics.iter()
+            .filter(|d| d.message.contains("volatile"))
+            .collect();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind, DiagnosticKind::DeclarationPartial);
+    }
+
+    // restrict is a pointer qualifier in C, not a declaration-level specifier.
+    // The diagnostic exists for completeness but PAC places restrict in PointerQualifier,
+    // not in DeclarationSpecifier, so there's no natural test case for it at declaration level.
+
+    #[test]
+    fn diag_inline_specifier() {
+        let pkg = extract("inline int fast(void) { return 0; }");
+        let diags: Vec<_> = pkg.diagnostics.iter()
+            .filter(|d| d.message.contains("inline"))
+            .collect();
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind, DiagnosticKind::DeclarationPartial);
+    }
+
+    #[test]
+    fn diag_noreturn_specifier() {
+        let pkg = extract("_Noreturn void die(void);");
+        let diags: Vec<_> = pkg.diagnostics.iter()
+            .filter(|d| d.message.contains("_Noreturn"))
+            .collect();
+        assert_eq!(diags.len(), 1);
+    }
+
+    #[test]
+    fn diag_static_assert() {
+        let pkg = extract("_Static_assert(1, \"ok\");");
+        let diags: Vec<_> = pkg.diagnostics.iter()
+            .filter(|d| d.message.contains("_Static_assert"))
+            .collect();
+        assert_eq!(diags.len(), 1);
+    }
+
+    // Phase 18: const expression hardening
+
+    #[test]
+    fn eval_enum_bitwise_ops() {
+        let pkg = extract("enum flags { A = 1 << 0, B = 1 << 1, C = 1 << 2, AB = (1 << 0) | (1 << 1) };");
+        let e = pkg.items.iter().find_map(|i| match i {
+            BindingItem::Enum(e) => Some(e),
+            _ => None,
+        }).unwrap();
+        assert_eq!(e.variants[0].value, Some(1));
+        assert_eq!(e.variants[1].value, Some(2));
+        assert_eq!(e.variants[2].value, Some(4));
+        assert_eq!(e.variants[3].value, Some(3));
+    }
+
+    #[test]
+    fn eval_enum_comparison_ops() {
+        let pkg = extract("enum cmp { LT = (1 < 2), EQ = (2 == 2), NE = (1 != 1) };");
+        let e = pkg.items.iter().find_map(|i| match i {
+            BindingItem::Enum(e) => Some(e),
+            _ => None,
+        }).unwrap();
+        assert_eq!(e.variants[0].value, Some(1)); // 1 < 2 = true
+        assert_eq!(e.variants[1].value, Some(1)); // 2 == 2 = true
+        assert_eq!(e.variants[2].value, Some(0)); // 1 != 1 = false
+    }
+
+    #[test]
+    fn eval_enum_logical_ops() {
+        let pkg = extract("enum logic { AND = (1 && 0), OR = (0 || 1), NOT = (!0) };");
+        let e = pkg.items.iter().find_map(|i| match i {
+            BindingItem::Enum(e) => Some(e),
+            _ => None,
+        }).unwrap();
+        assert_eq!(e.variants[0].value, Some(0)); // 1 && 0
+        assert_eq!(e.variants[1].value, Some(1)); // 0 || 1
+        assert_eq!(e.variants[2].value, Some(1)); // !0
+    }
+
+    #[test]
+    fn eval_enum_ternary() {
+        let pkg = extract("enum tern { X = (1 > 0) ? 42 : 99 };");
+        let e = pkg.items.iter().find_map(|i| match i {
+            BindingItem::Enum(e) => Some(e),
+            _ => None,
+        }).unwrap();
+        assert_eq!(e.variants[0].value, Some(42));
+    }
+
+    #[test]
+    fn eval_enum_modulo() {
+        let pkg = extract("enum m { A = 10 % 3 };");
+        let e = pkg.items.iter().find_map(|i| match i {
+            BindingItem::Enum(e) => Some(e),
+            _ => None,
+        }).unwrap();
+        assert_eq!(e.variants[0].value, Some(1));
     }
 }
