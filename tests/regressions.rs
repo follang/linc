@@ -201,6 +201,30 @@ fn regression_typedef_layout_fixture_validates_record_and_enum_aliases() {
 }
 
 #[test]
+fn regression_packed_bitfield_fixture_preserves_partial_layout_signal() {
+    let header = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test/fixtures/packed_bitfield_extreme.h");
+    let result = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .probe_type_layout("struct packed_registers")
+        .probe_type_layout("packed_registers_t")
+        .process()
+        .unwrap();
+
+    let record = result.package.find_record("packed_registers").unwrap();
+    assert_eq!(record.abi_confidence, Some(bic::AbiConfidence::PartialBitfieldLayout));
+    let representation = record.representation.as_ref().unwrap();
+    assert!(representation.size.is_some());
+    let fields = record.fields.as_ref().unwrap();
+    assert_eq!(fields[0].bit_width, Some(1));
+    assert_eq!(fields[1].bit_width, Some(3));
+    assert_eq!(fields[2].bit_width, Some(1));
+    assert_eq!(fields[3].bit_width, Some(3));
+    assert!(result.package.layouts.iter().any(|layout| layout.name == "struct packed_registers"));
+    assert!(result.package.layouts.iter().any(|layout| layout.name == "packed_registers_t"));
+}
+
+#[test]
 fn regression_link_plan_and_validation_agree_on_resolved_and_unresolved_providers() {
     let mut resolved_package = BindingPackage::new();
     resolved_package.items.push(BindingItem::Function(FunctionBinding {
