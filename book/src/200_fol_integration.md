@@ -105,6 +105,62 @@ integration profile.
 
 These gates should be policy decisions in `fol`, but the evidence should come from `bic`.
 
+## Recommended Gating Policy
+
+If `fol` wants one concrete, conservative policy that matches the current producer-side
+acceptance tests, the recommended order is:
+
+1. reject unsupported `schema_version`
+2. reject operational failures from scanning, probing, or artifact inspection
+3. inspect diagnostics and stop when required declarations or ABI-sensitive surfaces are marked as
+   partial, unsupported, or otherwise unsafe for generation
+4. require probed layouts for ABI-sensitive records, enums, typedef-backed variables, and other
+   by-value surfaces that `fol` intends to generate as layout-sensitive bindings
+5. reject validation reports with:
+   - `AbiShapeMismatch`
+   - `Missing`
+   - `UnresolvedDeclaredLinkInputs`
+   - `DuplicateProviders`
+6. require the resolved link plan to have concrete provider paths for every required native input
+
+That policy is intentionally narrower than the full generic `bic` contract.
+It is a recommended `fol` profile, not a universal rule for every downstream consumer.
+
+## Minimal vs Extended `fol` Trust Surface
+
+The current recommendation is to separate two `fol` modes clearly.
+
+Minimal declaration-oriented flow:
+
+- trust `BindingPackage.items`
+- trust `schema_version`
+- require inspection of `diagnostics`
+- do not assume ABI-sensitive generation is ready from declarations alone
+
+Extended ABI/link-aware flow:
+
+- require `BindingPackage.layouts` for ABI-sensitive types
+- require `ValidationReport` when native symbol presence and ABI shape matter
+- require `ResolvedLinkPlan` when final native dependency assembly matters
+- treat any unresolved or ambiguous provider state as a generation gate until `fol` has explicit
+  higher-level policy for that case
+
+## What `fol` Should Consider Ready
+
+For the current integration profile, `fol` can treat a package as ready for high-confidence
+generation only when all of the following are true:
+
+- the scanned package deserializes under the expected schema version
+- required declarations are present
+- required layouts are present for ABI-sensitive generated surfaces
+- diagnostics do not contain generation-blocking findings under `fol` policy
+- validation does not report ABI-shape mismatch, missing providers, unresolved declared link
+  inputs, or duplicate providers for required native declarations
+- the link plan resolves every required native input to at least one concrete provider artifact
+
+That keeps the `fol` contract narrow, explicit, and regression-testable while still leaving the
+core `bic` library contract general enough for other consumers.
+
 ## Minimal Durable Contract
 
 If the integration needs a smallest stable contract first, it should standardize on:
