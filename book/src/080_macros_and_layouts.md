@@ -133,6 +133,10 @@ Enum subjects also preserve:
 This gives downstream generators a concrete representation hint even before field-level enum
 analysis exists in the declaration IR.
 
+The repository also keeps dedicated probe contract fixtures for ABI-sensitive record and enum
+subjects so record completeness and enum representation metadata are regression-tested as part of
+the public transport surface.
+
 ## What Layouts Solve
 
 Compiler-probed layouts are especially useful for:

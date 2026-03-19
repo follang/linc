@@ -1,7 +1,7 @@
 use bic::{
-    from_json, resolve_link_plan_for_target, validate, BindingItem, BindingPackage, BindingType,
-    CallingConvention, FunctionBinding, LinkInput, LinkLibrary, LinkLibraryKind,
-    LinkRequirementSource, MacroValue, ParameterBinding, SymbolInventory,
+    from_json, resolve_link_plan_for_target, validate, AbiProbeReport, BindingItem,
+    BindingPackage, BindingType, CallingConvention, FunctionBinding, LinkInput, LinkLibrary,
+    LinkLibraryKind, LinkRequirementSource, MacroValue, ParameterBinding, SymbolInventory,
 };
 use bic::symbols::{ArtifactCapabilities, ArtifactFormat, ArtifactKind, ArtifactPlatform};
 
@@ -71,4 +71,15 @@ fn regression_decorated_fixture_validates_against_normalized_name() {
 fn regression_extended_contract_fixture_keeps_macro_value() {
     let pkg = from_json(include_str!("../test/contracts/fol_extended_contract.json")).unwrap();
     assert_eq!(pkg.macros[0].value, Some(MacroValue::Integer(3)));
+}
+
+#[test]
+fn regression_probe_record_fixture_keeps_record_and_enum_metadata() {
+    let report: AbiProbeReport = serde_json::from_str(include_str!(
+        "../test/contracts/probe_record_contract_snapshot.json"
+    ))
+    .unwrap();
+    assert_eq!(report.subjects.len(), 2);
+    assert_eq!(report.subjects[0].layout.name, "struct widget");
+    assert_eq!(report.subjects[1].enum_underlying_size, Some(4));
 }

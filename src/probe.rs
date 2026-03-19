@@ -440,6 +440,21 @@ mod tests {
     }
 
     #[test]
+    fn probe_record_contract_snapshot_is_consumable() {
+        let json = include_str!("../test/contracts/probe_record_contract_snapshot.json");
+        let report: AbiProbeReport = serde_json::from_str(json).unwrap();
+        assert_eq!(report.subjects.len(), 2);
+        assert_eq!(report.subjects[0].kind, ProbeSubjectKind::Record);
+        assert_eq!(
+            report.subjects[0].record_completeness,
+            Some(RecordCompleteness::Complete)
+        );
+        assert_eq!(report.subjects[1].kind, ProbeSubjectKind::Enum);
+        assert_eq!(report.subjects[1].enum_underlying_size, Some(4));
+        assert_eq!(report.subjects[1].enum_is_signed, Some(true));
+    }
+
+    #[test]
     fn probe_subject_kind_classification_handles_records_and_enums() {
         assert_eq!(classify_probe_subject("size_t"), ProbeSubjectKind::Type);
         assert_eq!(

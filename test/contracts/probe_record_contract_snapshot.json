@@ -1,0 +1,34 @@
+{
+  "target": {
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "compiler_command": "clang",
+    "compiler_version": "clang 18.0.0",
+    "flavor": "clang-c11"
+  },
+  "compiler_command": "clang",
+  "entry_headers": ["demo.h"],
+  "subjects": [
+    {
+      "name": "struct widget",
+      "kind": "Record",
+      "confidence": "MeasuredLayout",
+      "record_completeness": "Complete",
+      "enum_underlying_size": null,
+      "enum_is_signed": null,
+      "layout": { "name": "struct widget", "size": 24, "align": 8 }
+    },
+    {
+      "name": "enum widget_mode",
+      "kind": "Enum",
+      "confidence": "MeasuredLayout",
+      "record_completeness": null,
+      "enum_underlying_size": 4,
+      "enum_is_signed": true,
+      "layout": { "name": "enum widget_mode", "size": 4, "align": 4 }
+    }
+  ],
+  "layouts": [
+    { "name": "struct widget", "size": 24, "align": 8 },
+    { "name": "enum widget_mode", "size": 4, "align": 4 }
+  ]
+}
