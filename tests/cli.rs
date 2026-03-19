@@ -145,6 +145,10 @@ fn cli_inspect_symbols_emits_symbol_inventory_json() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["platform"], "Elf");
+    assert_eq!(json["kind"], "Object");
+    assert_eq!(json["capabilities"]["exports_symbols"], true);
+    assert_eq!(json["capabilities"]["imports_symbols"], false);
     let symbols = json["symbols"].as_array().unwrap();
     assert!(symbols
         .iter()
@@ -186,6 +190,9 @@ fn cli_inspect_symbols_emits_archive_member_provenance() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["platform"], "Elf");
+    assert_eq!(json["kind"], "StaticLibrary");
+    assert_eq!(json["capabilities"]["exports_symbols"], true);
     let symbols = json["symbols"].as_array().unwrap();
     assert!(symbols
         .iter()

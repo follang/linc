@@ -135,6 +135,12 @@ mod integration_tests {
         let inv = SymbolInventory {
             artifact_path: "test.o".into(),
             format: symbols::ArtifactFormat::ElfObject,
+            platform: symbols::ArtifactPlatform::Elf,
+            kind: symbols::ArtifactKind::Object,
+            capabilities: symbols::ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: None,

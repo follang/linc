@@ -17,6 +17,30 @@ pub enum ArtifactFormat {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArtifactPlatform {
+    Elf,
+    MachO,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArtifactKind {
+    Object,
+    StaticLibrary,
+    SharedLibrary,
+    Executable,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ArtifactCapabilities {
+    #[serde(default)]
+    pub exports_symbols: bool,
+    #[serde(default)]
+    pub imports_symbols: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SymbolVisibility {
     Default,
     Hidden,
@@ -51,6 +75,10 @@ pub struct SymbolEntry {
 pub struct SymbolInventory {
     pub artifact_path: String,
     pub format: ArtifactFormat,
+    pub platform: ArtifactPlatform,
+    pub kind: ArtifactKind,
+    #[serde(default)]
+    pub capabilities: ArtifactCapabilities,
     pub symbols: Vec<SymbolEntry>,
 }
 
@@ -90,6 +118,9 @@ pub fn inspect_bytes(data: &[u8], artifact_path: String) -> Result<SymbolInvento
     Ok(SymbolInventory {
         artifact_path,
         format,
+        platform: classify_platform(&obj),
+        kind: classify_kind(&obj),
+        capabilities: classify_capabilities(&obj),
         symbols,
     })
 }
@@ -134,8 +165,51 @@ fn inspect_archive(
     Ok(SymbolInventory {
         artifact_path,
         format,
+        platform: if is_macho {
+            ArtifactPlatform::MachO
+        } else {
+            ArtifactPlatform::Elf
+        },
+        kind: ArtifactKind::StaticLibrary,
+        capabilities: ArtifactCapabilities {
+            exports_symbols: true,
+            imports_symbols: false,
+        },
         symbols,
     })
+}
+
+fn classify_platform(obj: &object::File<'_>) -> ArtifactPlatform {
+    match obj.format() {
+        object::BinaryFormat::Elf => ArtifactPlatform::Elf,
+        object::BinaryFormat::MachO => ArtifactPlatform::MachO,
+        _ => ArtifactPlatform::Unknown,
+    }
+}
+
+fn classify_kind(obj: &object::File<'_>) -> ArtifactKind {
+    use object::ObjectKind;
+    match obj.kind() {
+        ObjectKind::Relocatable => ArtifactKind::Object,
+        ObjectKind::Dynamic => ArtifactKind::SharedLibrary,
+        ObjectKind::Executable => ArtifactKind::Executable,
+        _ => ArtifactKind::Unknown,
+    }
+}
+
+fn classify_capabilities(obj: &object::File<'_>) -> ArtifactCapabilities {
+    use object::ObjectKind;
+    match obj.kind() {
+        ObjectKind::Relocatable => ArtifactCapabilities {
+            exports_symbols: true,
+            imports_symbols: false,
+        },
+        ObjectKind::Dynamic | ObjectKind::Executable => ArtifactCapabilities {
+            exports_symbols: true,
+            imports_symbols: true,
+        },
+        _ => ArtifactCapabilities::default(),
+    }
 }
 
 fn classify_format(obj: &object::File<'_>) -> ArtifactFormat {
@@ -378,6 +452,9 @@ mod tests {
         let data = minimal_macho_object();
         let inv = inspect_bytes(&data, "test.o".into()).unwrap();
         assert_eq!(inv.format, ArtifactFormat::MachOObject);
+        assert_eq!(inv.platform, ArtifactPlatform::MachO);
+        assert_eq!(inv.kind, ArtifactKind::Object);
+        assert!(inv.capabilities.exports_symbols);
         // Leading '_' should be stripped
         assert!(inv.has_symbol("foo"), "symbols: {:?}", inv.symbols);
         assert!(!inv.has_symbol("_foo"), "underscore should be stripped");
@@ -417,6 +494,12 @@ mod tests {
         let inv = SymbolInventory {
             artifact_path: "test.o".into(),
             format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![
                 SymbolEntry {
                     name: "foo".into(),
@@ -450,6 +533,12 @@ mod tests {
         let inv = SymbolInventory {
             artifact_path: "test.o".into(),
             format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![
                 SymbolEntry {
                     name: "func1".into(),
@@ -492,6 +581,12 @@ mod tests {
         let inv = SymbolInventory {
             artifact_path: "libfoo.a".into(),
             format: ArtifactFormat::ElfStaticLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::StaticLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "foo_init".into(),
                 raw_name: Some("foo_init".into()),
@@ -535,6 +630,8 @@ mod tests {
 
         let inv = inspect_file(&o_path).unwrap();
         assert!(matches!(inv.format, ArtifactFormat::ElfObject));
+        assert_eq!(inv.platform, ArtifactPlatform::Elf);
+        assert_eq!(inv.kind, ArtifactKind::Object);
         assert!(inv.has_symbol("foo"));
         assert!(inv.has_symbol("bar"));
         let foo = inv.symbols.iter().find(|sym| sym.name == "foo").unwrap();
@@ -578,6 +675,8 @@ mod tests {
 
         let inv = inspect_file(&a_path).unwrap();
         assert_eq!(inv.format, ArtifactFormat::ElfStaticLibrary);
+        assert_eq!(inv.platform, ArtifactPlatform::Elf);
+        assert_eq!(inv.kind, ArtifactKind::StaticLibrary);
         assert!(inv.has_symbol("add"));
         let add = inv.symbols.iter().find(|sym| sym.name == "add").unwrap();
         assert_eq!(add.raw_name.as_deref(), Some("add"));

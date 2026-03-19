@@ -189,6 +189,12 @@ mod tests {
         SymbolInventory {
             artifact_path: "test.o".into(),
             format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols,
         }
     }
@@ -327,6 +333,12 @@ mod tests {
         let inv2 = SymbolInventory {
             artifact_path: "libbar.a".into(),
             format: ArtifactFormat::ElfStaticLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::StaticLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "bar".into(),
                 raw_name: Some("bar".into()),
@@ -355,6 +367,12 @@ mod tests {
         let inv1 = SymbolInventory {
             artifact_path: "libfoo_one.a".into(),
             format: ArtifactFormat::ElfStaticLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::StaticLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: Some("foo".into()),
@@ -369,6 +387,12 @@ mod tests {
         let inv2 = SymbolInventory {
             artifact_path: "libfoo_two.a".into(),
             format: ArtifactFormat::ElfStaticLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::StaticLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: Some("foo".into()),
@@ -461,6 +485,12 @@ mod tests {
         let inv = SymbolInventory {
             artifact_path: "test.o".into(),
             format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: None,
