@@ -684,10 +684,33 @@ fn expected_abi_size_inner(
             }
             package
                 .find_type_alias(name)
-                .and_then(|alias| expected_abi_size_inner(package, &alias.target, seen_aliases))
+                .and_then(|alias| {
+                    expected_typedef_size(package, alias, seen_aliases)
+                        .or_else(|| expected_abi_size_inner(package, &alias.target, seen_aliases))
+                })
         }
         _ => None,
     }
+}
+
+fn expected_typedef_size(
+    package: &BindingPackage,
+    alias: &crate::ir::TypeAliasBinding,
+    seen_aliases: &mut std::collections::HashSet<String>,
+) -> Option<u64> {
+    let mut layout_names = vec![alias.name.as_str()];
+    if let Some(resolution) = alias.canonical_resolution.as_ref() {
+        for name in &resolution.alias_chain {
+            layout_names.push(name);
+        }
+    }
+    find_layout_size(package, &layout_names).or_else(|| {
+        alias.canonical_resolution
+            .as_ref()
+            .and_then(|resolution| {
+                expected_abi_size_inner(package, &resolution.terminal_target, seen_aliases)
+            })
+    })
 }
 
 fn find_layout_size(package: &BindingPackage, names: &[&str]) -> Option<u64> {
@@ -1783,6 +1806,67 @@ mod tests {
                 observed_parameter_sizes: Vec::new(),
             })
         );
+    }
+
+    #[test]
+    fn typedef_layouts_drive_variable_abi_checks() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "widget_state".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: false,
+                binding: SymbolBinding::Global,
+                size: Some(16),
+                section: Some(".data".into()),
+                archive_member: None,
+                function_abi: None,
+            }],
+        };
+        let pkg = BindingPackage {
+            source_path: None,
+            items: vec![
+                BindingItem::TypeAlias(TypeAliasBinding {
+                    name: "widget_state_t".into(),
+                    target: BindingType::RecordRef("widget_state".into()),
+                    canonical_resolution: Some(AliasResolution {
+                        alias_chain: vec!["widget_state_t".into()],
+                        terminal_target: BindingType::RecordRef("widget_state".into()),
+                    }),
+                    abi_confidence: None,
+                    source_offset: None,
+                }),
+                BindingItem::Variable(VariableBinding {
+                    name: "widget_state".into(),
+                    ty: BindingType::TypedefRef("widget_state_t".into()),
+                    source_offset: None,
+                }),
+            ],
+            diagnostics: Vec::new(),
+            layouts: vec![TypeLayout {
+                name: "widget_state_t".into(),
+                size: 16,
+                align: 8,
+            }],
+            ..BindingPackage::new()
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::Matched);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::AbiShapeVerified);
     }
 
     #[test]
