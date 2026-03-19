@@ -438,6 +438,7 @@ mod tests {
             .map(|(name, is_func, vis)| SymbolEntry {
                 name: name.to_string(),
                 raw_name: None,
+                version: None,
                 visibility: vis.clone(),
                 is_function: *is_func,
                 binding: SymbolBinding::Global,
@@ -584,6 +585,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "_foo".into(),
                 raw_name: Some("_foo".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -696,6 +698,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: Some("_foo".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -735,6 +738,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: None,
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Weak,
@@ -794,6 +798,7 @@ mod tests {
                 SymbolEntry {
                     name: "foo".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -804,6 +809,7 @@ mod tests {
                 SymbolEntry {
                     name: "bar".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Weak,
@@ -855,6 +861,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "bar".into(),
                 raw_name: Some("bar".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -890,6 +897,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: Some("foo".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -911,6 +919,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: Some("foo".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1010,6 +1019,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: None,
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Weak,

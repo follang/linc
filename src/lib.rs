@@ -342,6 +342,7 @@ mod integration_tests {
             symbols: vec![SymbolEntry {
                 name: "foo".into(),
                 raw_name: None,
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: symbols::SymbolBinding::Global,

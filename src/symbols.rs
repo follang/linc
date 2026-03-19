@@ -82,6 +82,8 @@ pub struct SymbolEntry {
     pub name: String,
     #[serde(default)]
     pub raw_name: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
     pub visibility: SymbolVisibility,
     pub is_function: bool,
     pub binding: SymbolBinding,
@@ -351,7 +353,6 @@ fn classify_format(obj: &object::File<'_>) -> ArtifactFormat {
 fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
     use object::ObjectSection;
 
-    let is_macho = obj.format() == object::BinaryFormat::MachO;
     let mut symbols = Vec::new();
 
     // Check both regular and dynamic symbol tables
@@ -365,11 +366,7 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
 
         // Mach-O prefixes C symbols with '_'; strip it for consistency
         // with C identifier names used in header declarations.
-        let name = if is_macho {
-            raw_name.strip_prefix('_').unwrap_or(raw_name).to_string()
-        } else {
-            raw_name.to_string()
-        };
+        let (name, version) = normalize_symbol_identity(raw_name, obj.format());
 
         // Keep defined symbols (have a section) or global undefined symbols
         // that might be relevant for dynamic linking. Skip local undefined symbols.
@@ -430,6 +427,7 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
         symbols.push(SymbolEntry {
             name,
             raw_name: Some(raw_name.to_string()),
+            version,
             visibility,
             is_function,
             binding,
@@ -440,6 +438,28 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
     }
 
     symbols
+}
+
+fn normalize_symbol_identity(
+    raw_name: &str,
+    format: object::BinaryFormat,
+) -> (String, Option<String>) {
+    let normalized = if format == object::BinaryFormat::MachO {
+        raw_name.strip_prefix('_').unwrap_or(raw_name)
+    } else {
+        raw_name
+    };
+
+    if format == object::BinaryFormat::Elf {
+        if let Some((name, version)) = normalized.split_once("@@") {
+            return (name.to_string(), Some(version.to_string()));
+        }
+        if let Some((name, version)) = normalized.split_once('@') {
+            return (name.to_string(), Some(version.to_string()));
+        }
+    }
+
+    (normalized.to_string(), None)
 }
 
 #[cfg(test)]
@@ -779,6 +799,7 @@ mod tests {
                 SymbolEntry {
                     name: "foo".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -789,6 +810,7 @@ mod tests {
                 SymbolEntry {
                     name: "bar".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -819,6 +841,7 @@ mod tests {
                 SymbolEntry {
                     name: "func1".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -829,6 +852,7 @@ mod tests {
                 SymbolEntry {
                     name: "data1".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -839,6 +863,7 @@ mod tests {
                 SymbolEntry {
                     name: "func2".into(),
                     raw_name: None,
+                    version: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -867,6 +892,7 @@ mod tests {
             symbols: vec![SymbolEntry {
                 name: "foo_init".into(),
                 raw_name: Some("foo_init".into()),
+                version: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -900,6 +926,7 @@ mod tests {
         assert_eq!(inv.symbols.len(), 1);
         assert_eq!(inv.symbols[0].name, "demo_init");
         assert_eq!(inv.symbols[0].raw_name.as_deref(), Some("_demo_init@8"));
+        assert_eq!(inv.symbols[0].version, None);
         assert_eq!(inv.symbols[0].archive_member.as_deref(), Some("demo.obj"));
     }
 
@@ -920,6 +947,7 @@ mod tests {
         let symbols = vec![SymbolEntry {
             name: "demo_init".into(),
             raw_name: Some("__imp_demo_init".into()),
+            version: None,
             visibility: SymbolVisibility::Unknown,
             is_function: true,
             binding: SymbolBinding::Unknown,
@@ -1021,6 +1049,14 @@ Dynamic section at offset 0x2de0 contains 3 entries:
 "#,
         );
         assert_eq!(parsed, vec!["libm.so.6".to_string(), "libc.so.6".to_string()]);
+    }
+
+    #[test]
+    fn normalize_elf_symbol_identity_preserves_version() {
+        let (name, version) =
+            normalize_symbol_identity("memcpy@@GLIBC_2.14", object::BinaryFormat::Elf);
+        assert_eq!(name, "memcpy");
+        assert_eq!(version.as_deref(), Some("GLIBC_2.14"));
     }
 
     /// Compile a minimal C file to .o and inspect its symbols.
