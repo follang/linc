@@ -160,6 +160,7 @@ mod tests {
             source_path: None,
             items,
             diagnostics: Vec::new(),
+            ..BindingPackage::new()
         }
     }
 
@@ -191,6 +192,7 @@ mod tests {
             source_path: None,
             items,
             diagnostics: Vec::new(),
+            ..BindingPackage::new()
         }
     }
 

@@ -14,7 +14,7 @@ pub use extract::{extract_from_source, extract_from_translation_unit};
 pub use ir::{
     BindingItem, BindingPackage, BindingType, CallingConvention, EnumBinding, EnumVariant,
     FieldBinding, FunctionBinding, ParameterBinding, RecordBinding, RecordKind, TypeAliasBinding,
-    UnsupportedItem, VariableBinding,
+    UnsupportedItem, VariableBinding, SCHEMA_VERSION,
 };
 pub use line_markers::{FileOriginMap, OriginFilter, SourceOrigin};
 pub use preprocess::PreprocessedInput;
@@ -25,13 +25,24 @@ pub use symbols::{
 pub use validate::{validate, FunctionMatch, ItemKind, MatchStatus, SymbolMatch, ValidationReport};
 
 /// Serialize a BindingPackage to a deterministic JSON string.
-pub fn to_json(package: &BindingPackage) -> Result<String, serde_json::Error> {
-    serde_json::to_string_pretty(package)
+pub fn to_json(package: &BindingPackage) -> Result<String, String> {
+    serde_json::to_string_pretty(package).map_err(|e| format!("JSON serialize error: {}", e))
 }
 
 /// Deserialize a BindingPackage from a JSON string.
-pub fn from_json(json: &str) -> Result<BindingPackage, serde_json::Error> {
-    serde_json::from_str(json)
+///
+/// Returns an error if the schema version is newer than what this version of BIC supports.
+pub fn from_json(json: &str) -> Result<BindingPackage, String> {
+    let pkg: BindingPackage =
+        serde_json::from_str(json).map_err(|e| format!("JSON parse error: {}", e))?;
+    if pkg.schema_version > ir::SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported schema version {} (this BIC supports up to {})",
+            pkg.schema_version,
+            ir::SCHEMA_VERSION
+        ));
+    }
+    Ok(pkg)
 }
 
 #[cfg(test)]
@@ -222,5 +233,38 @@ mod integration_tests {
 
         // Cleanup
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn schema_version_present_in_json() {
+        let pkg = extract_from_source("void foo(void);").unwrap();
+        let json = to_json(&pkg).unwrap();
+        assert!(json.contains("\"schema_version\": 1"));
+        assert!(json.contains("\"bic_version\""));
+    }
+
+    #[test]
+    fn schema_version_roundtrip() {
+        let pkg = extract_from_source("void foo(void);").unwrap();
+        assert_eq!(pkg.schema_version, SCHEMA_VERSION);
+        let json = to_json(&pkg).unwrap();
+        let pkg2 = from_json(&json).unwrap();
+        assert_eq!(pkg2.schema_version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn reject_future_schema_version() {
+        let json = r#"{"schema_version": 99, "bic_version": "0.1.0", "source_path": null, "items": [], "diagnostics": []}"#;
+        let result = from_json(json);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unsupported schema version"));
+    }
+
+    #[test]
+    fn accept_missing_schema_version_defaults_to_current() {
+        // Old JSON without schema_version should deserialize with default
+        let json = r#"{"source_path": null, "items": [], "diagnostics": []}"#;
+        let pkg = from_json(json).unwrap();
+        assert_eq!(pkg.schema_version, SCHEMA_VERSION);
     }
 }

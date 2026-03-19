@@ -54,6 +54,7 @@ impl PreprocessedInput {
                             e.line, e.column, e.expected
                         ),
                     )],
+                    ..BindingPackage::new()
                 };
             }
         };
@@ -65,6 +66,7 @@ impl PreprocessedInput {
             source_path: self.source_path.clone(),
             items,
             diagnostics,
+            ..BindingPackage::new()
         }
     }
 }

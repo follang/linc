@@ -145,6 +145,7 @@ impl HeaderConfig {
                     source_path: Some(source_desc),
                     items,
                     diagnostics,
+                    ..BindingPackage::new()
                 };
 
                 // Apply origin filtering if configured

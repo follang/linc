@@ -1008,6 +1008,7 @@ pub fn extract_from_source(source: &str) -> Result<BindingPackage, String> {
         source_path: None,
         items,
         diagnostics,
+        ..BindingPackage::new()
     })
 }
 
@@ -1023,6 +1024,7 @@ pub fn extract_from_translation_unit(
         source_path,
         items,
         diagnostics,
+        ..BindingPackage::new()
     }
 }
 

@@ -394,6 +394,7 @@ mod tests {
                 source_offset: None,
             })],
             diagnostics: Vec::new(),
+            ..crate::ir::BindingPackage::new()
         };
         let out = emit_rust_ffi(&pkg);
         assert!(out.contains("__bindgen_anon_0"));
@@ -422,6 +423,7 @@ mod tests {
                 source_offset: None,
             })],
             diagnostics: Vec::new(),
+            ..crate::ir::BindingPackage::new()
         };
         let out = emit_rust_ffi(&pkg);
         assert!(out.contains("flexible array"));
@@ -440,6 +442,7 @@ mod tests {
                 source_offset: None,
             })],
             diagnostics: Vec::new(),
+            ..crate::ir::BindingPackage::new()
         };
         let out = emit_rust_ffi(&pkg);
         assert!(out.contains("opaque: _Complex"));

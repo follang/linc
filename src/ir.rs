@@ -2,16 +2,32 @@ use serde::{Deserialize, Serialize};
 
 use crate::diagnostics::Diagnostic;
 
+pub const SCHEMA_VERSION: u32 = 1;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindingPackage {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    #[serde(default = "default_bic_version")]
+    pub bic_version: String,
     pub source_path: Option<String>,
     pub items: Vec<BindingItem>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
+fn default_schema_version() -> u32 {
+    SCHEMA_VERSION
+}
+
+fn default_bic_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 impl BindingPackage {
     pub fn new() -> Self {
         Self {
+            schema_version: SCHEMA_VERSION,
+            bic_version: env!("CARGO_PKG_VERSION").to_string(),
             source_path: None,
             items: Vec::new(),
             diagnostics: Vec::new(),
