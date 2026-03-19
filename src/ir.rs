@@ -6,9 +6,13 @@ pub const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BindingTarget {
+    #[serde(default)]
     pub target_triple: Option<String>,
+    #[serde(default)]
     pub compiler_command: Option<String>,
+    #[serde(default)]
     pub compiler_version: Option<String>,
+    #[serde(default)]
     pub flavor: Option<String>,
 }
 
@@ -20,8 +24,11 @@ pub struct BindingDefine {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BindingInputs {
+    #[serde(default)]
     pub entry_headers: Vec<String>,
+    #[serde(default)]
     pub include_dirs: Vec<String>,
+    #[serde(default)]
     pub defines: Vec<BindingDefine>,
 }
 
@@ -40,8 +47,11 @@ pub struct LinkLibrary {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct BindingLinkSurface {
+    #[serde(default)]
     pub include_paths: Vec<String>,
+    #[serde(default)]
     pub library_paths: Vec<String>,
+    #[serde(default)]
     pub libraries: Vec<LinkLibrary>,
 }
 
@@ -392,6 +402,24 @@ mod tests {
         let json = r#"{
             "schema_version": 1,
             "bic_version": "0.1.0",
+            "source_path": "legacy.h",
+            "items": [],
+            "diagnostics": []
+        }"#;
+        let pkg: BindingPackage = serde_json::from_str(json).unwrap();
+        assert_eq!(pkg.target, BindingTarget::default());
+        assert_eq!(pkg.inputs, BindingInputs::default());
+        assert_eq!(pkg.link, BindingLinkSurface::default());
+    }
+
+    #[test]
+    fn binding_package_accepts_empty_nested_metadata_objects() {
+        let json = r#"{
+            "schema_version": 1,
+            "bic_version": "0.1.0",
+            "target": {},
+            "inputs": {},
+            "link": {},
             "source_path": "legacy.h",
             "items": [],
             "diagnostics": []
