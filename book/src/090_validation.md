@@ -59,6 +59,7 @@ symbol-resolution coverage from the deeper ABI-evidence work that is still evolv
 Current statuses are:
 
 - `Matched`
+- `AbiShapeMismatch`
 - `Missing`
 - `UnresolvedDeclaredLinkInputs`
 - `DecorationMismatch`
@@ -75,6 +76,20 @@ Each status tells you something different.
 ### `Matched`
 
 The declaration name resolved to a visible symbol of the expected kind.
+
+For variable declarations, `Matched` may now also carry positive ABI-shape evidence when `bic`
+can compare an observed symbol size against an inferred expected size.
+
+### `AbiShapeMismatch`
+
+The declaration resolved to a visible provider of the expected broad kind, but the available
+artifact-side size metadata disagreed with the expected declaration-side size.
+
+This is intentionally limited today:
+
+- it only applies where artifact metadata exposes a usable size
+- it only applies where `bic` can infer an expected size conservatively
+- it is currently strongest for variables, not routine signatures
 
 ### `Missing`
 
@@ -168,6 +183,8 @@ Current values distinguish:
 - duplicate visible providers
 - declared link inputs without a discovered provider
 - plain missing providers
+- ABI-shape-verified providers
+- ABI-shape mismatches
 - wrong-kind providers
 
 `ReexportedCandidate` can now come from either:
@@ -227,5 +244,11 @@ A `Matched` status does not prove:
 - structure layout compatibility
 - calling convention identity beyond the available evidence
 - semantic compatibility across versions
+
+The current ABI-evidence layer is intentionally narrow:
+
+- variable size checks from object metadata
+- primitive-type expectations
+- layout-backed expectations when `BindingPackage.layouts` provides the relevant named type size
 
 Use validation as strong symbol-level evidence, not as a complete ABI theorem.

@@ -284,11 +284,23 @@ fn validation_entry_root_types_roundtrip() {
             visibility: Some(bic::SymbolVisibility::Default),
             confidence: MatchConfidence::High,
             evidence_kind: EvidenceKind::ExactExported,
+            abi_shape: None,
         },
     };
     let json = serde_json::to_string(&entry).unwrap();
     let decoded: ValidationEntry = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, entry);
+}
+
+#[test]
+fn abi_shape_evidence_root_type_roundtrip() {
+    let evidence = bic::AbiShapeEvidence {
+        expected_size: Some(4),
+        observed_size: Some(8),
+    };
+    let json = serde_json::to_string(&evidence).unwrap();
+    let decoded: bic::AbiShapeEvidence = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, evidence);
 }
 
 #[test]
@@ -310,6 +322,7 @@ fn validation_summary_root_type_roundtrip() {
     let summary = ValidationSummary {
         total: 3,
         matched: 1,
+        abi_shape_mismatches: 0,
         missing: 1,
         unresolved_declared_link_inputs: 0,
         hidden: 0,

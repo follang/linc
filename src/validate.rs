@@ -14,6 +14,7 @@ pub enum ItemKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MatchStatus {
     Matched,
+    AbiShapeMismatch,
     Missing,
     UnresolvedDeclaredLinkInputs,
     DecorationMismatch,
@@ -54,6 +55,8 @@ pub struct ValidationEvidence {
     pub confidence: MatchConfidence,
     #[serde(default = "default_evidence_kind")]
     pub evidence_kind: EvidenceKind,
+    #[serde(default)]
+    pub abi_shape: Option<AbiShapeEvidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +70,8 @@ pub struct ValidationEntry {
 pub struct ValidationSummary {
     pub total: usize,
     pub matched: usize,
+    #[serde(default)]
+    pub abi_shape_mismatches: usize,
     pub missing: usize,
     pub unresolved_declared_link_inputs: usize,
     pub hidden: usize,
@@ -87,6 +92,7 @@ pub enum MatchConfidence {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceKind {
     ExactExported,
+    AbiShapeVerified,
     WeakExported,
     HiddenProvider,
     DecoratedCandidate,
@@ -94,7 +100,16 @@ pub enum EvidenceKind {
     DuplicateVisibleProviders,
     DeclaredLinkInputsWithoutProvider,
     MissingProvider,
+    AbiShapeMismatch,
     KindMismatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AbiShapeEvidence {
+    #[serde(default)]
+    pub expected_size: Option<u64>,
+    #[serde(default)]
+    pub observed_size: Option<u64>,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -190,11 +205,12 @@ pub fn validate_many(
 ) -> ValidationReport {
     let mut matches = Vec::new();
     let mut entries = Vec::new();
+    let mut any_abi_shape_evidence = false;
 
     for item in &package.items {
-        let (name, kind, expect_function) = match item {
-            BindingItem::Function(f) => (&f.name, ItemKind::Function, true),
-            BindingItem::Variable(v) => (&v.name, ItemKind::Variable, false),
+        let (name, kind, expect_function, variable_ty) = match item {
+            BindingItem::Function(f) => (&f.name, ItemKind::Function, true, None),
+            BindingItem::Variable(v) => (&v.name, ItemKind::Variable, false, Some(&v.ty)),
             _ => continue,
         };
 
@@ -250,7 +266,7 @@ pub fn validate_many(
             .chain(decorated_candidates.iter())
             .filter_map(|(_, symbol)| symbol.raw_name.clone())
             .collect::<Vec<_>>();
-        let (status, visibility) = match candidates.first() {
+        let (mut status, visibility) = match candidates.first() {
             Some(_) => {
                 let visible: Vec<_> = candidates
                     .iter()
@@ -305,8 +321,26 @@ pub fn validate_many(
                 (status, None)
             }
         };
+        let abi_shape = if status == MatchStatus::Matched && !expect_function {
+            variable_ty
+                .and_then(|ty| expected_abi_size(package, ty))
+                .zip(candidates.first().and_then(|(_, symbol)| symbol.size))
+                .map(|(expected_size, observed_size)| {
+                    any_abi_shape_evidence = true;
+                    if expected_size != observed_size {
+                        status = MatchStatus::AbiShapeMismatch;
+                    }
+                    AbiShapeEvidence {
+                        expected_size: Some(expected_size),
+                        observed_size: Some(observed_size),
+                    }
+                })
+        } else {
+            None
+        };
         let confidence = match status {
             MatchStatus::Matched => MatchConfidence::High,
+            MatchStatus::AbiShapeMismatch => MatchConfidence::Low,
             MatchStatus::WeakMatch => MatchConfidence::Medium,
             MatchStatus::DecorationMismatch
             | MatchStatus::Hidden
@@ -317,7 +351,14 @@ pub fn validate_many(
             MatchStatus::Missing => MatchConfidence::None,
         };
         let evidence_kind = match status {
-            MatchStatus::Matched => EvidenceKind::ExactExported,
+            MatchStatus::Matched => {
+                if abi_shape.is_some() {
+                    EvidenceKind::AbiShapeVerified
+                } else {
+                    EvidenceKind::ExactExported
+                }
+            }
+            MatchStatus::AbiShapeMismatch => EvidenceKind::AbiShapeMismatch,
             MatchStatus::WeakMatch => EvidenceKind::WeakExported,
             MatchStatus::Hidden => EvidenceKind::HiddenProvider,
             MatchStatus::DecorationMismatch => EvidenceKind::DecoratedCandidate,
@@ -369,13 +410,14 @@ pub fn validate_many(
                 visibility,
                 confidence,
                 evidence_kind,
+                abi_shape,
             },
         });
     }
 
     let summary = build_summary(&matches);
     ValidationReport {
-        phases: default_validation_phases(),
+        phases: build_validation_phases(any_abi_shape_evidence),
         entries,
         summary,
         matches,
@@ -390,6 +432,7 @@ fn build_summary(matches: &[SymbolMatch]) -> ValidationSummary {
     for entry in matches {
         match entry.status {
             MatchStatus::Matched => summary.matched += 1,
+            MatchStatus::AbiShapeMismatch => summary.abi_shape_mismatches += 1,
             MatchStatus::Missing => summary.missing += 1,
             MatchStatus::UnresolvedDeclaredLinkInputs => {
                 summary.unresolved_declared_link_inputs += 1
@@ -405,6 +448,10 @@ fn build_summary(matches: &[SymbolMatch]) -> ValidationSummary {
 }
 
 fn default_validation_phases() -> Vec<ValidationPhaseReport> {
+    build_validation_phases(false)
+}
+
+fn build_validation_phases(abi_evidence_completed: bool) -> Vec<ValidationPhaseReport> {
     vec![
         ValidationPhaseReport {
             phase: ValidationPhase::ProviderDiscovery,
@@ -416,9 +463,59 @@ fn default_validation_phases() -> Vec<ValidationPhaseReport> {
         },
         ValidationPhaseReport {
             phase: ValidationPhase::AbiEvidence,
-            completed: false,
+            completed: abi_evidence_completed,
         },
     ]
+}
+
+fn expected_abi_size(package: &BindingPackage, ty: &crate::ir::BindingType) -> Option<u64> {
+    expected_abi_size_inner(package, ty, &mut std::collections::HashSet::new())
+}
+
+fn expected_abi_size_inner(
+    package: &BindingPackage,
+    ty: &crate::ir::BindingType,
+    seen_aliases: &mut std::collections::HashSet<String>,
+) -> Option<u64> {
+    use crate::ir::BindingType;
+
+    match ty {
+        BindingType::Bool | BindingType::Char | BindingType::SChar | BindingType::UChar => Some(1),
+        BindingType::Short | BindingType::UShort => Some(2),
+        BindingType::Int | BindingType::UInt | BindingType::Float => Some(4),
+        BindingType::LongLong | BindingType::ULongLong | BindingType::Double => Some(8),
+        BindingType::Long | BindingType::ULong => Some(8),
+        BindingType::Qualified { ty, .. } => expected_abi_size_inner(package, ty, seen_aliases),
+        BindingType::Array(element, Some(len)) => {
+            expected_abi_size_inner(package, element, seen_aliases).map(|size| size * len)
+        }
+        BindingType::RecordRef(name) => {
+            let qualified = format!("struct {}", name);
+            find_layout_size(package, &[qualified.as_str(), name.as_str()])
+        }
+        BindingType::EnumRef(name) => {
+            let qualified = format!("enum {}", name);
+            find_layout_size(package, &[qualified.as_str(), name.as_str()])
+        }
+        BindingType::Opaque(name) => find_layout_size(package, &[name]),
+        BindingType::TypedefRef(name) => {
+            if !seen_aliases.insert(name.clone()) {
+                return None;
+            }
+            package
+                .find_type_alias(name)
+                .and_then(|alias| expected_abi_size_inner(package, &alias.target, seen_aliases))
+        }
+        _ => None,
+    }
+}
+
+fn find_layout_size(package: &BindingPackage, names: &[&str]) -> Option<u64> {
+    package
+        .layouts
+        .iter()
+        .find(|layout| names.iter().any(|name| layout.name == *name))
+        .map(|layout| layout.size)
 }
 
 fn default_match_confidence() -> MatchConfidence {
@@ -1103,6 +1200,89 @@ mod tests {
         let report = validate(&pkg, &inv);
         assert!(!report.all_matched());
         assert_eq!(report.matches[0].status, MatchStatus::NotAVariable);
+    }
+
+    #[test]
+    fn variable_size_match_records_abi_shape_evidence() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "errno".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: false,
+                binding: SymbolBinding::Global,
+                size: Some(4),
+                section: Some(".data".into()),
+                archive_member: None,
+            }],
+        };
+        let pkg = make_package_with_vars(&[], &["errno"]);
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::Matched);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::AbiShapeVerified);
+        assert_eq!(
+            report.entries[0].evidence.abi_shape,
+            Some(AbiShapeEvidence {
+                expected_size: Some(4),
+                observed_size: Some(4),
+            })
+        );
+        assert!(report.phases[2].completed);
+    }
+
+    #[test]
+    fn variable_size_mismatch_is_reported_as_abi_shape_mismatch() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "errno".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: false,
+                binding: SymbolBinding::Global,
+                size: Some(8),
+                section: Some(".data".into()),
+                archive_member: None,
+            }],
+        };
+        let pkg = make_package_with_vars(&[], &["errno"]);
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::AbiShapeMismatch);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::AbiShapeMismatch);
+        assert_eq!(report.summary.abi_shape_mismatches, 1);
+        assert_eq!(
+            report.entries[0].evidence.abi_shape,
+            Some(AbiShapeEvidence {
+                expected_size: Some(4),
+                observed_size: Some(8),
+            })
+        );
+        assert!(report.phases[2].completed);
     }
 
     #[test]
