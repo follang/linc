@@ -16,4 +16,4 @@ C headers → preprocessor → PAC parser → BIC extractor → IR → codegen /
 - Origin filtering to exclude system header declarations
 - Rust FFI code generation
 - JSON serialization of the binding IR
-- ELF symbol inspection and validation
+- ELF and Mach-O symbol inspection and validation
