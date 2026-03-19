@@ -92,7 +92,6 @@
 //!
 //! - [`extract_from_source`]
 //! - [`HeaderConfig::process`]
-//! - [`inspect_symbols`]
 //!
 //! Those APIs are still usable, but downstream users should treat their exact error
 //! strings as transitional rather than a stable matching contract.

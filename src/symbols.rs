@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::error::BicError;
 use object::read::Object;
 use object::read::archive::ArchiveFile;
 use object::{ObjectSymbol, SymbolKind};
@@ -98,13 +99,16 @@ impl SymbolInventory {
     }
 }
 
-pub fn inspect_file(path: impl AsRef<Path>) -> Result<SymbolInventory, String> {
+pub fn inspect_file(path: impl AsRef<Path>) -> Result<SymbolInventory, BicError> {
     let path = path.as_ref();
-    let data = std::fs::read(path).map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
+    let data = std::fs::read(path).map_err(|e| BicError::SymbolRead {
+        path: path.to_path_buf(),
+        reason: e.to_string(),
+    })?;
     inspect_bytes(&data, path.display().to_string())
 }
 
-pub fn inspect_bytes(data: &[u8], artifact_path: String) -> Result<SymbolInventory, String> {
+pub fn inspect_bytes(data: &[u8], artifact_path: String) -> Result<SymbolInventory, BicError> {
     // Try as archive first (static library)
     if let Ok(archive) = ArchiveFile::parse(data) {
         return inspect_archive(archive, data, artifact_path);
@@ -112,7 +116,10 @@ pub fn inspect_bytes(data: &[u8], artifact_path: String) -> Result<SymbolInvento
 
     // Try as single object file
     let obj = object::File::parse(data)
-        .map_err(|e| format!("failed to parse {}: {}", artifact_path, e))?;
+        .map_err(|e| BicError::UnsupportedFormat {
+            path: artifact_path.clone().into(),
+            format: e.to_string(),
+        })?;
 
     let format = classify_format(&obj);
     let symbols = extract_symbols_from_object(&obj);
@@ -133,18 +140,24 @@ fn inspect_archive(
     archive: ArchiveFile<'_>,
     data: &[u8],
     artifact_path: String,
-) -> Result<SymbolInventory, String> {
+) -> Result<SymbolInventory, BicError> {
     let mut symbols = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let mut is_macho = false;
     let mut format_detected = false;
 
     for member in archive.members() {
-        let member = member.map_err(|e| format!("failed to read archive member: {}", e))?;
+        let member = member.map_err(|e| BicError::SymbolRead {
+            path: artifact_path.clone().into(),
+            reason: format!("failed to read archive member: {}", e),
+        })?;
         let member_name = Some(String::from_utf8_lossy(member.name()).into_owned());
         let member_data = member
             .data(data)
-            .map_err(|e| format!("failed to read archive member data: {}", e))?;
+            .map_err(|e| BicError::SymbolRead {
+                path: artifact_path.clone().into(),
+                reason: format!("failed to read archive member data: {}", e),
+            })?;
 
         if let Ok(obj) = object::File::parse(member_data) {
             if !format_detected {
@@ -651,7 +664,7 @@ mod tests {
     #[test]
     fn inspect_nonexistent_file() {
         let result = inspect_file("/nonexistent/path.o");
-        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), BicError::SymbolRead { .. }));
     }
 
     #[test]
