@@ -5,6 +5,7 @@ use object::read::Object;
 use object::read::archive::ArchiveFile;
 use object::{ObjectSymbol, SymbolKind};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Native artifact format recognized by the symbol inventory layer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,7 +75,7 @@ pub enum SymbolBinding {
 }
 
 /// Direction of the symbol relative to the inspected artifact.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SymbolDirection {
     Exported,
     Imported,
@@ -99,6 +100,8 @@ pub struct SymbolEntry {
     pub direction: SymbolDirection,
     #[serde(default)]
     pub reexported_via: Vec<String>,
+    #[serde(default)]
+    pub alias_of: Option<String>,
     pub visibility: SymbolVisibility,
     pub is_function: bool,
     pub binding: SymbolBinding,
@@ -371,6 +374,7 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
     use object::ObjectSection;
 
     let mut symbols = Vec::new();
+    let mut primary_aliases = HashMap::new();
 
     // Check both regular and dynamic symbol tables
     let iter = obj.symbols().chain(obj.dynamic_symbols());
@@ -445,19 +449,23 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
             .and_then(|idx| obj.section_by_index(idx).ok())
             .and_then(|sec| sec.name().ok().map(|n| n.to_string()));
 
-        symbols.push(SymbolEntry {
+        let mut symbol = SymbolEntry {
             name,
             raw_name: Some(raw_name.to_string()),
             version,
             direction,
             reexported_via: Vec::new(),
+            alias_of: None,
             visibility,
             is_function,
             binding,
             size,
             section,
             archive_member: None,
-        });
+        };
+        assign_symbol_alias(&mut primary_aliases, &mut symbol, sym.address());
+
+        symbols.push(symbol);
     }
 
     symbols
@@ -492,6 +500,40 @@ fn attach_reexport_candidates(
         if symbol.direction == SymbolDirection::Imported {
             symbol.reexported_via = dependency_edges.to_vec();
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct SymbolAliasKey {
+    section: String,
+    address: u64,
+    is_function: bool,
+    direction: SymbolDirection,
+}
+
+fn assign_symbol_alias(
+    primary_aliases: &mut HashMap<SymbolAliasKey, String>,
+    symbol: &mut SymbolEntry,
+    address: u64,
+) {
+    if symbol.direction != SymbolDirection::Exported || address == 0 {
+        return;
+    }
+    let Some(section) = symbol.section.clone() else {
+        return;
+    };
+    let key = SymbolAliasKey {
+        section,
+        address,
+        is_function: symbol.is_function,
+        direction: symbol.direction.clone(),
+    };
+    if let Some(primary) = primary_aliases.get(&key) {
+        if primary != &symbol.name {
+            symbol.alias_of = Some(primary.clone());
+        }
+    } else {
+        primary_aliases.insert(key, symbol.name.clone());
     }
 }
 
@@ -857,6 +899,7 @@ mod tests {
                     version: None,
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
+                    alias_of: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -870,6 +913,7 @@ mod tests {
                     version: None,
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
+                    alias_of: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -903,6 +947,7 @@ mod tests {
                     version: None,
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
+                    alias_of: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -916,6 +961,7 @@ mod tests {
                     version: None,
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
+                    alias_of: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -929,6 +975,7 @@ mod tests {
                     version: None,
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
+                    alias_of: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -960,6 +1007,7 @@ mod tests {
                 version: None,
                 direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
+                alias_of: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1017,6 +1065,7 @@ mod tests {
             version: None,
             direction: SymbolDirection::Imported,
             reexported_via: Vec::new(),
+            alias_of: None,
             visibility: SymbolVisibility::Unknown,
             is_function: true,
             binding: SymbolBinding::Unknown,
@@ -1129,6 +1178,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
                 version: None,
                 direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
+                alias_of: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1142,6 +1192,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
                 version: Some("GLIBC_2.2.5".into()),
                 direction: SymbolDirection::Imported,
                 reexported_via: Vec::new(),
+                alias_of: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1159,6 +1210,45 @@ Dynamic section at offset 0x2de0 contains 3 entries:
 
         assert!(symbols[0].reexported_via.is_empty());
         assert_eq!(symbols[1].reexported_via, vec!["libc.so.6", "libm.so.6"]);
+    }
+
+    #[test]
+    fn assign_symbol_alias_marks_secondary_exported_name() {
+        let mut primary_aliases = HashMap::new();
+        let mut primary = SymbolEntry {
+            name: "demo_init".into(),
+            raw_name: Some("demo_init".into()),
+            version: None,
+            direction: SymbolDirection::Exported,
+            reexported_via: Vec::new(),
+            alias_of: None,
+            visibility: SymbolVisibility::Default,
+            is_function: true,
+            binding: SymbolBinding::Global,
+            size: Some(32),
+            section: Some(".text".into()),
+            archive_member: None,
+        };
+        let mut alias = SymbolEntry {
+            name: "demo_alias".into(),
+            raw_name: Some("demo_alias".into()),
+            version: None,
+            direction: SymbolDirection::Exported,
+            reexported_via: Vec::new(),
+            alias_of: None,
+            visibility: SymbolVisibility::Default,
+            is_function: true,
+            binding: SymbolBinding::Global,
+            size: Some(32),
+            section: Some(".text".into()),
+            archive_member: None,
+        };
+
+        assign_symbol_alias(&mut primary_aliases, &mut primary, 0x1000);
+        assign_symbol_alias(&mut primary_aliases, &mut alias, 0x1000);
+
+        assert_eq!(primary.alias_of, None);
+        assert_eq!(alias.alias_of.as_deref(), Some("demo_init"));
     }
 
     #[test]

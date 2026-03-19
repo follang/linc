@@ -67,6 +67,7 @@ Each `SymbolEntry` carries:
 - optional `section`
 - optional `archive_member`
 - optional `reexported_via`
+- optional `alias_of`
 
 ### Normalized vs Raw Name
 
@@ -82,6 +83,10 @@ This is important because native artifacts may use:
 `direction` is also important now: only exported symbols are candidate providers during
 validation. Imported symbols are still preserved because they matter for shared-library and
 link-planning analysis.
+
+`alias_of` is preserved when `bic` can see more than one exported symbol name resolving to the
+same section/address identity. That is intentionally conservative: `bic` only records alias
+relationships when the artifact evidence is strong enough.
 
 ## Archive Member Provenance
 

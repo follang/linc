@@ -346,6 +346,7 @@ mod integration_tests {
                 version: None,
                 direction: symbols::SymbolDirection::Exported,
                 reexported_via: Vec::new(),
+                alias_of: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: symbols::SymbolBinding::Global,
