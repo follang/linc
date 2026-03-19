@@ -5,6 +5,7 @@ use bic::{
     ValidationReport,
 };
 use bic::symbols::{ArtifactCapabilities, ArtifactFormat, ArtifactKind, ArtifactPlatform};
+use std::path::PathBuf;
 
 #[test]
 fn regression_old_json_with_empty_nested_objects_stays_consumable() {
@@ -94,4 +95,69 @@ fn regression_duplicate_provider_report_fixture_stays_consumable() {
     assert_eq!(report.summary.duplicate_providers, 1);
     assert_eq!(report.duplicate_providers().len(), 1);
     assert_eq!(report.entries[0].evidence.evidence_kind, bic::EvidenceKind::DuplicateVisibleProviders);
+}
+
+#[test]
+fn regression_tricky_layout_fixture_stays_consumable() {
+    let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/fixtures/tricky_layouts.h");
+    let result = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .probe_type_layout("struct packed_flags")
+        .probe_type_layout("enum widget_mode")
+        .process()
+        .unwrap();
+
+    let alias = result.package.find_type_alias("my_size_ptr").unwrap();
+    let resolution = alias.canonical_resolution.as_ref().unwrap();
+    assert_eq!(resolution.alias_chain, vec!["my_size_t", "size_t"]);
+
+    let record = result.package.find_record("packed_flags").unwrap();
+    assert_eq!(record.abi_confidence, Some(bic::AbiConfidence::PartialBitfieldLayout));
+    let fields = record.fields.as_ref().unwrap();
+    assert_eq!(fields[0].bit_width, Some(3));
+    assert_eq!(fields[1].bit_width, Some(5));
+
+    let widget_mode = result.package.find_enum("widget_mode").unwrap();
+    assert_eq!(
+        widget_mode.abi_confidence,
+        Some(bic::AbiConfidence::RepresentationProbed)
+    );
+}
+
+#[test]
+fn regression_tricky_macro_fixture_stays_consumable() {
+    let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/fixtures/tricky_macros.h");
+    let result = bic::HeaderConfig::new().entry_header(&header).process().unwrap();
+
+    let api_level = result
+        .package
+        .macros
+        .iter()
+        .find(|macro_binding| macro_binding.name == "API_LEVEL")
+        .unwrap();
+    assert_eq!(api_level.value, Some(MacroValue::Integer(7)));
+
+    let config_macro = result
+        .package
+        .effective_macro_environment
+        .iter()
+        .find(|entry| entry.macro_name == "HAVE_WIDGETS")
+        .unwrap();
+    assert_eq!(config_macro.value, Some(MacroValue::Integer(1)));
+
+    let abi_macro = result
+        .package
+        .effective_macro_environment
+        .iter()
+        .find(|entry| entry.macro_name == "WIDGET_PACK")
+        .unwrap();
+    assert_eq!(abi_macro.category, bic::MacroCategory::AbiAffecting);
+
+    let function_like = result
+        .package
+        .macros
+        .iter()
+        .find(|macro_binding| macro_binding.name == "DECLARE_WIDGET")
+        .unwrap();
+    assert!(function_like.is_unsupported_function_like());
 }

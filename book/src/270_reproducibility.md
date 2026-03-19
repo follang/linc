@@ -23,6 +23,10 @@ For stable fixtures:
 - avoid depending on ambient machine state when a fixture can encode the case directly
 - keep fixture names tied to the contract or bug they protect
 
+The checked-in fixture headers under `test/fixtures/` are part of that rule.
+They exist so tricky layout and macro cases remain regression-tested through the public library
+surface instead of only through inline one-off test strings.
+
 ## Toolchain-Dependent Tests
 
 Some tests naturally depend on the local compiler, linker, or system libraries.
