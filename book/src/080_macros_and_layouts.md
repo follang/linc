@@ -3,6 +3,7 @@
 Two of the most important "not just declarations" surfaces in `bic` are:
 
 - macro inventory
+- macro provenance
 - compiler-probed type layouts
 
 Together they close a large part of the gap between syntax-only header extraction and ABI-aware binding generation.
@@ -20,6 +21,9 @@ Each `MacroBinding` carries:
 - `kind`
 - `category`
 - optional parsed `value` for bindable integer/string constants
+
+`BindingPackage.macro_provenance` carries aligned package-level provenance entries for captured
+macros, including origin classification and source location where line-marker evidence is available.
 
 ### Macro Kind
 

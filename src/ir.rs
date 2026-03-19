@@ -107,6 +107,16 @@ impl MacroBinding {
     }
 }
 
+/// Per-macro provenance attached at the package layer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct MacroProvenance {
+    pub macro_name: String,
+    #[serde(default)]
+    pub source_origin: Option<SourceOrigin>,
+    #[serde(default)]
+    pub source_location: Option<SourceLocation>,
+}
+
 /// Compiler-probed layout evidence for a named type.
 ///
 /// Invariant: `name` is the consumer-visible identity key and `size`/`align` are only present when
@@ -251,6 +261,8 @@ pub struct BindingPackage {
     pub link: BindingLinkSurface,
     #[serde(default)]
     pub provenance: Vec<DeclarationProvenance>,
+    #[serde(default)]
+    pub macro_provenance: Vec<MacroProvenance>,
     pub source_path: Option<String>,
     pub items: Vec<BindingItem>,
     pub diagnostics: Vec<Diagnostic>,
@@ -275,6 +287,7 @@ impl BindingPackage {
             layouts: Vec::new(),
             link: BindingLinkSurface::default(),
             provenance: Vec::new(),
+            macro_provenance: Vec::new(),
             source_path: None,
             items: Vec::new(),
             diagnostics: Vec::new(),
@@ -655,6 +668,7 @@ mod tests {
         assert!(pkg.layouts.is_empty());
         assert_eq!(pkg.link, BindingLinkSurface::default());
         assert!(pkg.provenance.is_empty());
+        assert!(pkg.macro_provenance.is_empty());
     }
 
     #[test]

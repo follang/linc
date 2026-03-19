@@ -9,8 +9,8 @@ use crate::ir::{
     BindingDefine, BindingInputs, BindingItem, BindingItemKind, BindingLinkSurface,
     BindingPackage, BindingTarget, DeclarationProvenance, LinkArtifact, LinkArtifactKind,
     LinkFramework, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource,
-    LinkResolutionMode, MacroBinding, MacroCategory, MacroForm, MacroKind, MacroValue,
-    NativeSurfaceKind,
+    LinkResolutionMode, MacroBinding, MacroCategory, MacroForm, MacroKind, MacroProvenance,
+    MacroValue, NativeSurfaceKind,
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
 use crate::probe::probe_type_layouts;
@@ -572,7 +572,7 @@ impl HeaderConfig {
         let (command, args) = self.describe_invocation(&pac_config, &tmp_file);
 
         let parse_result = pac::driver::parse(&pac_config, &tmp_file);
-        let macros = self.capture_macros(&tmp_file);
+        let (macros, macro_provenance) = self.capture_macros(&tmp_file);
 
         // Clean up
         std::fs::remove_file(&tmp_file).ok();
@@ -601,6 +601,7 @@ impl HeaderConfig {
                     target: self.binding_target(),
                     inputs: self.binding_inputs(),
                     macros,
+                    macro_provenance,
                     link: self.binding_link_surface(),
                     items,
                     diagnostics,
@@ -765,10 +766,10 @@ impl HeaderConfig {
         }
     }
 
-    fn capture_macros(&self, input: &Path) -> Vec<MacroBinding> {
+    fn capture_macros(&self, input: &Path) -> (Vec<MacroBinding>, Vec<MacroProvenance>) {
         let compiler = self.compiler_command();
         let mut cmd = std::process::Command::new(&compiler);
-        cmd.arg("-dM").arg("-E");
+        cmd.arg("-dD").arg("-E");
         for dir in &self.include_dirs {
             cmd.arg(format!("-I{}", dir.display()));
         }
@@ -785,15 +786,15 @@ impl HeaderConfig {
         cmd.arg(input);
 
         let Ok(output) = cmd.output() else {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         };
         if !output.status.success() {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
         let Ok(stdout) = String::from_utf8(output.stdout) else {
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         };
-        parse_macro_definitions(&stdout)
+        parse_macro_definitions_with_provenance(&stdout, &self.entry_headers)
     }
 
     fn describe_invocation(&self, config: &pac::driver::Config, input: &Path) -> (String, Vec<String>) {
@@ -901,11 +902,37 @@ fn detect_compiler_version(compiler_command: &str) -> Option<String> {
     stdout.lines().next().map(str::to_string).filter(|line| !line.is_empty())
 }
 
+#[cfg(test)]
 fn parse_macro_definitions(source: &str) -> Vec<MacroBinding> {
     source
         .lines()
         .filter_map(parse_macro_definition_line)
         .collect()
+}
+
+fn parse_macro_definitions_with_provenance(
+    source: &str,
+    entry_headers: &[impl AsRef<Path>],
+) -> (Vec<MacroBinding>, Vec<MacroProvenance>) {
+    let origin_map = FileOriginMap::parse(source, entry_headers);
+    let mut macros = Vec::new();
+    let mut provenance = Vec::new();
+    let mut offset = 0;
+
+    for line in source.split('\n') {
+        let line_start = offset;
+        offset += line.len() + 1;
+        if let Some(binding) = parse_macro_definition_line(line) {
+            provenance.push(MacroProvenance {
+                macro_name: binding.name.clone(),
+                source_origin: Some(origin_map.origin_at(line_start)),
+                source_location: origin_map.location_at(line_start),
+            });
+            macros.push(binding);
+        }
+    }
+
+    (macros, provenance)
 }
 
 fn parse_macro_definition_line(line: &str) -> Option<MacroBinding> {
@@ -1510,6 +1537,24 @@ mod tests {
     }
 
     #[test]
+    fn parse_macro_definitions_with_provenance_tracks_locations() {
+        let source = concat!(
+            "# 3 \"demo.h\"\n",
+            "#define API_LEVEL 7\n",
+            "#define API_NAME \"demo\"\n",
+        );
+        let (macros, provenance) = parse_macro_definitions_with_provenance(source, &["demo.h"]);
+        assert_eq!(macros.len(), 2);
+        assert_eq!(provenance.len(), 2);
+        assert_eq!(provenance[0].macro_name, "API_LEVEL");
+        assert_eq!(provenance[0].source_origin, Some(crate::SourceOrigin::Entry));
+        assert_eq!(
+            provenance[0].source_location.as_ref().and_then(|loc| loc.line),
+            Some(3)
+        );
+    }
+
+    #[test]
     fn flavor_to_pac_conversion() {
         assert_eq!(Flavor::GnuC11.to_pac(), pac::driver::Flavor::GnuC11);
         assert_eq!(Flavor::ClangC11.to_pac(), pac::driver::Flavor::ClangC11);
@@ -1693,6 +1738,14 @@ int compute(int x);
             .iter()
             .any(|m| m.name == "HAVE_ZLIB"
                 && m.category == MacroCategory::ConfigurationFlag));
+        assert_eq!(result.package.macro_provenance.len(), result.package.macros.len());
+        assert!(result
+            .package
+            .macro_provenance
+            .iter()
+            .any(|prov| prov.macro_name == "API_LEVEL"
+                && prov.source_origin == Some(crate::SourceOrigin::Entry)
+                && prov.source_location.is_some()));
 
         cleanup(&dir);
     }
