@@ -607,12 +607,20 @@ pub struct FieldBinding {
     pub ty: BindingType,
     #[serde(default)]
     pub bit_width: Option<u64>,
+    #[serde(default)]
+    pub layout: Option<FieldLayout>,
 }
 
 impl FieldBinding {
     pub fn is_bitfield(&self) -> bool {
         self.bit_width.is_some()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FieldLayout {
+    #[serde(default)]
+    pub offset_bytes: Option<u64>,
 }
 
 /// Extracted record declaration.
@@ -739,6 +747,7 @@ mod tests {
                 name: Some("x".into()),
                 ty: BindingType::Int,
                 bit_width: None,
+                layout: None,
             }]),
             source_offset: Some(2),
         }));
@@ -960,11 +969,13 @@ mod tests {
                     name: Some("x".into()),
                     ty: BindingType::Int,
                     bit_width: None,
+                    layout: None,
                 },
                 FieldBinding {
                     name: Some("y".into()),
                     ty: BindingType::Int,
                     bit_width: None,
+                    layout: None,
                 },
             ]),
             source_offset: None,
@@ -979,6 +990,7 @@ mod tests {
             name: Some("flags".into()),
             ty: BindingType::UInt,
             bit_width: Some(3),
+            layout: None,
         };
         assert!(field.is_bitfield());
     }

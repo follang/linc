@@ -300,6 +300,7 @@ impl Extractor {
                 name: None,
                 ty,
                 bit_width: None,
+                layout: None,
             });
             return;
         }
@@ -345,6 +346,7 @@ impl Extractor {
                 name,
                 ty,
                 bit_width,
+                layout: None,
             });
         }
     }

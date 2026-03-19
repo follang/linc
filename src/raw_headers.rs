@@ -14,6 +14,7 @@ use crate::ir::{
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
 use crate::probe::probe_type_layouts;
+use crate::probe::ProbeSubjectReport;
 
 /// High-level scan configuration for turning headers into a `BindingPackage`.
 ///
@@ -615,7 +616,9 @@ impl HeaderConfig {
                 package.provenance = build_item_provenance(&package.items, &origin_map);
 
                 if !self.probe_types.is_empty() {
-                    package.layouts = probe_type_layouts(self, &self.probe_types)?.layouts;
+                    let probe_report = probe_type_layouts(self, &self.probe_types)?;
+                    package.layouts = probe_report.layouts;
+                    attach_probe_field_offsets(&mut package.items, &probe_report.subjects);
                 }
 
                 // Apply origin filtering if configured
@@ -900,6 +903,51 @@ fn build_effective_macro_environment(
             }
         })
         .collect()
+}
+
+fn attach_probe_field_offsets(
+    items: &mut [BindingItem],
+    subjects: &[ProbeSubjectReport],
+) {
+    let subject_map = subjects
+        .iter()
+        .map(|subject| (subject.name.as_str(), subject))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    for item in items {
+        let BindingItem::Record(record) = item else {
+            continue;
+        };
+        let Some(record_name) = record.name.as_deref() else {
+            continue;
+        };
+        let subject_name = match record.kind {
+            crate::ir::RecordKind::Struct => format!("struct {}", record_name),
+            crate::ir::RecordKind::Union => format!("union {}", record_name),
+        };
+        let Some(subject) = subject_map.get(subject_name.as_str()) else {
+            continue;
+        };
+        let Some(fields) = record.fields.as_mut() else {
+            continue;
+        };
+        let field_map = subject
+            .fields
+            .iter()
+            .map(|field| (field.name.as_str(), field))
+            .collect::<std::collections::HashMap<_, _>>();
+        for field in fields {
+            let Some(field_name) = field.name.as_deref() else {
+                continue;
+            };
+            let Some(probed) = field_map.get(field_name) else {
+                continue;
+            };
+            field.layout = Some(crate::ir::FieldLayout {
+                offset_bytes: probed.offset_bytes,
+            });
+        }
+    }
 }
 
 fn detect_target_triple(compiler_command: &str) -> Option<String> {
@@ -1823,6 +1871,23 @@ int compute(int x);
         assert_eq!(provenance.item_name.as_deref(), Some("value_t"));
         assert_eq!(provenance.source_origin, Some(crate::SourceOrigin::Entry));
         assert!(provenance.source_location.is_some());
+        let record = result
+            .package
+            .records()
+            .find(|record| record.name.as_deref() == Some("widget"))
+            .unwrap();
+        let fields = record.fields.as_ref().unwrap();
+        assert_eq!(fields[0].name.as_deref(), Some("a"));
+        assert_eq!(
+            fields[0].layout.as_ref().and_then(|layout| layout.offset_bytes),
+            Some(0)
+        );
+        assert_eq!(fields[1].name.as_deref(), Some("b"));
+        assert!(fields[1]
+            .layout
+            .as_ref()
+            .and_then(|layout| layout.offset_bytes)
+            .is_some());
 
         cleanup(&dir);
     }

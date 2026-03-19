@@ -4,7 +4,7 @@ use bic::{
     MacroForm, MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence,
     ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout, RecordCompleteness, TypeAliasBinding,
     TypeLayout, ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
-    ValidationPhaseReport, ValidationSummary, probe_type_layouts,
+    ValidationPhaseReport, ValidationSummary, FieldLayout, probe_type_layouts,
 };
 
 #[test]
@@ -158,6 +158,16 @@ fn probed_field_layout_supports_partial_bitfield_metadata() {
     let json = serde_json::to_string(&field).unwrap();
     let decoded: ProbedFieldLayout = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, field);
+}
+
+#[test]
+fn field_layout_root_type_roundtrip() {
+    let layout = FieldLayout {
+        offset_bytes: Some(8),
+    };
+    let json = serde_json::to_string(&layout).unwrap();
+    let decoded: FieldLayout = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, layout);
 }
 
 #[test]
