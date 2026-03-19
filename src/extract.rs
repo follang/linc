@@ -88,8 +88,12 @@ impl Extractor {
         let Some(name) = name else { return };
 
         let base_ty = self.resolve_base_type(&fdef.specifiers);
-        let (return_type, params, variadic) =
+        let base_is_const = self.has_const_qualifier(&fdef.specifiers);
+        let (mut return_type, params, variadic) =
             self.resolve_function_parts(&fdef.declarator.node, base_ty);
+        if base_is_const {
+            return_type = self.mark_innermost_pointer_const(return_type);
+        }
 
         self.items.push(BindingItem::Function(FunctionBinding {
             name,
@@ -157,8 +161,12 @@ impl Extractor {
         };
 
         let base_ty = self.resolve_base_type(specifiers);
-        let (return_type, params, variadic) =
+        let base_is_const = self.has_const_qualifier(specifiers);
+        let (mut return_type, params, variadic) =
             self.resolve_function_parts(declarator, base_ty);
+        if base_is_const {
+            return_type = self.mark_innermost_pointer_const(return_type);
+        }
 
         self.items.push(BindingItem::Function(FunctionBinding {
             name,
@@ -259,19 +267,24 @@ impl Extractor {
             return;
         }
 
+        let base_is_const = self.has_const_qualifier_sq(&field.specifiers);
+
         for sd in &field.declarators {
             let name = sd
                 .node
                 .declarator
                 .as_ref()
                 .and_then(|d| self.declarator_name(&d.node));
-            let ty = match &sd.node.declarator {
+            let mut ty = match &sd.node.declarator {
                 Some(d) => self.apply_derived_type(
                     self.resolve_base_type_from_type_specs(&base_type_specs),
                     &d.node,
                 ),
                 None => self.resolve_base_type_from_type_specs(&base_type_specs),
             };
+            if base_is_const {
+                ty = self.mark_innermost_pointer_const(ty);
+            }
             out.push(FieldBinding { name, ty });
         }
     }
@@ -425,7 +438,61 @@ impl Extractor {
         declarator: &Declarator,
     ) -> BindingType {
         let base = self.resolve_base_type(specifiers);
-        self.apply_derived_type(base, declarator)
+        let base_is_const = self.has_const_qualifier(specifiers);
+        let mut ty = self.apply_derived_type(base, declarator);
+
+        // If the base type had const and the outermost type is a pointer,
+        // mark the innermost pointer's pointee as const.
+        // In `const char *p`: base=Char(const), derived=[Pointer]
+        // The result should be Pointer { pointee: Char, const_pointee: true }
+        if base_is_const {
+            ty = self.mark_innermost_pointer_const(ty);
+        }
+
+        ty
+    }
+
+    fn has_const_qualifier(&self, specifiers: &[Node<DeclarationSpecifier>]) -> bool {
+        specifiers.iter().any(|s| {
+            matches!(
+                s.node,
+                DeclarationSpecifier::TypeQualifier(ref tq) if tq.node == TypeQualifier::Const
+            )
+        })
+    }
+
+    fn has_const_qualifier_sq(&self, specifiers: &[Node<SpecifierQualifier>]) -> bool {
+        specifiers.iter().any(|s| {
+            matches!(
+                s.node,
+                SpecifierQualifier::TypeQualifier(ref tq) if tq.node == TypeQualifier::Const
+            )
+        })
+    }
+
+    /// Mark the innermost pointer in a type as const_pointee.
+    /// For `Pointer { pointee: Char, const_pointee: false }` → sets const_pointee=true
+    /// For `Pointer { pointee: Pointer { pointee: Char }, ... }` → recurses to inner
+    fn mark_innermost_pointer_const(&self, ty: BindingType) -> BindingType {
+        match ty {
+            BindingType::Pointer {
+                pointee,
+                const_pointee: _,
+            } => {
+                // Check if the pointee is also a pointer — if so, recurse
+                match *pointee {
+                    inner @ BindingType::Pointer { .. } => BindingType::Pointer {
+                        pointee: Box::new(self.mark_innermost_pointer_const(inner)),
+                        const_pointee: false,
+                    },
+                    other => BindingType::Pointer {
+                        pointee: Box::new(other),
+                        const_pointee: true,
+                    },
+                }
+            }
+            other => other, // Not a pointer, nothing to mark
+        }
     }
 
     fn apply_derived_type(&self, base: BindingType, declarator: &Declarator) -> BindingType {
@@ -435,11 +502,18 @@ impl Extractor {
         // In C declarator syntax, the derived list goes from innermost to outermost
         // Pointers are leftmost (first), arrays/functions are rightmost (last)
         // We need to split: pointers wrap inside-out, arrays/functions wrap outside-in
-        let mut pointer_count = 0;
+        let mut pointers: Vec<bool> = Vec::new(); // true = const pointee
         for derived in &declarator.derived {
             match &derived.node {
-                DerivedDeclarator::Pointer(_) => {
-                    pointer_count += 1;
+                DerivedDeclarator::Pointer(qualifiers) => {
+                    let is_const = qualifiers.iter().any(|q| {
+                        matches!(
+                            q.node,
+                            PointerQualifier::TypeQualifier(ref tq)
+                                if tq.node == TypeQualifier::Const
+                        )
+                    });
+                    pointers.push(is_const);
                 }
                 DerivedDeclarator::Array(arr) => {
                     let size = match &arr.node.size {
@@ -464,8 +538,41 @@ impl Extractor {
             }
         }
 
-        for _ in 0..pointer_count {
-            ty = BindingType::Pointer(Box::new(ty));
+        // In C, `const char *p` means: pointer to const char.
+        // The pointer qualifiers in pac attach to the POINTER level, not the pointee.
+        // `const char *p` parses as: base=char, specifier has Const, pointer has no qualifier.
+        // `char * const p` parses as: base=char, pointer has Const qualifier.
+        //
+        // For Rust FFI we care about pointee constness:
+        // - If the BASE type has const (from specifiers), the innermost pointer should be const_pointee=true
+        // - If the POINTER has const qualifier, that's pointer-itself-const (irrelevant for Rust)
+        //
+        // However, pac puts the const on the pointer qualifier list for `const T *`:
+        // the const actually qualifies the pointee. The first pointer's qualifiers
+        // describe what the pointer points to.
+        //
+        // Actually in C declaration syntax processed by pac:
+        // `const int *p` → specifiers=[Const, Int], derived=[Pointer([])]
+        // `int *const p` → specifiers=[Int], derived=[Pointer([Const])]
+        // `const int *const p` → specifiers=[Const, Int], derived=[Pointer([Const])]
+        //
+        // The pointer qualifier Const means the pointer ITSELF is const.
+        // The specifier Const means the pointed-to type is const.
+        // For `const char *`, const is in the specifiers, NOT in the pointer qualifiers.
+        //
+        // So we need to check if the base type's specifiers had const.
+        // We'll handle that by checking if pointers[0] is const (pointer-self-const)
+        // and separately tracking base-const from the caller.
+        //
+        // For now: pointer qualifiers indicate pointer-self-const which is not
+        // what we need. The pointee const comes from the base specifiers.
+        // We'll pass that through from the caller. For the simple wrapping here,
+        // we just create non-const pointers and let the caller override.
+        for _is_ptr_const in &pointers {
+            ty = BindingType::Pointer {
+                pointee: Box::new(ty),
+                const_pointee: false,
+            };
         }
 
         // Handle nested declarator (parenthesized)
@@ -489,7 +596,10 @@ impl Extractor {
         for derived in &declarator.derived {
             match &derived.node {
                 DerivedDeclarator::Pointer(_) => {
-                    return_type = BindingType::Pointer(Box::new(return_type));
+                    return_type = BindingType::Pointer {
+                        pointee: Box::new(return_type),
+                        const_pointee: false,
+                    };
                 }
                 DerivedDeclarator::Function(fdecl) => {
                     params = self.extract_parameters(&fdecl.node.parameters);
@@ -526,10 +636,14 @@ impl Extractor {
                     .as_ref()
                     .and_then(|d| self.declarator_name(&d.node));
                 let base = self.resolve_base_type_from_param_specifiers(&p.node.specifiers);
-                let ty = match &p.node.declarator {
+                let base_is_const = self.has_const_qualifier(&p.node.specifiers);
+                let mut ty = match &p.node.declarator {
                     Some(d) => self.apply_derived_type(base, &d.node),
                     None => base,
                 };
+                if base_is_const {
+                    ty = self.mark_innermost_pointer_const(ty);
+                }
                 ParameterBinding { name, ty }
             })
             .collect()
@@ -668,7 +782,7 @@ mod tests {
         match &pkg.items[0] {
             BindingItem::TypeAlias(ta) => {
                 assert_eq!(ta.name, "handle_t");
-                assert_eq!(ta.target, BindingType::Pointer(Box::new(BindingType::Void)));
+                assert_eq!(ta.target, BindingType::ptr(BindingType::Void));
             }
             other => panic!("expected TypeAlias, got {:?}", other),
         }
@@ -699,7 +813,7 @@ mod tests {
                 assert_eq!(f.parameters[0].name.as_deref(), Some("s"));
                 assert_eq!(
                     f.parameters[0].ty,
-                    BindingType::Pointer(Box::new(BindingType::Char))
+                    BindingType::const_ptr(BindingType::Char)
                 );
             }
             other => panic!("expected Function, got {:?}", other),
@@ -801,7 +915,7 @@ mod tests {
                 assert_eq!(f.name, "malloc");
                 assert_eq!(
                     f.return_type,
-                    BindingType::Pointer(Box::new(BindingType::Void))
+                    BindingType::ptr(BindingType::Void)
                 );
                 assert_eq!(f.parameters.len(), 1);
                 assert_eq!(f.parameters[0].ty, BindingType::ULong);
@@ -861,7 +975,7 @@ mod tests {
             BindingItem::TypeAlias(ta) => {
                 assert_eq!(ta.name, "handler_t");
                 match &ta.target {
-                    BindingType::Pointer(inner) => match inner.as_ref() {
+                    BindingType::Pointer { pointee: inner, .. } => match inner.as_ref() {
                         BindingType::FunctionPointer { return_type, parameters, variadic } => {
                             assert_eq!(**return_type, BindingType::Void);
                             assert_eq!(parameters.len(), 1);
@@ -875,6 +989,53 @@ mod tests {
             }
             other => panic!("expected TypeAlias, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn extract_const_char_pointer_param() {
+        let pkg = extract("int puts(const char *s);");
+        match &pkg.items[0] {
+            BindingItem::Function(f) => {
+                assert_eq!(f.parameters[0].ty, BindingType::const_ptr(BindingType::Char));
+            }
+            other => panic!("expected Function, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn extract_mutable_pointer_param() {
+        let pkg = extract("void fill(int *buf);");
+        match &pkg.items[0] {
+            BindingItem::Function(f) => {
+                assert_eq!(f.parameters[0].ty, BindingType::ptr(BindingType::Int));
+            }
+            other => panic!("expected Function, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn extract_const_void_pointer_return() {
+        let pkg = extract("const void *memchr(const void *s, int c, unsigned long n);");
+        match &pkg.items[0] {
+            BindingItem::Function(f) => {
+                assert_eq!(f.return_type, BindingType::const_ptr(BindingType::Void));
+                assert_eq!(f.parameters[0].ty, BindingType::const_ptr(BindingType::Void));
+                assert_eq!(f.parameters[1].ty, BindingType::Int);
+            }
+            other => panic!("expected Function, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn extract_const_field_pointer() {
+        let pkg = extract("struct s { const char *name; int *data; };");
+        let records: Vec<_> = pkg.items.iter().filter_map(|i| match i {
+            BindingItem::Record(r) => Some(r),
+            _ => None,
+        }).collect();
+        let fields = records[0].fields.as_ref().unwrap();
+        assert_eq!(fields[0].ty, BindingType::const_ptr(BindingType::Char));
+        assert_eq!(fields[1].ty, BindingType::ptr(BindingType::Int));
     }
 
     #[test]

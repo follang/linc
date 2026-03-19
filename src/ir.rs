@@ -53,7 +53,10 @@ pub enum BindingType {
     Float,
     Double,
     LongDouble,
-    Pointer(Box<BindingType>),
+    Pointer {
+        pointee: Box<BindingType>,
+        const_pointee: bool,
+    },
     Array(Box<BindingType>, Option<u64>),
     FunctionPointer {
         return_type: Box<BindingType>,
@@ -64,6 +67,22 @@ pub enum BindingType {
     RecordRef(String),
     EnumRef(String),
     Opaque(String),
+}
+
+impl BindingType {
+    pub fn ptr(pointee: BindingType) -> Self {
+        BindingType::Pointer {
+            pointee: Box::new(pointee),
+            const_pointee: false,
+        }
+    }
+
+    pub fn const_ptr(pointee: BindingType) -> Self {
+        BindingType::Pointer {
+            pointee: Box::new(pointee),
+            const_pointee: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -161,10 +180,12 @@ mod tests {
 
     #[test]
     fn binding_type_pointer_nesting() {
-        let ty = BindingType::Pointer(Box::new(BindingType::Pointer(Box::new(BindingType::Char))));
+        let ty = BindingType::ptr(BindingType::ptr(BindingType::Char));
         match &ty {
-            BindingType::Pointer(inner) => match inner.as_ref() {
-                BindingType::Pointer(inner2) => assert_eq!(*inner2.as_ref(), BindingType::Char),
+            BindingType::Pointer { pointee: inner, .. } => match inner.as_ref() {
+                BindingType::Pointer { pointee: inner2, .. } => {
+                    assert_eq!(*inner2.as_ref(), BindingType::Char)
+                }
                 _ => panic!("expected pointer"),
             },
             _ => panic!("expected pointer"),
@@ -205,7 +226,7 @@ mod tests {
             parameters: vec![
                 ParameterBinding {
                     name: Some("fmt".into()),
-                    ty: BindingType::Pointer(Box::new(BindingType::Char)),
+                    ty: BindingType::ptr(BindingType::Char),
                 },
             ],
             return_type: BindingType::Int,
@@ -232,7 +253,7 @@ mod tests {
                 name: Some("size".into()),
                 ty: BindingType::TypedefRef("size_t".into()),
             }],
-            return_type: BindingType::Pointer(Box::new(BindingType::Void)),
+            return_type: BindingType::ptr(BindingType::Void),
             variadic: false,
             source_offset: Some(100),
         }));
@@ -261,7 +282,7 @@ mod tests {
     fn function_pointer_type() {
         let ty = BindingType::FunctionPointer {
             return_type: Box::new(BindingType::Void),
-            parameters: vec![BindingType::Int, BindingType::Pointer(Box::new(BindingType::Void))],
+            parameters: vec![BindingType::Int, BindingType::ptr(BindingType::Void)],
             variadic: false,
         };
         match &ty {
@@ -270,6 +291,34 @@ mod tests {
                 assert!(!variadic);
             }
             _ => panic!("expected function pointer"),
+        }
+    }
+
+    #[test]
+    fn const_pointer_vs_mut_pointer() {
+        let const_ptr = BindingType::const_ptr(BindingType::Char);
+        let mut_ptr = BindingType::ptr(BindingType::Char);
+        assert_ne!(const_ptr, mut_ptr);
+
+        match &const_ptr {
+            BindingType::Pointer { const_pointee, .. } => assert!(const_pointee),
+            _ => panic!("expected pointer"),
+        }
+        match &mut_ptr {
+            BindingType::Pointer { const_pointee, .. } => assert!(!const_pointee),
+            _ => panic!("expected pointer"),
+        }
+    }
+
+    #[test]
+    fn const_pointer_serialization_roundtrip() {
+        let ty = BindingType::const_ptr(BindingType::Void);
+        let json = serde_json::to_string(&ty).unwrap();
+        let ty2: BindingType = serde_json::from_str(&json).unwrap();
+        assert_eq!(ty, ty2);
+        match &ty2 {
+            BindingType::Pointer { const_pointee, .. } => assert!(const_pointee),
+            _ => panic!("expected pointer"),
         }
     }
 }

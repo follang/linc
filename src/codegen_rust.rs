@@ -179,11 +179,15 @@ impl RustEmitter {
             BindingType::Float => "f32".into(),
             BindingType::Double => "f64".into(),
             BindingType::LongDouble => "f64".into(), // Approximation
-            BindingType::Pointer(inner) => {
-                if **inner == BindingType::Void {
-                    "*mut ::core::ffi::c_void".into()
+            BindingType::Pointer {
+                pointee,
+                const_pointee,
+            } => {
+                let mutability = if *const_pointee { "*const" } else { "*mut" };
+                if **pointee == BindingType::Void {
+                    format!("{} ::core::ffi::c_void", mutability)
                 } else {
-                    format!("*mut {}", self.render_type(inner))
+                    format!("{} {}", mutability, self.render_type(pointee))
                 }
             }
             BindingType::Array(inner, Some(size)) => {
@@ -252,7 +256,7 @@ mod tests {
     #[test]
     fn emit_variadic_function() {
         let out = gen("int printf(const char *fmt, ...);");
-        assert!(out.contains("pub fn printf(fmt: *mut ::core::ffi::c_char, ...)"));
+        assert!(out.contains("pub fn printf(fmt: *const ::core::ffi::c_char, ...)"));
     }
 
     #[test]
@@ -332,5 +336,31 @@ mod tests {
     fn emit_function_pointer_typedef() {
         let out = gen("typedef void (*handler_t)(int sig);");
         assert!(out.contains("pub type handler_t"));
+    }
+
+    #[test]
+    fn emit_const_pointer_param() {
+        let out = gen("int puts(const char *s);");
+        assert!(out.contains("s: *const ::core::ffi::c_char"));
+    }
+
+    #[test]
+    fn emit_mut_pointer_param() {
+        let out = gen("void fill(int *buf);");
+        assert!(out.contains("buf: *mut ::core::ffi::c_int"));
+    }
+
+    #[test]
+    fn emit_const_void_pointer_return() {
+        let out = gen("const void *find(void);");
+        assert!(out.contains("*const ::core::ffi::c_void"));
+    }
+
+    #[test]
+    fn emit_memcpy_signature() {
+        let out = gen("void *memcpy(void *dest, const void *src, unsigned long n);");
+        assert!(out.contains("dest: *mut ::core::ffi::c_void"));
+        assert!(out.contains("src: *const ::core::ffi::c_void"));
+        assert!(out.contains("-> *mut ::core::ffi::c_void"));
     }
 }
