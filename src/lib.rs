@@ -117,6 +117,8 @@
 //!   their exact long-term shape
 //! - validation and symbol inventories are structured evidence, not proof that every ABI detail
 //!   is fully modeled
+//! - `SCHEMA_VERSION` intentionally remains `1` for now because recent changes have been
+//!   additive/defaultable rather than a reviewed breaking wire-format step
 //!
 //! # Current Failure Model
 //!
