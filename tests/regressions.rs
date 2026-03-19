@@ -366,6 +366,46 @@ fn regression_tricky_macro_fixture_stays_consumable() {
 }
 
 #[test]
+fn regression_macro_public_api_fixture_preserves_configuration_and_abi_macros() {
+    let header = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("test/fixtures/macro_public_api.h");
+    let result = bic::HeaderConfig::new().entry_header(&header).process().unwrap();
+
+    let api_level = result
+        .package
+        .macros
+        .iter()
+        .find(|entry| entry.name == "WIDGET_API_LEVEL")
+        .unwrap();
+    assert_eq!(api_level.value, Some(MacroValue::Integer(12)));
+    assert_eq!(api_level.category, bic::MacroCategory::BindableConstant);
+
+    let fast_path = result
+        .package
+        .effective_macro_environment
+        .iter()
+        .find(|entry| entry.macro_name == "WIDGET_ENABLE_FAST_PATH")
+        .unwrap();
+    assert_eq!(fast_path.category, bic::MacroCategory::ConfigurationFlag);
+
+    let abi_macro = result
+        .package
+        .macros
+        .iter()
+        .find(|entry| entry.name == "WIDGET_PACKED")
+        .unwrap();
+    assert_eq!(abi_macro.category, bic::MacroCategory::AbiAffecting);
+
+    let function_like = result
+        .package
+        .macros
+        .iter()
+        .find(|entry| entry.name == "WIDGET_DECLARE_HANDLE")
+        .unwrap();
+    assert!(function_like.is_unsupported_function_like());
+}
+
+#[test]
 fn regression_linux_artifact_fixture_stays_consumable() {
     let inventory: SymbolInventory = serde_json::from_str(include_str!(
         "../test/contracts/linux_elf_inventory_fixture.json"
