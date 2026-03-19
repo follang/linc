@@ -1,9 +1,10 @@
 use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
-    FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
-    MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
-    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationDeclaration,
-    ValidationEntry, ValidationEvidence, ValidationPhase, ValidationPhaseReport, probe_type_layouts,
+    EvidenceKind, FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory,
+    MacroForm, MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence,
+    ProbeSubjectKind, ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout,
+    ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
+    ValidationPhaseReport, probe_type_layouts,
 };
 
 #[test]
@@ -188,6 +189,7 @@ fn validation_entry_root_types_roundtrip() {
             raw_symbol_names: vec!["_malloc".into()],
             visibility: Some(bic::SymbolVisibility::Default),
             confidence: MatchConfidence::High,
+            evidence_kind: EvidenceKind::ExactExported,
         },
     };
     let json = serde_json::to_string(&entry).unwrap();
@@ -200,4 +202,11 @@ fn match_confidence_root_type_roundtrip() {
     let json = serde_json::to_string(&MatchConfidence::Medium).unwrap();
     let decoded: MatchConfidence = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, MatchConfidence::Medium);
+}
+
+#[test]
+fn evidence_kind_root_type_roundtrip() {
+    let json = serde_json::to_string(&EvidenceKind::WeakExported).unwrap();
+    let decoded: EvidenceKind = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, EvidenceKind::WeakExported);
 }

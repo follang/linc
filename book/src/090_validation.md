@@ -142,6 +142,7 @@ Each `ValidationEntry` preserves:
 - `raw_symbol_names`
 - observed `visibility`
 - `confidence`
+- `evidence_kind`
 
 The older `matches` list remains available as the flatter compatibility surface.
 
@@ -153,6 +154,21 @@ Validation confidence is currently a policy-friendly summary of the available sy
 - `Medium`: provider exists, but only as a weak symbol
 - `Low`: partial or conflicting evidence exists
 - `None`: no provider evidence was found
+
+## Evidence Kind
+
+`evidence_kind` is the more structural classification of provider state.
+Current values distinguish:
+
+- exact exported providers
+- weak exported providers
+- hidden providers
+- decorated-name candidates
+- re-export candidates inferred from dependency-bearing shared artifacts
+- duplicate visible providers
+- declared link inputs without a discovered provider
+- plain missing providers
+- wrong-kind providers
 
 ## How To Read A Report
 

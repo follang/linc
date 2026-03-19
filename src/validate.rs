@@ -52,6 +52,8 @@ pub struct ValidationEvidence {
     pub visibility: Option<SymbolVisibility>,
     #[serde(default = "default_match_confidence")]
     pub confidence: MatchConfidence,
+    #[serde(default = "default_evidence_kind")]
+    pub evidence_kind: EvidenceKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +69,19 @@ pub enum MatchConfidence {
     Medium,
     Low,
     None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceKind {
+    ExactExported,
+    WeakExported,
+    HiddenProvider,
+    DecoratedCandidate,
+    ReexportedCandidate,
+    DuplicateVisibleProviders,
+    DeclaredLinkInputsWithoutProvider,
+    MissingProvider,
+    KindMismatch,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -86,6 +101,8 @@ pub struct SymbolMatch {
     pub provider_artifacts: Vec<String>,
     #[serde(default = "default_match_confidence")]
     pub confidence: MatchConfidence,
+    #[serde(default = "default_evidence_kind")]
+    pub evidence_kind: EvidenceKind,
 }
 
 /// Aggregate validation report for a package against one or more inventories.
@@ -248,6 +265,22 @@ pub fn validate_many(
             | MatchStatus::NotAVariable => MatchConfidence::Low,
             MatchStatus::Missing => MatchConfidence::None,
         };
+        let evidence_kind = match status {
+            MatchStatus::Matched => EvidenceKind::ExactExported,
+            MatchStatus::WeakMatch => EvidenceKind::WeakExported,
+            MatchStatus::Hidden => EvidenceKind::HiddenProvider,
+            MatchStatus::DecorationMismatch => EvidenceKind::DecoratedCandidate,
+            MatchStatus::DuplicateProviders => EvidenceKind::DuplicateVisibleProviders,
+            MatchStatus::UnresolvedDeclaredLinkInputs => {
+                if inventories.iter().any(|inventory| !inventory.dependency_edges.is_empty()) {
+                    EvidenceKind::ReexportedCandidate
+                } else {
+                    EvidenceKind::DeclaredLinkInputsWithoutProvider
+                }
+            }
+            MatchStatus::Missing => EvidenceKind::MissingProvider,
+            MatchStatus::NotAFunction | MatchStatus::NotAVariable => EvidenceKind::KindMismatch,
+        };
 
         matches.push(SymbolMatch {
             name: name.clone(),
@@ -256,6 +289,7 @@ pub fn validate_many(
             visibility: visibility.clone(),
             provider_artifacts: provider_artifacts.clone(),
             confidence: confidence.clone(),
+            evidence_kind: evidence_kind.clone(),
         });
         entries.push(ValidationEntry {
             declaration: ValidationDeclaration {
@@ -268,6 +302,7 @@ pub fn validate_many(
                 raw_symbol_names,
                 visibility,
                 confidence,
+                evidence_kind,
             },
         });
     }
@@ -298,6 +333,10 @@ fn default_validation_phases() -> Vec<ValidationPhaseReport> {
 
 fn default_match_confidence() -> MatchConfidence {
     MatchConfidence::None
+}
+
+fn default_evidence_kind() -> EvidenceKind {
+    EvidenceKind::MissingProvider
 }
 
 fn format_provider(inventory: &SymbolInventory, symbol: &crate::symbols::SymbolEntry) -> String {
@@ -615,6 +654,8 @@ mod tests {
         );
         assert_eq!(report.entries[0].evidence.confidence, MatchConfidence::High);
         assert_eq!(report.matches[0].confidence, MatchConfidence::High);
+        assert_eq!(report.entries[0].evidence.evidence_kind, EvidenceKind::ExactExported);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::ExactExported);
     }
 
     #[test]
@@ -644,6 +685,34 @@ mod tests {
         let report = validate(&pkg, &inv);
         assert_eq!(report.matches[0].confidence, MatchConfidence::Medium);
         assert_eq!(report.entries[0].evidence.confidence, MatchConfidence::Medium);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::WeakExported);
+    }
+
+    #[test]
+    fn unresolved_declared_inputs_with_dependency_edges_are_marked_as_reexport_candidates() {
+        let mut pkg = make_package(&["foo"]);
+        pkg.link.libraries.push(LinkLibrary {
+            name: "demo".into(),
+            kind: LinkLibraryKind::Default,
+            source: LinkRequirementSource::Declared,
+        });
+
+        let inv = SymbolInventory {
+            artifact_path: "libdemo.so".into(),
+            format: ArtifactFormat::ElfSharedLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::SharedLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: true,
+            },
+            dependency_edges: vec!["libc.so.6".into()],
+            symbols: Vec::new(),
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::UnresolvedDeclaredLinkInputs);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::ReexportedCandidate);
     }
 
     #[test]
