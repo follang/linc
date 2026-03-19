@@ -113,22 +113,9 @@ Mach-O commonly prefixes external symbols with `_`.
 
 That normalization is intentionally paired with `raw_name` preservation so no spelling evidence is lost.
 
-## CLI Equivalent
-
-```sh
-bic inspect-symbols --file build/libdemo.so
-```
-
-The command prints pretty JSON suitable for:
-
-- debugging
-- snapshots in tests
-- feeding validation jobs
-- collecting artifact metadata in a build graph
-
 ## When To Use Inventories Directly
 
-Use `inspect-symbols` or `inspect_symbols(...)` directly when:
+Use `inspect_symbols(...)` directly when:
 
 - you want to debug a native artifact before validating bindings
 - you need artifact metadata without having headers available

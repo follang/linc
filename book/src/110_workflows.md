@@ -4,11 +4,16 @@ This chapter ties the separate surfaces together into practical workflows.
 
 ## Workflow 1: Scan A Header And Save JSON
 
-```sh
-bic scan \
-  --header include/demo.h \
-  --include-dir include \
-  > bindings.json
+```rust
+use bic::{HeaderConfig, to_json};
+
+let result = HeaderConfig::new()
+    .header("include/demo.h")
+    .include_dir("include")
+    .process()?;
+
+let json = to_json(&result.package).unwrap();
+std::fs::write("bindings.json", json).unwrap();
 ```
 
 This is the baseline path for most automation.
@@ -23,8 +28,12 @@ The resulting file now contains:
 
 ## Workflow 2: Inspect A Native Artifact
 
-```sh
-bic inspect-symbols --file build/libdemo.so > symbols.json
+```rust
+use bic::inspect_symbols;
+
+let inventory = inspect_symbols("build/libdemo.so")?;
+let json = serde_json::to_string_pretty(&inventory).unwrap();
+std::fs::write("symbols.json", json).unwrap();
 ```
 
 Use this when you need artifact evidence first.
@@ -37,27 +46,31 @@ Typical reasons:
 
 ## Workflow 3: Validate Bindings Against Artifacts
 
-```sh
-bic validate \
-  --bindings-json bindings.json \
-  --artifact build/libdemo.so
+```rust
+use bic::{inspect_symbols, validate};
+
+let inventory = inspect_symbols("build/libdemo.so")?;
+let report = validate(&package, &inventory);
 ```
 
 This is the first serious consistency check between header intent and native reality.
 
 For a split native surface:
 
-```sh
-bic validate \
-  --bindings-json bindings.json \
-  --artifact build/libcore.so \
-  --artifact build/libsupport.a
+```rust
+use bic::{inspect_symbols, validate_many};
+
+let core = inspect_symbols("build/libcore.so")?;
+let support = inspect_symbols("build/libsupport.a")?;
+let report = validate_many(&package, &[core, support]);
 ```
 
 ## Workflow 4: Extract Just The Link Surface
 
-```sh
-bic link-plan --bindings-json bindings.json > link-surface.json
+```rust
+let link_surface = &package.link;
+let json = serde_json::to_string_pretty(link_surface).unwrap();
+std::fs::write("link-surface.json", json).unwrap();
 ```
 
 This is a useful boundary if a downstream tool only wants:
@@ -75,8 +88,12 @@ If a raw-header scan is confusing, break the problem in two:
 1. produce or capture preprocessed source
 2. run `scan-preprocessed`
 
-```sh
-bic scan-preprocessed --file debug.i --source-path debug.h
+```rust
+use bic::PreprocessedInput;
+
+let package = PreprocessedInput::from_file("debug.i")?
+    .with_path("debug.h")
+    .extract();
 ```
 
 This isolates extraction behavior from compiler invocation behavior.
@@ -85,20 +102,17 @@ This isolates extraction behavior from compiler invocation behavior.
 
 For packages with important struct ABI:
 
-```sh
-bic scan \
-  --header include/api.h \
-  --probe-type "struct api_context" \
-  --probe-type "struct api_options" \
-  > bindings.json
-```
+```rust
+use bic::{HeaderConfig, inspect_symbols, validate};
 
-Then validate against the built native artifact:
+let result = HeaderConfig::new()
+    .header("include/api.h")
+    .probe_type_layout("struct api_context")
+    .probe_type_layout("struct api_options")
+    .process()?;
 
-```sh
-bic validate \
-  --bindings-json bindings.json \
-  --artifact build/libapi.so
+let inventory = inspect_symbols("build/libapi.so")?;
+let report = validate(&result.package, &inventory);
 ```
 
 This gives you:
@@ -114,7 +128,7 @@ in one workflow.
 
 The intended downstream pattern is:
 
-1. `bic scan` produces `BindingPackage`
+1. `bic` library code produces `BindingPackage`
 2. `fol` reads the package JSON
 3. `fol` lowers `package.items` into generated bindings
 4. `fol` reads `package.link` to construct native link inputs

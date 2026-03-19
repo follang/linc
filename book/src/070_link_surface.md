@@ -148,18 +148,19 @@ That still makes them useful for:
 - downstream filtering
 - build-graph selection
 
-## Reading The Link Surface From JSON
+## Reading The Link Surface Programmatically
 
-The CLI makes link extraction easy:
+The link surface is already part of `BindingPackage`, so most consumers should read it directly:
 
-```sh
-bic link-plan --bindings-json bindings.json
+```rust
+let package = HeaderConfig::new()
+    .header("api.h")
+    .link_lib("demo")
+    .process()?
+    .package;
+
+let link = &package.link;
+println!("ordered inputs: {}", link.ordered_inputs.len());
 ```
 
-That command prints the normalized `BindingLinkSurface` only.
-
-This is useful when:
-
-- you want to inspect link metadata without the full declaration payload
-- another tool only cares about native inputs
-- you want a compact snapshot in tests
+This keeps link-planning policy in the downstream library or tool that consumes `bic`.

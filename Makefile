@@ -14,7 +14,7 @@ $(info Project: $(PROJECT_NAME))
 $(info Version: $(CURRENT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r test t help h clean docs release
+.PHONY: build b compile c test t help h clean docs release
 
 SHELL := /bin/bash
 
@@ -30,12 +30,6 @@ compile:
 
 c: compile
 
-run:
-	@cargo run
-
-r: run
-
-
 test:
 	@cargo test
 	@cargo test -- --ignored
@@ -49,7 +43,6 @@ help:
 	@echo "Available targets:"
 	@echo "  build        Build project"
 	@echo "  compile      Configure and generate build files"
-	@echo "  run          Run the main executable"
 	@echo "  test         Run tests"
 	@echo "  docs         Build documentation (TYPE=mdbook|doxygen)"
 	@echo "  release      Create a new release (TYPE=patch|minor|major)"

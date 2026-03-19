@@ -115,17 +115,6 @@ This is useful for:
 - surfacing duplicate providers
 - building later link-resolution heuristics
 
-## CLI Usage
-
-```sh
-bic validate \
-  --bindings-json bindings.json \
-  --artifact build/libfoo.so \
-  --artifact build/libsupport.a
-```
-
-The command prints a JSON `ValidationReport`.
-
 ## How To Read A Report
 
 The most important first pass is:

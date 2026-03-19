@@ -99,23 +99,6 @@ let report = probe_type_layouts(&cfg, &["struct api_context".into()])?;
 println!("{:?}", report.layouts);
 ```
 
-## Probe Through The CLI
-
-```sh
-bic probe-layout \
-  --header api.h \
-  --include-dir include \
-  --type "struct api_context"
-```
-
-Or attach layouts directly during scan:
-
-```sh
-bic scan \
-  --header api.h \
-  --probe-type "struct api_context"
-```
-
 ## What Layouts Solve
 
 Compiler-probed layouts are especially useful for:

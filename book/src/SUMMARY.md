@@ -9,5 +9,4 @@
 - [Link Surface](./070_link_surface.md)
 - [Macros And Layouts](./080_macros_and_layouts.md)
 - [Validation](./090_validation.md)
-- [CLI Reference](./100_cli.md)
 - [End-To-End Workflows](./110_workflows.md)

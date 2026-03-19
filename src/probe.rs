@@ -61,7 +61,7 @@ pub fn probe_type_layouts(
 
     let run_output = std::process::Command::new(&exe_path)
         .output()
-        .map_err(|e| format!("failed to run layout probe binary: {}", e))?;
+        .map_err(|e| format!("failed to run layout probe program: {}", e))?;
     if !run_output.status.success() {
         let stderr = String::from_utf8_lossy(&run_output.stderr);
         cleanup_probe_root(&temp_root);

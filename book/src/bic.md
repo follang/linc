@@ -80,7 +80,7 @@ That separation matters. The intended division of labor is:
 
 ## Main Public Surfaces
 
-Most users touch one or more of these entry points:
+Most users touch one or more of these library entry points:
 
 - `HeaderConfig` for scanning raw headers
 - `PreprocessedInput` for parsing already-preprocessed source
@@ -88,15 +88,6 @@ Most users touch one or more of these entry points:
 - `inspect_symbols` for reading native artifact symbols
 - `validate` and `validate_many` for declaration-vs-artifact checks
 - `emit_rust_ffi` for Rust FFI emission when the `codegen` feature is enabled
-
-The CLI mirrors those surfaces:
-
-- `bic scan`
-- `bic scan-preprocessed`
-- `bic probe-layout`
-- `bic inspect-symbols`
-- `bic validate`
-- `bic link-plan`
 
 ## Recommended Reading Order
 
@@ -109,13 +100,11 @@ If you are new to the repository, read the book in this order:
 5. Link Surface
 6. Symbol Inventories
 7. Validation
-8. CLI Reference
-9. End-to-End Workflows
+8. End-to-End Workflows
 
 If you only want to integrate `bic` into another tool, focus on:
 
 - [Header Processing](./020_headers.md)
 - [IR Model](./030_ir.md)
 - [Link Surface](./070_link_surface.md)
-- [CLI Reference](./100_cli.md)
 - [End-to-End Workflows](./110_workflows.md)

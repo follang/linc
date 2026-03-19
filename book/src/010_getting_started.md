@@ -141,24 +141,12 @@ Those six surfaces usually tell you whether the problem is:
 - ABI probing
 - link metadata declaration
 
-## Minimal CLI Equivalent
+## Library-Only Design
 
-Everything above has a CLI path.
+`bic` is intended to be consumed as a Rust library.
 
-```sh
-bic scan --header mylib.h
-```
+That means the normal integration path is:
 
-For richer scans:
-
-```sh
-bic scan \
-  --header api.h \
-  --include-dir vendor/include \
-  --library-dir vendor/lib \
-  --define MYLIB_FEATURE_X=1 \
-  --link-lib mylib \
-  --probe-type "struct api_context"
-```
-
-The CLI prints JSON, which makes it suitable for scripting and build graph integration.
+1. call `HeaderConfig::process()` or other library APIs directly
+2. serialize the resulting values if another tool needs JSON
+3. keep executable/tooling policy in the downstream crate rather than in `bic` itself
