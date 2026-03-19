@@ -633,6 +633,8 @@ pub struct RecordBinding {
     pub fields: Option<Vec<FieldBinding>>,
     #[serde(default)]
     pub representation: Option<RecordRepresentation>,
+    #[serde(default)]
+    pub abi_confidence: Option<AbiConfidence>,
     pub source_offset: Option<usize>,
 }
 
@@ -669,6 +671,8 @@ pub struct EnumBinding {
     pub variants: Vec<EnumVariant>,
     #[serde(default)]
     pub representation: Option<EnumRepresentation>,
+    #[serde(default)]
+    pub abi_confidence: Option<AbiConfidence>,
     pub source_offset: Option<usize>,
 }
 
@@ -685,7 +689,18 @@ pub struct EnumRepresentation {
 pub struct TypeAliasBinding {
     pub name: String,
     pub target: BindingType,
+    #[serde(default)]
+    pub abi_confidence: Option<AbiConfidence>,
     pub source_offset: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AbiConfidence {
+    DeclaredOnly,
+    LayoutProbed,
+    FieldOffsetsProbed,
+    RepresentationProbed,
+    PartialBitfieldLayout,
 }
 
 /// Extracted external variable declaration.
@@ -772,6 +787,7 @@ mod tests {
                 layout: None,
             }]),
             representation: None,
+            abi_confidence: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -781,11 +797,13 @@ mod tests {
                 value: Some(0),
             }],
             representation: None,
+            abi_confidence: None,
             source_offset: Some(3),
         }));
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "size_t".into(),
             target: BindingType::ULong,
+            abi_confidence: None,
             source_offset: Some(4),
         }));
         pkg.items.push(BindingItem::Variable(VariableBinding {
@@ -826,6 +844,7 @@ mod tests {
             name: Some("point".into()),
             fields: None,
             representation: None,
+            abi_confidence: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -835,11 +854,13 @@ mod tests {
                 value: Some(0),
             }],
             representation: None,
+            abi_confidence: None,
             source_offset: Some(3),
         }));
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "size_t".into(),
             target: BindingType::ULong,
+            abi_confidence: None,
             source_offset: Some(4),
         }));
         pkg.items.push(BindingItem::Variable(VariableBinding {
@@ -914,6 +935,7 @@ mod tests {
             name: Some("point".into()),
             fields: None,
             representation: None,
+            abi_confidence: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -923,11 +945,13 @@ mod tests {
                 value: Some(0),
             }],
             representation: None,
+            abi_confidence: None,
             source_offset: Some(3),
         }));
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "size_t".into(),
             target: BindingType::ULong,
+            abi_confidence: None,
             source_offset: Some(4),
         }));
         pkg.items.push(BindingItem::Variable(VariableBinding {
@@ -983,6 +1007,7 @@ mod tests {
             name: Some("FILE".into()),
             fields: None,
             representation: None,
+            abi_confidence: None,
             source_offset: None,
         };
         assert!(rec.is_opaque());
@@ -1008,6 +1033,7 @@ mod tests {
                 },
             ]),
             representation: None,
+            abi_confidence: None,
             source_offset: None,
         };
         assert!(!rec.is_opaque());
@@ -1129,6 +1155,7 @@ mod tests {
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "size_t".into(),
             target: BindingType::ULong,
+            abi_confidence: None,
             source_offset: Some(0),
         }));
         pkg.items.push(BindingItem::Function(FunctionBinding {
@@ -1277,6 +1304,7 @@ mod tests {
                 EnumVariant { name: "BLUE".into(), value: Some(2) },
             ],
             representation: None,
+            abi_confidence: None,
             source_offset: None,
         };
         assert_eq!(e.variants.len(), 3);
@@ -1292,6 +1320,13 @@ mod tests {
         let json = serde_json::to_string(&representation).unwrap();
         let decoded: EnumRepresentation = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, representation);
+    }
+
+    #[test]
+    fn abi_confidence_roundtrip() {
+        let json = serde_json::to_string(&AbiConfidence::PartialBitfieldLayout).unwrap();
+        let decoded: AbiConfidence = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, AbiConfidence::PartialBitfieldLayout);
     }
 
     #[test]

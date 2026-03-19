@@ -1,10 +1,11 @@
 use bic::{
-    AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
-    EvidenceKind, FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory,
-    MacroForm, MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence,
-    ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout, RecordCompleteness, TypeAliasBinding,
-    TypeLayout, ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
-    ValidationPhaseReport, ValidationSummary, EnumRepresentation, FieldLayout,
+    AbiConfidence, AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType,
+    CallingConvention, EvidenceKind, FunctionBinding, HeaderConfig, LinkResolutionMode,
+    MacroBinding, MacroCategory, MacroForm, MacroKind, MacroValue, MatchConfidence,
+    ParameterBinding, ProbeConfidence, ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout,
+    RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationDeclaration, ValidationEntry,
+    ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationSummary,
+    EnumRepresentation, FieldLayout,
     RecordRepresentation, probe_type_layouts,
 };
 
@@ -23,6 +24,7 @@ fn binding_package_public_helpers_are_available_from_root() {
     package.items.push(BindingItem::TypeAlias(TypeAliasBinding {
         name: "size_t".into(),
         target: BindingType::ULong,
+        abi_confidence: None,
         source_offset: Some(1),
     }));
     package.items.push(BindingItem::Function(FunctionBinding {
@@ -192,6 +194,13 @@ fn record_representation_root_type_roundtrip() {
     let json = serde_json::to_string(&representation).unwrap();
     let decoded: RecordRepresentation = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, representation);
+}
+
+#[test]
+fn abi_confidence_root_type_roundtrip() {
+    let json = serde_json::to_string(&AbiConfidence::FieldOffsetsProbed).unwrap();
+    let decoded: AbiConfidence = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, AbiConfidence::FieldOffsetsProbed);
 }
 
 #[test]

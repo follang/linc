@@ -6,11 +6,12 @@ use crate::diagnostics::{Diagnostic, DiagnosticKind};
 use crate::error::BicError;
 use crate::extract::Extractor;
 use crate::ir::{
-    BindingDefine, BindingInputs, BindingItem, BindingItemKind, BindingLinkSurface,
-    BindingPackage, BindingTarget, DeclarationProvenance, LinkArtifact, LinkArtifactKind,
-    LinkFramework, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource,
-    LinkResolutionMode, MacroBinding, MacroCategory, MacroEnvironmentEntry, MacroForm, MacroKind,
-    MacroProvenance, MacroValue, NativeSurfaceKind,
+    AbiConfidence, BindingDefine, BindingInputs, BindingItem, BindingItemKind,
+    BindingLinkSurface, BindingPackage, BindingTarget, DeclarationProvenance, LinkArtifact,
+    LinkArtifactKind, LinkFramework, LinkInput, LinkLibrary, LinkLibraryKind,
+    LinkRequirementSource, LinkResolutionMode, MacroBinding, MacroCategory,
+    MacroEnvironmentEntry, MacroForm, MacroKind, MacroProvenance, MacroValue,
+    NativeSurfaceKind,
 };
 use crate::line_markers::{FileOriginMap, OriginFilter};
 use crate::probe::probe_type_layouts;
@@ -618,7 +619,7 @@ impl HeaderConfig {
                 if !self.probe_types.is_empty() {
                     let probe_report = probe_type_layouts(self, &self.probe_types)?;
                     package.layouts = probe_report.layouts;
-                    attach_probe_field_offsets(&mut package.items, &probe_report.subjects);
+                    attach_probe_evidence(&mut package.items, &probe_report.subjects);
                 }
 
                 // Apply origin filtering if configured
@@ -905,10 +906,7 @@ fn build_effective_macro_environment(
         .collect()
 }
 
-fn attach_probe_field_offsets(
-    items: &mut [BindingItem],
-    subjects: &[ProbeSubjectReport],
-) {
+fn attach_probe_evidence(items: &mut [BindingItem], subjects: &[ProbeSubjectReport]) {
     let subject_map = subjects
         .iter()
         .map(|subject| (subject.name.as_str(), subject))
@@ -916,6 +914,11 @@ fn attach_probe_field_offsets(
 
     for item in items {
         match item {
+            BindingItem::TypeAlias(type_alias) => {
+                if let Some(subject) = subject_map.get(type_alias.name.as_str()) {
+                    type_alias.abi_confidence = Some(alias_abi_confidence(subject));
+                }
+            }
             BindingItem::Record(record) => {
                 let Some(record_name) = record.name.as_deref() else {
                     continue;
@@ -934,6 +937,7 @@ fn attach_probe_field_offsets(
                         .record_completeness
                         .map(|completeness| format!("{:?}", completeness)),
                 });
+                record.abi_confidence = Some(record_abi_confidence(subject));
                 let Some(fields) = record.fields.as_mut() else {
                     continue;
                 };
@@ -966,9 +970,39 @@ fn attach_probe_field_offsets(
                     underlying_size: subject.enum_underlying_size,
                     is_signed: subject.enum_is_signed,
                 });
+                enum_binding.abi_confidence = Some(enum_abi_confidence(subject));
             }
             _ => {}
         }
+    }
+}
+
+fn alias_abi_confidence(subject: &ProbeSubjectReport) -> AbiConfidence {
+    let _ = subject;
+    AbiConfidence::LayoutProbed
+}
+
+fn enum_abi_confidence(subject: &ProbeSubjectReport) -> AbiConfidence {
+    if subject.enum_underlying_size.is_some() || subject.enum_is_signed.is_some() {
+        AbiConfidence::RepresentationProbed
+    } else {
+        AbiConfidence::LayoutProbed
+    }
+}
+
+fn record_abi_confidence(subject: &ProbeSubjectReport) -> AbiConfidence {
+    if subject
+        .fields
+        .iter()
+        .any(|field| field.bit_width.is_some() && field.offset_bytes.is_none())
+    {
+        AbiConfidence::PartialBitfieldLayout
+    } else if subject.fields.iter().any(|field| field.offset_bytes.is_some()) {
+        AbiConfidence::FieldOffsetsProbed
+    } else if subject.record_completeness.is_some() {
+        AbiConfidence::RepresentationProbed
+    } else {
+        AbiConfidence::LayoutProbed
     }
 }
 
@@ -1887,6 +1921,8 @@ int compute(int x);
             .layouts
             .iter()
             .any(|layout| layout.name == "struct widget"));
+        let value_alias = result.package.find_type_alias("value_t").unwrap();
+        assert_eq!(value_alias.abi_confidence, Some(AbiConfidence::LayoutProbed));
         assert_eq!(result.package.provenance.len(), result.package.items.len());
         let provenance = result.package.item_provenance(0).unwrap();
         assert_eq!(provenance.item_kind, Some(BindingItemKind::TypeAlias));
@@ -1898,6 +1934,7 @@ int compute(int x);
             .records()
             .find(|record| record.name.as_deref() == Some("widget"))
             .unwrap();
+        assert_eq!(record.abi_confidence, Some(AbiConfidence::FieldOffsetsProbed));
         assert_eq!(
             record
                 .representation
@@ -1948,6 +1985,10 @@ int compute(int x);
             .as_ref()
             .and_then(|representation| representation.is_signed)
             .is_some());
+        assert_eq!(
+            enum_binding.abi_confidence,
+            Some(AbiConfidence::RepresentationProbed)
+        );
 
         cleanup(&dir);
     }

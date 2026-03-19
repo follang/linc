@@ -637,6 +637,7 @@ mod tests {
         pkg.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name: "my_type".into(),
             target: BindingType::Int,
+            abi_confidence: None,
             source_offset: None,
         }));
         let report = validate(&pkg, &inv);

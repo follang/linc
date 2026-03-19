@@ -174,6 +174,7 @@ impl Extractor {
         self.items.push(BindingItem::TypeAlias(TypeAliasBinding {
             name,
             target,
+            abi_confidence: None,
             source_offset: Some(offset),
         }));
     }
@@ -280,6 +281,7 @@ impl Extractor {
             name,
             fields,
             representation: None,
+            abi_confidence: None,
             source_offset: Some(offset),
         }));
     }
@@ -367,6 +369,7 @@ impl Extractor {
             name,
             variants,
             representation: None,
+            abi_confidence: None,
             source_offset: Some(offset),
         }));
     }
