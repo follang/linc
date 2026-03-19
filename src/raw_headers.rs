@@ -24,6 +24,7 @@ pub struct HeaderConfig {
     pub link_artifacts: Vec<LinkArtifact>,
     pub ordered_link_inputs: Vec<LinkInput>,
     pub preferred_link_mode: LinkResolutionMode,
+    pub platform_constraints: Vec<String>,
     pub probe_types: Vec<String>,
     pub compiler: Option<String>,
     pub flavor: Option<Flavor>,
@@ -74,6 +75,7 @@ impl HeaderConfig {
             link_artifacts: Vec::new(),
             ordered_link_inputs: Vec::new(),
             preferred_link_mode: LinkResolutionMode::Default,
+            platform_constraints: Vec::new(),
             probe_types: Vec::new(),
             compiler: None,
             flavor: None,
@@ -196,6 +198,11 @@ impl HeaderConfig {
 
     pub fn prefer_dynamic_linking(mut self) -> Self {
         self.preferred_link_mode = LinkResolutionMode::PreferDynamic;
+        self
+    }
+
+    pub fn target_constraint(mut self, constraint: impl Into<String>) -> Self {
+        self.platform_constraints.push(constraint.into());
         self
     }
 
@@ -406,6 +413,7 @@ impl HeaderConfig {
     fn binding_link_surface(&self) -> BindingLinkSurface {
         BindingLinkSurface {
             preferred_mode: self.preferred_link_mode,
+            platform_constraints: self.platform_constraints.clone(),
             include_paths: self
                 .include_dirs
                 .iter()
@@ -658,6 +666,7 @@ mod tests {
             .link_static_artifact("native/libfoo.a")
             .link_shared_artifact("native/libfoo.so")
             .prefer_static_linking()
+            .target_constraint("linux")
             .probe_type_layout("struct foo")
             .compiler("gcc")
             .flavor(Flavor::GnuC11);
@@ -671,6 +680,7 @@ mod tests {
         assert_eq!(cfg.link_frameworks.len(), 1);
         assert_eq!(cfg.link_artifacts.len(), 3);
         assert_eq!(cfg.preferred_link_mode, LinkResolutionMode::PreferStatic);
+        assert_eq!(cfg.platform_constraints, vec!["linux".to_string()]);
         assert_eq!(cfg.probe_types.len(), 1);
         assert_eq!(cfg.compiler.as_deref(), Some("gcc"));
         assert_eq!(cfg.flavor, Some(Flavor::GnuC11));
@@ -696,6 +706,7 @@ mod tests {
             .link_shared_lib("ssl")
             .link_shared_artifact("/usr/local/lib/libssl.so")
             .prefer_dynamic_linking()
+            .target_constraint("macos")
             .probe_type_layout("size_t");
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -709,6 +720,7 @@ mod tests {
         assert_eq!(cfg2.link_artifacts.len(), 1);
         assert_eq!(cfg2.ordered_link_inputs.len(), 3);
         assert_eq!(cfg2.preferred_link_mode, LinkResolutionMode::PreferDynamic);
+        assert_eq!(cfg2.platform_constraints, vec!["macos".to_string()]);
         assert_eq!(cfg2.probe_types.len(), 1);
     }
 
@@ -748,6 +760,8 @@ mod tests {
             .link_static_lib("crypto")
             .link_static_artifact("lib/libcrypto.a")
             .prefer_static_linking()
+            .target_constraint("linux")
+            .target_constraint("x86_64")
             .probe_type_layout("struct widget");
 
         let target = cfg.binding_target();
@@ -763,6 +777,10 @@ mod tests {
         assert_eq!(link.framework_paths, vec!["frameworks".to_string()]);
         assert_eq!(link.library_paths, vec!["lib".to_string()]);
         assert_eq!(link.preferred_mode, LinkResolutionMode::PreferStatic);
+        assert_eq!(
+            link.platform_constraints,
+            vec!["linux".to_string(), "x86_64".to_string()]
+        );
         assert_eq!(link.frameworks.len(), 1);
         assert_eq!(link.frameworks[0].name, "CoreFoundation");
         assert_eq!(link.libraries.len(), 1);

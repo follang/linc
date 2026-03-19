@@ -131,6 +131,8 @@ pub struct BindingLinkSurface {
     #[serde(default)]
     pub preferred_mode: LinkResolutionMode,
     #[serde(default)]
+    pub platform_constraints: Vec<String>,
+    #[serde(default)]
     pub include_paths: Vec<String>,
     #[serde(default)]
     pub framework_paths: Vec<String>,
@@ -480,6 +482,7 @@ mod tests {
         }];
         pkg.link = BindingLinkSurface {
             preferred_mode: LinkResolutionMode::PreferDynamic,
+            platform_constraints: vec!["macos".into()],
             include_paths: vec!["/usr/include".into()],
             framework_paths: vec!["/System/Library/Frameworks".into()],
             library_paths: vec!["/usr/lib".into()],
@@ -685,6 +688,7 @@ mod tests {
     fn link_library_serialization_roundtrip() {
         let link = BindingLinkSurface {
             preferred_mode: LinkResolutionMode::PreferStatic,
+            platform_constraints: vec!["linux".into(), "x86_64".into()],
             include_paths: vec!["include".into()],
             framework_paths: vec!["frameworks".into()],
             library_paths: vec!["lib".into()],
@@ -762,6 +766,7 @@ mod tests {
         }"#;
         let decoded: BindingLinkSurface = serde_json::from_str(json).unwrap();
         assert_eq!(decoded.preferred_mode, LinkResolutionMode::Default);
+        assert!(decoded.platform_constraints.is_empty());
         assert_eq!(decoded.libraries[0].source, LinkRequirementSource::Declared);
         assert_eq!(decoded.artifacts[0].source, LinkRequirementSource::Declared);
         assert!(decoded.framework_paths.is_empty());

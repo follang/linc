@@ -91,6 +91,10 @@ fn run_scan(args: &[String]) -> Result<(), String> {
                 i += 1;
                 cfg = cfg.compiler(required_value(args, i, "--compiler")?);
             }
+            "--target-constraint" => {
+                i += 1;
+                cfg = cfg.target_constraint(required_value(args, i, "--target-constraint")?);
+            }
             "--flavor" => {
                 i += 1;
                 cfg = cfg.flavor(parse_header_flavor(required_value(args, i, "--flavor")?)?);
@@ -376,6 +380,7 @@ fn usage() -> String {
         "  --link-static-artifact <path>",
         "  --link-shared-artifact <path>",
         "  --compiler <cmd>",
+        "  --target-constraint <value>",
         "  --flavor <gnu|clang|std>",
         "  --prefer-static",
         "  --prefer-dynamic",
