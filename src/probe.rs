@@ -6,6 +6,20 @@ use crate::error::BicError;
 use crate::ir::{BindingTarget, TypeLayout};
 use crate::raw_headers::{Flavor, HeaderConfig};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProbeSubjectKind {
+    Type,
+    Record,
+    Enum,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProbeSubjectReport {
+    pub name: String,
+    pub kind: ProbeSubjectKind,
+    pub layout: TypeLayout,
+}
+
 /// Result of an ABI layout probe run.
 ///
 /// Invariant: `layouts` is only populated for subjects that were explicitly requested and
@@ -16,6 +30,8 @@ pub struct AbiProbeReport {
     pub target: BindingTarget,
     pub compiler_command: String,
     pub entry_headers: Vec<String>,
+    #[serde(default)]
+    pub subjects: Vec<ProbeSubjectReport>,
     pub layouts: Vec<TypeLayout>,
 }
 
@@ -86,6 +102,15 @@ pub fn probe_type_layouts(
             reason: e.to_string(),
         })?;
     let layouts = parse_layout_output(&stdout)?;
+    let subjects = type_names
+        .iter()
+        .zip(layouts.iter())
+        .map(|(type_name, layout)| ProbeSubjectReport {
+            name: type_name.as_ref().to_string(),
+            kind: classify_probe_subject(type_name.as_ref()),
+            layout: layout.clone(),
+        })
+        .collect();
     cleanup_probe_root(&temp_root);
 
     Ok(AbiProbeReport {
@@ -96,8 +121,21 @@ pub fn probe_type_layouts(
             .iter()
             .map(|path| path.display().to_string())
             .collect(),
+        subjects,
         layouts,
     })
+}
+
+fn classify_probe_subject(type_name: &str) -> ProbeSubjectKind {
+    if type_name.trim_start().starts_with("struct ")
+        || type_name.trim_start().starts_with("union ")
+    {
+        ProbeSubjectKind::Record
+    } else if type_name.trim_start().starts_with("enum ") {
+        ProbeSubjectKind::Enum
+    } else {
+        ProbeSubjectKind::Type
+    }
 }
 
 fn compiler_command(config: &HeaderConfig) -> String {
@@ -234,6 +272,9 @@ mod tests {
         assert_eq!(report.target.compiler_command.as_deref(), Some("gcc"));
         assert_eq!(report.target.flavor.as_deref(), Some("gnu-c11"));
         assert_eq!(report.layouts.len(), 2);
+        assert_eq!(report.subjects.len(), 2);
+        assert_eq!(report.subjects[0].kind, ProbeSubjectKind::Type);
+        assert_eq!(report.subjects[1].kind, ProbeSubjectKind::Record);
         assert!(report.layouts.iter().any(|layout| {
             layout.name == "value_t" && layout.size >= 4 && layout.align >= 4
         }));
@@ -278,6 +319,15 @@ mod tests {
             },
             compiler_command: "clang".into(),
             entry_headers: vec!["demo.h".into()],
+            subjects: vec![ProbeSubjectReport {
+                name: "size_t".into(),
+                kind: ProbeSubjectKind::Type,
+                layout: TypeLayout {
+                    name: "size_t".into(),
+                    size: 8,
+                    align: 8,
+                },
+            }],
             layouts: vec![TypeLayout {
                 name: "size_t".into(),
                 size: 8,
@@ -296,6 +346,22 @@ mod tests {
         let report: AbiProbeReport = serde_json::from_str(json).unwrap();
         assert_eq!(report.compiler_command, "clang");
         assert_eq!(report.target.compiler_command.as_deref(), Some("clang"));
+        assert_eq!(report.subjects.len(), 1);
+        assert_eq!(report.subjects[0].name, "size_t");
         assert_eq!(report.layouts.len(), 1);
+    }
+
+    #[test]
+    fn probe_subject_kind_classification_handles_records_and_enums() {
+        assert_eq!(classify_probe_subject("size_t"), ProbeSubjectKind::Type);
+        assert_eq!(
+            classify_probe_subject("struct widget"),
+            ProbeSubjectKind::Record
+        );
+        assert_eq!(
+            classify_probe_subject(" union payload"),
+            ProbeSubjectKind::Record
+        );
+        assert_eq!(classify_probe_subject("enum mode"), ProbeSubjectKind::Enum);
     }
 }

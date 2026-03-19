@@ -108,6 +108,15 @@ println!("{:?}", report.layouts);
 `AbiProbeReport` also preserves target/compiler identity metadata alongside the layouts.
 That makes probe evidence auditable and safer to hand across process or repo boundaries.
 
+For extensibility, the report also carries `subjects`.
+Each `ProbeSubjectReport` keeps:
+
+- the requested subject name
+- its broad subject kind (`Type`, `Record`, or `Enum`)
+- the measured `TypeLayout`
+
+The older `layouts` array is still preserved as a flattened compatibility surface.
+
 ## What Layouts Solve
 
 Compiler-probed layouts are especially useful for:

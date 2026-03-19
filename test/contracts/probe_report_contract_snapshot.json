@@ -7,6 +7,13 @@
   },
   "compiler_command": "clang",
   "entry_headers": ["demo.h"],
+  "subjects": [
+    {
+      "name": "size_t",
+      "kind": "Type",
+      "layout": { "name": "size_t", "size": 8, "align": 8 }
+    }
+  ],
   "layouts": [
     { "name": "size_t", "size": 8, "align": 8 }
   ]

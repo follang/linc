@@ -207,7 +207,7 @@ pub use link_plan::{
     ResolvedLinkRequirement, ResolvedProvider,
 };
 pub use preprocess::PreprocessedInput;
-pub use probe::{probe_type_layouts, AbiProbeReport};
+pub use probe::{probe_type_layouts, AbiProbeReport, ProbeSubjectKind, ProbeSubjectReport};
 pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]
 pub use symbols::{

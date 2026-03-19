@@ -1,7 +1,8 @@
 use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
-    MacroKind, MacroValue, ParameterBinding, TypeAliasBinding, TypeLayout, probe_type_layouts,
+    MacroKind, MacroValue, ParameterBinding, ProbeSubjectKind, ProbeSubjectReport,
+    TypeAliasBinding, TypeLayout, probe_type_layouts,
 };
 
 #[test]
@@ -93,6 +94,15 @@ fn abi_probe_report_root_types_roundtrip() {
         },
         compiler_command: "clang".into(),
         entry_headers: vec!["demo.h".into()],
+        subjects: vec![ProbeSubjectReport {
+            name: "size_t".into(),
+            kind: ProbeSubjectKind::Type,
+            layout: TypeLayout {
+                name: "size_t".into(),
+                size: 8,
+                align: 8,
+            },
+        }],
         layouts: vec![TypeLayout {
             name: "size_t".into(),
             size: 8,
