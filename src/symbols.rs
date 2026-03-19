@@ -85,6 +85,13 @@ fn default_symbol_direction() -> SymbolDirection {
     SymbolDirection::Exported
 }
 
+/// Optional routine-level ABI hints preserved on one symbol when available.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FunctionAbiHint {
+    #[serde(default)]
+    pub parameter_count: Option<usize>,
+}
+
 /// One discovered symbol entry.
 ///
 /// Invariant: `name` is the normalized match key, while `raw_name` preserves the original spelling
@@ -102,6 +109,8 @@ pub struct SymbolEntry {
     pub reexported_via: Vec<String>,
     #[serde(default)]
     pub alias_of: Option<String>,
+    #[serde(default)]
+    pub function_abi: Option<FunctionAbiHint>,
     pub visibility: SymbolVisibility,
     pub is_function: bool,
     pub binding: SymbolBinding,
@@ -456,6 +465,7 @@ fn extract_symbols_from_object(obj: &object::File<'_>) -> Vec<SymbolEntry> {
             direction,
             reexported_via: Vec::new(),
             alias_of: None,
+            function_abi: None,
             visibility,
             is_function,
             binding,
@@ -900,6 +910,7 @@ mod tests {
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
                     alias_of: None,
+                    function_abi: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -914,6 +925,7 @@ mod tests {
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
                     alias_of: None,
+                    function_abi: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -948,6 +960,7 @@ mod tests {
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
                     alias_of: None,
+                    function_abi: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -962,6 +975,7 @@ mod tests {
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
                     alias_of: None,
+                    function_abi: None,
                     visibility: SymbolVisibility::Default,
                     is_function: false,
                     binding: SymbolBinding::Global,
@@ -976,6 +990,7 @@ mod tests {
                     direction: SymbolDirection::Exported,
                     reexported_via: Vec::new(),
                     alias_of: None,
+                    function_abi: None,
                     visibility: SymbolVisibility::Default,
                     is_function: true,
                     binding: SymbolBinding::Global,
@@ -1008,6 +1023,7 @@ mod tests {
                 direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
                 alias_of: None,
+                function_abi: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1066,6 +1082,7 @@ mod tests {
             direction: SymbolDirection::Imported,
             reexported_via: Vec::new(),
             alias_of: None,
+            function_abi: None,
             visibility: SymbolVisibility::Unknown,
             is_function: true,
             binding: SymbolBinding::Unknown,
@@ -1250,6 +1267,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
                 direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
                 alias_of: None,
+                function_abi: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1264,6 +1282,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
                 direction: SymbolDirection::Imported,
                 reexported_via: Vec::new(),
                 alias_of: None,
+                function_abi: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: SymbolBinding::Global,
@@ -1293,6 +1312,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
             direction: SymbolDirection::Exported,
             reexported_via: Vec::new(),
             alias_of: None,
+            function_abi: None,
             visibility: SymbolVisibility::Default,
             is_function: true,
             binding: SymbolBinding::Global,
@@ -1307,6 +1327,7 @@ Dynamic section at offset 0x2de0 contains 3 entries:
             direction: SymbolDirection::Exported,
             reexported_via: Vec::new(),
             alias_of: None,
+            function_abi: None,
             visibility: SymbolVisibility::Default,
             is_function: true,
             binding: SymbolBinding::Global,

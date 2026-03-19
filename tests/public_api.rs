@@ -4,7 +4,7 @@ use bic::{
     MacroBinding, MacroCategory, MacroForm, MacroKind, MacroValue, MatchConfidence,
     ParameterBinding, ProbeConfidence, ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout,
     RecordCompleteness, TypeAliasBinding, TypeLayout, TypeQualifiers, ValidationDeclaration, ValidationEntry,
-    ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationSummary,
+    ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationSummary, RoutineAbiEvidence,
     EnumRepresentation, FieldLayout,
     RecordRepresentation, probe_type_layouts,
 };
@@ -205,6 +205,17 @@ fn abi_confidence_root_type_roundtrip() {
 }
 
 #[test]
+fn routine_abi_evidence_root_type_roundtrip() {
+    let evidence = RoutineAbiEvidence {
+        expected_parameter_count: Some(2),
+        observed_parameter_count: Some(2),
+    };
+    let json = serde_json::to_string(&evidence).unwrap();
+    let decoded: RoutineAbiEvidence = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, evidence);
+}
+
+#[test]
 fn alias_resolution_root_type_roundtrip() {
     let resolution = AliasResolution {
         alias_chain: vec!["size_t".into()],
@@ -285,6 +296,7 @@ fn validation_entry_root_types_roundtrip() {
             confidence: MatchConfidence::High,
             evidence_kind: EvidenceKind::ExactExported,
             abi_shape: None,
+            routine_abi: None,
         },
     };
     let json = serde_json::to_string(&entry).unwrap();

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::ir::{BindingItem, BindingPackage};
-use crate::symbols::{SymbolBinding, SymbolDirection, SymbolInventory, SymbolVisibility};
+use crate::symbols::{
+    FunctionAbiHint, SymbolBinding, SymbolDirection, SymbolInventory, SymbolVisibility,
+};
 
 /// Declaration category that validation currently reasons about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -57,6 +59,8 @@ pub struct ValidationEvidence {
     pub evidence_kind: EvidenceKind,
     #[serde(default)]
     pub abi_shape: Option<AbiShapeEvidence>,
+    #[serde(default)]
+    pub routine_abi: Option<RoutineAbiEvidence>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -110,6 +114,14 @@ pub struct AbiShapeEvidence {
     pub expected_size: Option<u64>,
     #[serde(default)]
     pub observed_size: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutineAbiEvidence {
+    #[serde(default)]
+    pub expected_parameter_count: Option<usize>,
+    #[serde(default)]
+    pub observed_parameter_count: Option<usize>,
 }
 
 /// Renamed from FunctionMatch to support both functions and variables.
@@ -208,9 +220,23 @@ pub fn validate_many(
     let mut any_abi_shape_evidence = false;
 
     for item in &package.items {
-        let (name, kind, expect_function, variable_ty) = match item {
-            BindingItem::Function(f) => (&f.name, ItemKind::Function, true, None),
-            BindingItem::Variable(v) => (&v.name, ItemKind::Variable, false, Some(&v.ty)),
+        let (name, kind, expect_function, variable_ty, function_hint) = match item {
+            BindingItem::Function(f) => (
+                &f.name,
+                ItemKind::Function,
+                true,
+                None,
+                Some(FunctionAbiHint {
+                    parameter_count: Some(f.parameters.len()),
+                }),
+            ),
+            BindingItem::Variable(v) => (
+                &v.name,
+                ItemKind::Variable,
+                false,
+                Some(&v.ty),
+                None,
+            ),
             _ => continue,
         };
 
@@ -338,6 +364,28 @@ pub fn validate_many(
         } else {
             None
         };
+        let routine_abi = if status == MatchStatus::Matched && expect_function {
+            function_hint
+                .and_then(|expected| expected.parameter_count)
+                .zip(
+                    candidates
+                        .first()
+                        .and_then(|(_, symbol)| symbol.function_abi.as_ref())
+                        .and_then(|observed| observed.parameter_count),
+                )
+                .map(|(expected_parameter_count, observed_parameter_count)| {
+                    any_abi_shape_evidence = true;
+                    if expected_parameter_count != observed_parameter_count {
+                        status = MatchStatus::AbiShapeMismatch;
+                    }
+                    RoutineAbiEvidence {
+                        expected_parameter_count: Some(expected_parameter_count),
+                        observed_parameter_count: Some(observed_parameter_count),
+                    }
+                })
+        } else {
+            None
+        };
         let confidence = match status {
             MatchStatus::Matched => MatchConfidence::High,
             MatchStatus::AbiShapeMismatch => MatchConfidence::Low,
@@ -352,7 +400,7 @@ pub fn validate_many(
         };
         let evidence_kind = match status {
             MatchStatus::Matched => {
-                if abi_shape.is_some() {
+                if abi_shape.is_some() || routine_abi.is_some() {
                     EvidenceKind::AbiShapeVerified
                 } else {
                     EvidenceKind::ExactExported
@@ -411,6 +459,7 @@ pub fn validate_many(
                 confidence,
                 evidence_kind,
                 abi_shape,
+                routine_abi,
             },
         });
     }
@@ -575,6 +624,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             })
             .collect();
         SymbolInventory {
@@ -725,6 +775,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
 
@@ -782,6 +833,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
 
@@ -875,6 +927,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
 
@@ -918,6 +971,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
         let pkg = make_package(&["foo"]);
@@ -986,6 +1040,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
 
@@ -1022,6 +1077,7 @@ mod tests {
                     size: None,
                     section: None,
                     archive_member: None,
+                    function_abi: None,
                 },
                 SymbolEntry {
                     name: "bar".into(),
@@ -1036,6 +1092,7 @@ mod tests {
                     size: None,
                     section: None,
                     archive_member: None,
+                    function_abi: None,
                 },
             ],
         };
@@ -1091,6 +1148,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: Some("bar.o".into()),
+                function_abi: None,
             }],
         };
 
@@ -1130,6 +1188,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: Some("foo1.o".into()),
+                function_abi: None,
             }],
         };
         let inv2 = SymbolInventory {
@@ -1155,6 +1214,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: Some("foo2.o".into()),
+                function_abi: None,
             }],
         };
 
@@ -1227,6 +1287,7 @@ mod tests {
                 size: Some(4),
                 section: Some(".data".into()),
                 archive_member: None,
+                function_abi: None,
             }],
         };
         let pkg = make_package_with_vars(&[], &["errno"]);
@@ -1238,6 +1299,139 @@ mod tests {
             Some(AbiShapeEvidence {
                 expected_size: Some(4),
                 observed_size: Some(4),
+            })
+        );
+        assert!(report.phases[2].completed);
+    }
+
+    #[test]
+    fn function_parameter_count_match_records_routine_abi_evidence() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "add".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: Some(".text".into()),
+                archive_member: None,
+                function_abi: Some(FunctionAbiHint {
+                    parameter_count: Some(2),
+                }),
+            }],
+        };
+        let pkg = BindingPackage {
+            source_path: None,
+            items: vec![BindingItem::Function(FunctionBinding {
+                name: "add".into(),
+                calling_convention: CallingConvention::C,
+                parameters: vec![
+                    ParameterBinding {
+                        name: Some("a".into()),
+                        ty: BindingType::Int,
+                    },
+                    ParameterBinding {
+                        name: Some("b".into()),
+                        ty: BindingType::Int,
+                    },
+                ],
+                return_type: BindingType::Int,
+                variadic: false,
+                source_offset: None,
+            })],
+            diagnostics: Vec::new(),
+            ..BindingPackage::new()
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::Matched);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::AbiShapeVerified);
+        assert_eq!(
+            report.entries[0].evidence.routine_abi,
+            Some(RoutineAbiEvidence {
+                expected_parameter_count: Some(2),
+                observed_parameter_count: Some(2),
+            })
+        );
+        assert!(report.phases[2].completed);
+    }
+
+    #[test]
+    fn function_parameter_count_mismatch_is_reported_as_abi_shape_mismatch() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "add".into(),
+                raw_name: None,
+                version: None,
+                direction: SymbolDirection::Exported,
+                reexported_via: Vec::new(),
+                alias_of: None,
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: Some(".text".into()),
+                archive_member: None,
+                function_abi: Some(FunctionAbiHint {
+                    parameter_count: Some(1),
+                }),
+            }],
+        };
+        let pkg = BindingPackage {
+            source_path: None,
+            items: vec![BindingItem::Function(FunctionBinding {
+                name: "add".into(),
+                calling_convention: CallingConvention::C,
+                parameters: vec![
+                    ParameterBinding {
+                        name: Some("a".into()),
+                        ty: BindingType::Int,
+                    },
+                    ParameterBinding {
+                        name: Some("b".into()),
+                        ty: BindingType::Int,
+                    },
+                ],
+                return_type: BindingType::Int,
+                variadic: false,
+                source_offset: None,
+            })],
+            diagnostics: Vec::new(),
+            ..BindingPackage::new()
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.matches[0].status, MatchStatus::AbiShapeMismatch);
+        assert_eq!(report.matches[0].evidence_kind, EvidenceKind::AbiShapeMismatch);
+        assert_eq!(report.summary.abi_shape_mismatches, 1);
+        assert_eq!(
+            report.entries[0].evidence.routine_abi,
+            Some(RoutineAbiEvidence {
+                expected_parameter_count: Some(2),
+                observed_parameter_count: Some(1),
             })
         );
         assert!(report.phases[2].completed);
@@ -1268,6 +1462,7 @@ mod tests {
                 size: Some(8),
                 section: Some(".data".into()),
                 archive_member: None,
+                function_abi: None,
             }],
         };
         let pkg = make_package_with_vars(&[], &["errno"]);
@@ -1341,6 +1536,7 @@ mod tests {
                 size: None,
                 section: None,
                 archive_member: None,
+                function_abi: None,
             }],
         };
         let pkg = make_package(&["foo"]);

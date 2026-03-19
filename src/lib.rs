@@ -215,14 +215,14 @@ pub use probe::{
 pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]
 pub use symbols::{
-    inspect_file as inspect_symbols, SymbolBinding, SymbolDirection, SymbolEntry, SymbolInventory,
-    SymbolVisibility,
+    inspect_file as inspect_symbols, FunctionAbiHint, SymbolBinding, SymbolDirection, SymbolEntry,
+    SymbolInventory, SymbolVisibility,
 };
 #[cfg(feature = "symbols")]
 pub use validate::{
     validate, validate_many, AbiShapeEvidence, EvidenceKind, FunctionMatch, ItemKind,
     MatchConfidence, MatchStatus, SymbolMatch, ValidationDeclaration, ValidationEntry,
-    ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationReport,
+    RoutineAbiEvidence, ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationReport,
     ValidationSummary,
 };
 
@@ -348,6 +348,7 @@ mod integration_tests {
                 direction: symbols::SymbolDirection::Exported,
                 reexported_via: Vec::new(),
                 alias_of: None,
+                function_abi: None,
                 visibility: SymbolVisibility::Default,
                 is_function: true,
                 binding: symbols::SymbolBinding::Global,

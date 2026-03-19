@@ -28,7 +28,7 @@ Use `validate_many` whenever the package is expected to resolve across more than
 
 ## What Validation Looks At
 
-Validation currently focuses on bindable symbol presence and kind.
+Validation currently focuses on bindable symbol presence and kind, with conservative ABI-shape evidence where the library can prove something honestly.
 It compares:
 
 - extracted functions
@@ -40,6 +40,7 @@ against:
 - raw/decorated symbol spellings
 - symbol visibility
 - symbol binding strength
+- routine parameter-count hints
 - provider artifact provenance
 
 ## Validation Phases
@@ -77,8 +78,12 @@ Each status tells you something different.
 
 The declaration name resolved to a visible symbol of the expected kind.
 
-For variable declarations, `Matched` may now also carry positive ABI-shape evidence when `bic`
+For variable declarations, `Matched` may now carry positive ABI-shape evidence when `bic`
 can compare an observed symbol size against an inferred expected size.
+
+For function declarations, `Matched` may now also carry positive routine ABI evidence when
+the provider inventory exposes a conservative parameter-count hint and that count agrees with
+the extracted declaration.
 
 ### `AbiShapeMismatch`
 
@@ -89,7 +94,7 @@ This is intentionally limited today:
 
 - it only applies where artifact metadata exposes a usable size
 - it only applies where `bic` can infer an expected size conservatively
-- it is currently strongest for variables, not routine signatures
+- routine checks currently start with parameter-count evidence rather than full signature proof
 
 ### `Missing`
 
@@ -158,6 +163,8 @@ Each `ValidationEntry` preserves:
 - observed `visibility`
 - `confidence`
 - `evidence_kind`
+- `abi_shape` for variable-size evidence
+- `routine_abi` for conservative routine-shape evidence
 
 The older `matches` list remains available as the flatter compatibility surface.
 
