@@ -67,32 +67,45 @@ pub struct ResolvedLinkPlan {
 }
 
 pub fn resolve_link_plan(package: &BindingPackage) -> ResolvedLinkPlan {
-    resolve_link_plan_with_inventories(package, &[])
+    resolve_link_plan_for_target(package, &[], None)
 }
 
 pub fn resolve_link_plan_with_inventories(
     package: &BindingPackage,
     inventories: &[SymbolInventory],
 ) -> ResolvedLinkPlan {
-    let requirements: Vec<ResolvedLinkRequirement> = package
-        .link
-        .ordered_inputs
-        .iter()
-        .cloned()
-        .map(|declared| {
-            let providers = matching_providers(&declared, inventories);
-            ResolvedLinkRequirement {
-                source: declared_requirement_source(&declared),
-                resolution: match providers.len() {
-                    0 => RequirementResolution::Unresolved,
-                    1 => RequirementResolution::Resolved,
-                    _ => RequirementResolution::Ambiguous,
-                },
-                providers,
-                declared,
-            }
-        })
-        .collect();
+    resolve_link_plan_for_target(package, inventories, None)
+}
+
+pub fn resolve_link_plan_for_target(
+    package: &BindingPackage,
+    inventories: &[SymbolInventory],
+    target: Option<&str>,
+) -> ResolvedLinkPlan {
+    let target_matches = target_matches_constraints(&package.link.platform_constraints, target);
+    let requirements: Vec<ResolvedLinkRequirement> = if target_matches {
+        package
+            .link
+            .ordered_inputs
+            .iter()
+            .cloned()
+            .map(|declared| {
+                let providers = matching_providers(&declared, inventories);
+                ResolvedLinkRequirement {
+                    source: declared_requirement_source(&declared),
+                    resolution: match providers.len() {
+                        0 => RequirementResolution::Unresolved,
+                        1 => RequirementResolution::Resolved,
+                        _ => RequirementResolution::Ambiguous,
+                    },
+                    providers,
+                    declared,
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     let transitive_dependencies = requirements
         .iter()
@@ -105,11 +118,29 @@ pub fn resolve_link_plan_with_inventories(
     ResolvedLinkPlan {
         preferred_mode: package.link.preferred_mode,
         native_surface_kind: package.link.native_surface_kind,
-        platform_constraints: package.link.platform_constraints.clone(),
-        inputs: package.link.ordered_inputs.clone(),
+        platform_constraints: filtered_constraints(&package.link.platform_constraints, target),
+        inputs: if target_matches {
+            package.link.ordered_inputs.clone()
+        } else {
+            Vec::new()
+        },
         requirements,
         transitive_dependencies,
     }
+}
+
+fn filtered_constraints(constraints: &[String], target: Option<&str>) -> Vec<String> {
+    if target_matches_constraints(constraints, target) {
+        constraints.to_vec()
+    } else {
+        Vec::new()
+    }
+}
+
+fn target_matches_constraints(constraints: &[String], target: Option<&str>) -> bool {
+    constraints.is_empty()
+        || target.is_none()
+        || target.is_some_and(|target| constraints.iter().any(|constraint| target.contains(constraint)))
 }
 
 fn matching_providers(input: &LinkInput, inventories: &[SymbolInventory]) -> Vec<ResolvedProvider> {
@@ -336,5 +367,30 @@ mod tests {
         let plan = resolve_link_plan_with_inventories(&package, &inventories);
         assert_eq!(plan.requirements[0].resolution, RequirementResolution::Ambiguous);
         assert_eq!(plan.requirements[0].providers.len(), 2);
+    }
+
+    #[test]
+    fn resolve_link_plan_for_target_filters_non_matching_constraints() {
+        let mut package = BindingPackage::new();
+        package.link = BindingLinkSurface {
+            platform_constraints: vec!["linux".into()],
+            ordered_inputs: vec![LinkInput::Library(LinkLibrary {
+                name: "z".into(),
+                kind: LinkLibraryKind::Default,
+                source: LinkRequirementSource::Declared,
+            })],
+            ..BindingLinkSurface::default()
+        };
+
+        let matching = resolve_link_plan_for_target(&package, &[], Some("x86_64-unknown-linux-gnu"));
+        assert_eq!(matching.inputs.len(), 1);
+        assert_eq!(matching.requirements.len(), 1);
+        assert_eq!(matching.platform_constraints, vec!["linux".to_string()]);
+
+        let non_matching =
+            resolve_link_plan_for_target(&package, &[], Some("x86_64-apple-darwin"));
+        assert!(non_matching.inputs.is_empty());
+        assert!(non_matching.requirements.is_empty());
+        assert!(non_matching.platform_constraints.is_empty());
     }
 }

@@ -191,6 +191,19 @@ for requirement in &plan.requirements {
 That keeps "what the package asked for" distinct from "what the current artifact set appears to
 provide".
 
+If a consumer is planning for one concrete target, it can also filter the plan by target triple:
+
+```rust
+let linux_plan = bic::resolve_link_plan_for_target(
+    &package,
+    &inventories,
+    Some("x86_64-unknown-linux-gnu"),
+);
+```
+
+Today this uses simple substring matching over `platform_constraints`.
+That should be read as target-applicability filtering, not as a full constraint language.
+
 The requirement resolution state is explicit:
 
 - `Unresolved`

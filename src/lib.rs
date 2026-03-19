@@ -201,9 +201,9 @@ pub use ir::{
 };
 pub use line_markers::{FileOriginMap, OriginFilter, SourceOrigin};
 pub use link_plan::{
-    resolve_link_plan, resolve_link_plan_with_inventories, ProviderMatchKind,
-    ProviderProvenance, RequirementResolution, ResolvedLinkPlan, ResolvedLinkRequirement,
-    ResolvedProvider,
+    resolve_link_plan, resolve_link_plan_for_target, resolve_link_plan_with_inventories,
+    ProviderMatchKind, ProviderProvenance, RequirementResolution, ResolvedLinkPlan,
+    ResolvedLinkRequirement, ResolvedProvider,
 };
 pub use preprocess::PreprocessedInput;
 pub use probe::{probe_type_layouts, AbiProbeReport};
