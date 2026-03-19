@@ -1,8 +1,8 @@
 use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
-    MacroKind, MacroValue, ParameterBinding, ProbeSubjectKind, ProbeSubjectReport,
-    TypeAliasBinding, TypeLayout, probe_type_layouts,
+    MacroKind, MacroValue, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
+    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, probe_type_layouts,
 };
 
 #[test]
@@ -97,6 +97,8 @@ fn abi_probe_report_root_types_roundtrip() {
         subjects: vec![ProbeSubjectReport {
             name: "size_t".into(),
             kind: ProbeSubjectKind::Type,
+            confidence: ProbeConfidence::MeasuredLayout,
+            record_completeness: None,
             layout: TypeLayout {
                 name: "size_t".into(),
                 size: 8,
@@ -113,4 +115,23 @@ fn abi_probe_report_root_types_roundtrip() {
     let json = serde_json::to_string(&report).unwrap();
     let decoded: AbiProbeReport = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, report);
+}
+
+#[test]
+fn probe_subject_report_supports_record_completeness_metadata() {
+    let subject = ProbeSubjectReport {
+        name: "struct widget".into(),
+        kind: ProbeSubjectKind::Record,
+        confidence: ProbeConfidence::MeasuredLayout,
+        record_completeness: Some(RecordCompleteness::Complete),
+        layout: TypeLayout {
+            name: "struct widget".into(),
+            size: 16,
+            align: 8,
+        },
+    };
+
+    let json = serde_json::to_string(&subject).unwrap();
+    let decoded: ProbeSubjectReport = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, subject);
 }

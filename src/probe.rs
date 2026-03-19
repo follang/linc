@@ -13,10 +13,24 @@ pub enum ProbeSubjectKind {
     Enum,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProbeConfidence {
+    MeasuredLayout,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecordCompleteness {
+    Complete,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProbeSubjectReport {
     pub name: String,
     pub kind: ProbeSubjectKind,
+    #[serde(default = "default_probe_confidence")]
+    pub confidence: ProbeConfidence,
+    #[serde(default)]
+    pub record_completeness: Option<RecordCompleteness>,
     pub layout: TypeLayout,
 }
 
@@ -108,6 +122,8 @@ pub fn probe_type_layouts(
         .map(|(type_name, layout)| ProbeSubjectReport {
             name: type_name.as_ref().to_string(),
             kind: classify_probe_subject(type_name.as_ref()),
+            confidence: ProbeConfidence::MeasuredLayout,
+            record_completeness: classify_record_completeness(type_name.as_ref()),
             layout: layout.clone(),
         })
         .collect();
@@ -136,6 +152,15 @@ fn classify_probe_subject(type_name: &str) -> ProbeSubjectKind {
     } else {
         ProbeSubjectKind::Type
     }
+}
+
+fn classify_record_completeness(type_name: &str) -> Option<RecordCompleteness> {
+    matches!(classify_probe_subject(type_name), ProbeSubjectKind::Record)
+        .then_some(RecordCompleteness::Complete)
+}
+
+fn default_probe_confidence() -> ProbeConfidence {
+    ProbeConfidence::MeasuredLayout
 }
 
 fn compiler_command(config: &HeaderConfig) -> String {
@@ -275,6 +300,11 @@ mod tests {
         assert_eq!(report.subjects.len(), 2);
         assert_eq!(report.subjects[0].kind, ProbeSubjectKind::Type);
         assert_eq!(report.subjects[1].kind, ProbeSubjectKind::Record);
+        assert_eq!(report.subjects[0].confidence, ProbeConfidence::MeasuredLayout);
+        assert_eq!(
+            report.subjects[1].record_completeness,
+            Some(RecordCompleteness::Complete)
+        );
         assert!(report.layouts.iter().any(|layout| {
             layout.name == "value_t" && layout.size >= 4 && layout.align >= 4
         }));
@@ -322,6 +352,8 @@ mod tests {
             subjects: vec![ProbeSubjectReport {
                 name: "size_t".into(),
                 kind: ProbeSubjectKind::Type,
+                confidence: ProbeConfidence::MeasuredLayout,
+                record_completeness: None,
                 layout: TypeLayout {
                     name: "size_t".into(),
                     size: 8,
@@ -363,5 +395,25 @@ mod tests {
             ProbeSubjectKind::Record
         );
         assert_eq!(classify_probe_subject("enum mode"), ProbeSubjectKind::Enum);
+    }
+
+    #[test]
+    fn probe_report_defaults_confidence_for_older_json() {
+        let json = r#"{
+          "target": {},
+          "compiler_command": "clang",
+          "entry_headers": ["demo.h"],
+          "subjects": [
+            {
+              "name": "struct widget",
+              "kind": "Record",
+              "layout": { "name": "struct widget", "size": 16, "align": 8 }
+            }
+          ],
+          "layouts": [{ "name": "struct widget", "size": 16, "align": 8 }]
+        }"#;
+        let report: AbiProbeReport = serde_json::from_str(json).unwrap();
+        assert_eq!(report.subjects[0].confidence, ProbeConfidence::MeasuredLayout);
+        assert_eq!(report.subjects[0].record_completeness, None);
     }
 }

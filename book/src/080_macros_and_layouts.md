@@ -113,9 +113,17 @@ Each `ProbeSubjectReport` keeps:
 
 - the requested subject name
 - its broad subject kind (`Type`, `Record`, or `Enum`)
+- probe confidence
+- record completeness when the subject is a record
 - the measured `TypeLayout`
 
 The older `layouts` array is still preserved as a flattened compatibility surface.
+
+Current confidence/completeness semantics are intentionally conservative:
+
+- `MeasuredLayout` means the compiler successfully measured the layout
+- `Complete` means a record subject compiled as a complete type and therefore had a usable
+  `sizeof` / `_Alignof` probe surface
 
 ## What Layouts Solve
 
