@@ -2,7 +2,8 @@ use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
     MacroKind, MacroValue, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
-    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, probe_type_layouts,
+    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationPhase,
+    ValidationPhaseReport, probe_type_layouts,
 };
 
 #[test]
@@ -161,4 +162,15 @@ fn probe_subject_report_supports_enum_representation_metadata() {
     assert_eq!(decoded.enum_underlying_size, Some(4));
     assert_eq!(decoded.enum_is_signed, Some(true));
     assert_eq!(decoded, subject);
+}
+
+#[test]
+fn validation_phase_report_root_types_roundtrip() {
+    let phase = ValidationPhaseReport {
+        phase: ValidationPhase::ProviderDiscovery,
+        completed: true,
+    };
+    let json = serde_json::to_string(&phase).unwrap();
+    let decoded: ValidationPhaseReport = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, phase);
 }

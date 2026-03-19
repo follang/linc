@@ -42,6 +42,18 @@ against:
 - symbol binding strength
 - provider artifact provenance
 
+## Validation Phases
+
+`ValidationReport.phases` exposes the current validation pipeline as explicit report data:
+
+- `ProviderDiscovery`
+- `SymbolIdentity`
+- `AbiEvidence`
+
+Today, the first two phases complete during normal symbol validation and `AbiEvidence` remains
+present but incomplete. That is intentional: consumers can now distinguish the current
+symbol-resolution coverage from the deeper ABI-evidence work that is still evolving.
+
 ## Match Statuses
 
 Current statuses are:

@@ -24,6 +24,19 @@ pub enum MatchStatus {
     DuplicateProviders,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ValidationPhase {
+    ProviderDiscovery,
+    SymbolIdentity,
+    AbiEvidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationPhaseReport {
+    pub phase: ValidationPhase,
+    pub completed: bool,
+}
+
 /// Renamed from FunctionMatch to support both functions and variables.
 pub type FunctionMatch = SymbolMatch;
 
@@ -44,6 +57,8 @@ pub struct SymbolMatch {
 /// Aggregate validation report for a package against one or more inventories.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidationReport {
+    #[serde(default = "default_validation_phases")]
+    pub phases: Vec<ValidationPhaseReport>,
     pub matches: Vec<SymbolMatch>,
 }
 
@@ -106,7 +121,7 @@ pub fn validate_many(
         let provider_artifacts = candidates
             .iter()
             .map(|(inventory, symbol)| format_provider(inventory, symbol))
-            .collect();
+            .collect::<Vec<_>>();
         let decorated_candidates: Vec<_> = inventories
             .iter()
             .flat_map(|inventory| {
@@ -190,7 +205,27 @@ pub fn validate_many(
         });
     }
 
-    ValidationReport { matches }
+    ValidationReport {
+        phases: default_validation_phases(),
+        matches,
+    }
+}
+
+fn default_validation_phases() -> Vec<ValidationPhaseReport> {
+    vec![
+        ValidationPhaseReport {
+            phase: ValidationPhase::ProviderDiscovery,
+            completed: true,
+        },
+        ValidationPhaseReport {
+            phase: ValidationPhase::SymbolIdentity,
+            completed: true,
+        },
+        ValidationPhaseReport {
+            phase: ValidationPhase::AbiEvidence,
+            completed: false,
+        },
+    ]
 }
 
 fn format_provider(inventory: &SymbolInventory, symbol: &crate::symbols::SymbolEntry) -> String {
@@ -446,6 +481,30 @@ mod tests {
         let json = serde_json::to_string(&report).unwrap();
         let report2: ValidationReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report, report2);
+    }
+
+    #[test]
+    fn report_exposes_validation_phases() {
+        let inv = make_inventory(&["foo"], &[]);
+        let pkg = make_package(&["foo"]);
+        let report = validate(&pkg, &inv);
+        assert_eq!(
+            report.phases,
+            vec![
+                ValidationPhaseReport {
+                    phase: ValidationPhase::ProviderDiscovery,
+                    completed: true,
+                },
+                ValidationPhaseReport {
+                    phase: ValidationPhase::SymbolIdentity,
+                    completed: true,
+                },
+                ValidationPhaseReport {
+                    phase: ValidationPhase::AbiEvidence,
+                    completed: false,
+                },
+            ]
+        );
     }
 
     #[test]

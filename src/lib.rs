@@ -219,7 +219,8 @@ pub use symbols::{
 };
 #[cfg(feature = "symbols")]
 pub use validate::{
-    validate, validate_many, FunctionMatch, ItemKind, MatchStatus, SymbolMatch, ValidationReport,
+    validate, validate_many, FunctionMatch, ItemKind, MatchStatus, SymbolMatch, ValidationPhase,
+    ValidationPhaseReport, ValidationReport,
 };
 
 /// Serialize a BindingPackage to a deterministic JSON string.
