@@ -253,3 +253,37 @@ fn cli_link_plan_emits_link_surface_json() {
 
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn cli_probe_layout_emits_type_layout_json() {
+    let dir = temp_dir("probe_layout");
+    let header = dir.join("api.h");
+    std::fs::write(
+        &header,
+        "typedef unsigned int value_t;\nstruct widget { int a; double b; };\n",
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_bic"))
+        .args([
+            "probe-layout",
+            "--header",
+            header.to_str().unwrap(),
+            "--type",
+            "value_t",
+            "--type",
+            "struct widget",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "{:?}", output);
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let layouts = json["layouts"].as_array().unwrap();
+    assert!(layouts.iter().any(|layout| layout["name"] == "value_t"));
+    assert!(layouts.iter().any(|layout| layout["name"] == "struct widget"));
+
+    std::fs::remove_dir_all(&dir).ok();
+}

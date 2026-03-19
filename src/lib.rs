@@ -4,6 +4,7 @@ pub mod extract;
 pub mod ir;
 pub mod line_markers;
 pub mod preprocess;
+pub mod probe;
 pub mod raw_headers;
 
 #[cfg(feature = "codegen")]
@@ -28,6 +29,7 @@ pub use ir::{
 };
 pub use line_markers::{FileOriginMap, OriginFilter, SourceOrigin};
 pub use preprocess::PreprocessedInput;
+pub use probe::{probe_type_layouts, AbiProbeReport, TypeLayout};
 pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]
 pub use symbols::{

@@ -1,0 +1,224 @@
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use crate::raw_headers::{Flavor, HeaderConfig};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TypeLayout {
+    pub name: String,
+    pub size: u64,
+    pub align: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AbiProbeReport {
+    pub compiler_command: String,
+    pub entry_headers: Vec<String>,
+    pub layouts: Vec<TypeLayout>,
+}
+
+pub fn probe_type_layouts(
+    config: &HeaderConfig,
+    type_names: &[impl AsRef<str>],
+) -> Result<AbiProbeReport, String> {
+    if config.entry_headers.is_empty() {
+        return Err("no entry headers specified".into());
+    }
+    if type_names.is_empty() {
+        return Err("no type names specified for probing".into());
+    }
+
+    let compiler = compiler_command(config);
+    let temp_root = temp_probe_root();
+    std::fs::create_dir_all(&temp_root)
+        .map_err(|e| format!("failed to create probe temp dir: {}", e))?;
+    let source_path = temp_root.join("probe.c");
+    let exe_path = temp_root.join("probe-bin");
+
+    std::fs::write(&source_path, build_probe_source(config, type_names))
+        .map_err(|e| format!("failed to write probe source: {}", e))?;
+
+    let mut compile = std::process::Command::new(&compiler);
+    compile.arg("-std=c11");
+    for dir in &config.include_dirs {
+        compile.arg(format!("-I{}", dir.display()));
+    }
+    for (name, value) in &config.defines {
+        match value {
+            Some(v) => {
+                compile.arg(format!("-D{}={}", name, v));
+            }
+            None => {
+                compile.arg(format!("-D{}", name));
+            }
+        }
+    }
+    compile.arg(&source_path).arg("-o").arg(&exe_path);
+
+    let compile_output = compile
+        .output()
+        .map_err(|e| format!("failed to invoke compiler '{}': {}", compiler, e))?;
+    if !compile_output.status.success() {
+        let stderr = String::from_utf8_lossy(&compile_output.stderr);
+        cleanup_probe_root(&temp_root);
+        return Err(format!("layout probe compilation failed: {}", stderr.trim()));
+    }
+
+    let run_output = std::process::Command::new(&exe_path)
+        .output()
+        .map_err(|e| format!("failed to run layout probe binary: {}", e))?;
+    if !run_output.status.success() {
+        let stderr = String::from_utf8_lossy(&run_output.stderr);
+        cleanup_probe_root(&temp_root);
+        return Err(format!("layout probe execution failed: {}", stderr.trim()));
+    }
+
+    let stdout = String::from_utf8(run_output.stdout)
+        .map_err(|e| format!("layout probe produced invalid UTF-8: {}", e))?;
+    let layouts = parse_layout_output(&stdout)?;
+    cleanup_probe_root(&temp_root);
+
+    Ok(AbiProbeReport {
+        compiler_command: compiler,
+        entry_headers: config
+            .entry_headers
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect(),
+        layouts,
+    })
+}
+
+fn compiler_command(config: &HeaderConfig) -> String {
+    let flavor = config.flavor.unwrap_or(Flavor::GnuC11);
+    config
+        .compiler
+        .clone()
+        .unwrap_or_else(|| match flavor {
+            Flavor::ClangC11 => "clang".into(),
+            _ => "gcc".into(),
+        })
+}
+
+fn build_probe_source(config: &HeaderConfig, type_names: &[impl AsRef<str>]) -> String {
+    let mut source = String::from("#include <stdio.h>\n#include <stddef.h>\n");
+    for header in &config.entry_headers {
+        source.push_str(&format!("#include \"{}\"\n", header.display()));
+    }
+    source.push_str("\nint main(void) {\n");
+    for type_name in type_names {
+        let raw = type_name.as_ref();
+        let literal = c_string_literal(raw);
+        source.push_str(&format!(
+            "    printf(\"%s\\t%zu\\t%zu\\n\", \"{}\", sizeof({}), _Alignof({}));\n",
+            literal, raw, raw
+        ));
+    }
+    source.push_str("    return 0;\n}\n");
+    source
+}
+
+fn c_string_literal(raw: &str) -> String {
+    raw.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn parse_layout_output(stdout: &str) -> Result<Vec<TypeLayout>, String> {
+    stdout
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let mut parts = line.split('\t');
+            let name = parts
+                .next()
+                .ok_or_else(|| format!("invalid probe output line: {}", line))?;
+            let size = parts
+                .next()
+                .ok_or_else(|| format!("invalid probe output line: {}", line))?
+                .parse::<u64>()
+                .map_err(|e| format!("invalid size in probe output '{}': {}", line, e))?;
+            let align = parts
+                .next()
+                .ok_or_else(|| format!("invalid probe output line: {}", line))?
+                .parse::<u64>()
+                .map_err(|e| format!("invalid align in probe output '{}': {}", line, e))?;
+            Ok(TypeLayout {
+                name: name.to_string(),
+                size,
+                align,
+            })
+        })
+        .collect()
+}
+
+fn temp_probe_root() -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("bic_probe_{}_{}", std::process::id(), id))
+}
+
+fn cleanup_probe_root(root: &std::path::Path) {
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(label: &str) -> PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("bic_probe_test_{label}_{}_{}", std::process::id(), id));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn parse_layout_output_roundtrip() {
+        let parsed = parse_layout_output("widget\t16\t8\nvalue_t\t4\t4\n").unwrap();
+        assert_eq!(
+            parsed,
+            vec![
+                TypeLayout {
+                    name: "widget".into(),
+                    size: 16,
+                    align: 8,
+                },
+                TypeLayout {
+                    name: "value_t".into(),
+                    size: 4,
+                    align: 4,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn probe_type_layouts_from_header() {
+        let dir = temp_dir("header");
+        let header = dir.join("api.h");
+        std::fs::write(
+            &header,
+            "typedef unsigned int value_t;\nstruct widget { int a; double b; };\n",
+        )
+        .unwrap();
+
+        let report = probe_type_layouts(
+            &HeaderConfig::new().header(&header),
+            &["value_t", "struct widget"],
+        )
+        .unwrap();
+
+        assert_eq!(report.layouts.len(), 2);
+        assert!(report.layouts.iter().any(|layout| {
+            layout.name == "value_t" && layout.size >= 4 && layout.align >= 4
+        }));
+        assert!(report.layouts.iter().any(|layout| {
+            layout.name == "struct widget" && layout.size >= 16 && layout.align >= 8
+        }));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

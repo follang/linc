@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use bic::{from_json, inspect_symbols, to_json, validate, HeaderConfig, PreprocessedInput};
+use bic::{
+    from_json, inspect_symbols, probe_type_layouts, to_json, validate, HeaderConfig,
+    PreprocessedInput,
+};
 
 fn main() {
     if let Err(message) = run(std::env::args().skip(1).collect()) {
@@ -20,6 +23,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         "inspect-symbols" => run_inspect_symbols(rest),
         "validate" => run_validate(rest),
         "link-plan" => run_link_plan(rest),
+        "probe-layout" => run_probe_layout(rest),
         "--help" | "-h" | "help" => {
             println!("{}", usage());
             Ok(())
@@ -245,6 +249,55 @@ fn run_link_plan(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn run_probe_layout(args: &[String]) -> Result<(), String> {
+    let mut cfg = HeaderConfig::new();
+    let mut type_names = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--header" => {
+                i += 1;
+                cfg = cfg.header(required_value(args, i, "--header")?);
+            }
+            "--include-dir" => {
+                i += 1;
+                cfg = cfg.include_dir(required_value(args, i, "--include-dir")?);
+            }
+            "--define" => {
+                i += 1;
+                let define = required_value(args, i, "--define")?;
+                let (name, value) = parse_define(define);
+                cfg = cfg.define(name, value);
+            }
+            "--compiler" => {
+                i += 1;
+                cfg = cfg.compiler(required_value(args, i, "--compiler")?);
+            }
+            "--flavor" => {
+                i += 1;
+                cfg = cfg.flavor(parse_header_flavor(required_value(args, i, "--flavor")?)?);
+            }
+            "--type" => {
+                i += 1;
+                type_names.push(required_value(args, i, "--type")?.to_string());
+            }
+            "--help" | "-h" => {
+                println!("{}", usage());
+                return Ok(());
+            }
+            other => return Err(format!("unknown probe-layout option '{other}'")),
+        }
+        i += 1;
+    }
+
+    let report = probe_type_layouts(&cfg, &type_names)?;
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?
+    );
+    Ok(())
+}
+
 fn required_value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str, String> {
     args.get(index)
         .map(|value| value.as_str())
@@ -284,6 +337,7 @@ fn usage() -> String {
         "  bic inspect-symbols --file <path>",
         "  bic validate --bindings-json <path> --artifact <path>",
         "  bic link-plan --bindings-json <path>",
+        "  bic probe-layout --header <path> --type <name> [options]",
         "",
         "scan options:",
         "  --header <path>",
@@ -314,6 +368,14 @@ fn usage() -> String {
         "",
         "link-plan options:",
         "  --bindings-json <path>",
+        "",
+        "probe-layout options:",
+        "  --header <path>",
+        "  --include-dir <path>",
+        "  --define NAME[=VALUE]",
+        "  --compiler <cmd>",
+        "  --flavor <gnu|clang|std>",
+        "  --type <name>",
     ]
     .join("\n")
 }
