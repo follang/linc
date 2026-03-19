@@ -617,6 +617,78 @@ mod tests {
     }
 
     #[test]
+    fn artifact_kind_platform_capability_matrix_is_consistent() {
+        let cases = [
+            (
+                ArtifactPlatform::Elf,
+                ArtifactKind::Object,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+            ),
+            (
+                ArtifactPlatform::Elf,
+                ArtifactKind::StaticLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+            ),
+            (
+                ArtifactPlatform::Elf,
+                ArtifactKind::SharedLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+            ),
+            (
+                ArtifactPlatform::MachO,
+                ArtifactKind::Object,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+            ),
+            (
+                ArtifactPlatform::MachO,
+                ArtifactKind::StaticLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+            ),
+            (
+                ArtifactPlatform::MachO,
+                ArtifactKind::SharedLibrary,
+                ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+            ),
+        ];
+
+        for (platform, kind, capabilities) in cases {
+            let inventory = SymbolInventory {
+                artifact_path: format!("{platform:?}-{kind:?}"),
+                format: ArtifactFormat::Unknown("fixture".into()),
+                platform,
+                kind,
+                capabilities,
+                dependency_edges: Vec::new(),
+                symbols: Vec::new(),
+            };
+
+            assert!(inventory.capabilities.exports_symbols);
+            assert_eq!(
+                inventory.capabilities.imports_symbols,
+                matches!(inventory.kind, ArtifactKind::SharedLibrary | ArtifactKind::Executable)
+            );
+        }
+    }
+
+    #[test]
     fn macho_section_name() {
         let data = minimal_macho_object();
         let inv = inspect_bytes(&data, "test.o".into()).unwrap();

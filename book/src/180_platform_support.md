@@ -55,6 +55,10 @@ Current strengths:
 - Apple-specific scan metadata can be preserved
 - direct matrix tests cover Mach-O object, static-library, and dylib format/capability expectations
 
+Across the currently supported ELF and Mach-O surfaces, the test suite also asserts a shared
+artifact-kind/platform capability matrix so support claims stay aligned with the actual inventory
+model.
+
 Current caveats:
 
 - validation depth is not yet as battle-tested as ELF
