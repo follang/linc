@@ -1,5 +1,6 @@
 pub mod codegen_rust;
 pub mod diagnostics;
+pub mod error;
 pub mod extract;
 pub mod ir;
 pub mod line_markers;
@@ -9,6 +10,7 @@ pub mod symbols;
 pub mod validate;
 
 pub use codegen_rust::emit_rust_ffi;
+pub use error::BicError;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Severity};
 pub use extract::{extract_from_source, extract_from_translation_unit};
 pub use ir::{
@@ -25,22 +27,20 @@ pub use symbols::{
 pub use validate::{validate, FunctionMatch, ItemKind, MatchStatus, SymbolMatch, ValidationReport};
 
 /// Serialize a BindingPackage to a deterministic JSON string.
-pub fn to_json(package: &BindingPackage) -> Result<String, String> {
-    serde_json::to_string_pretty(package).map_err(|e| format!("JSON serialize error: {}", e))
+pub fn to_json(package: &BindingPackage) -> Result<String, BicError> {
+    serde_json::to_string_pretty(package).map_err(BicError::from)
 }
 
 /// Deserialize a BindingPackage from a JSON string.
 ///
 /// Returns an error if the schema version is newer than what this version of BIC supports.
-pub fn from_json(json: &str) -> Result<BindingPackage, String> {
-    let pkg: BindingPackage =
-        serde_json::from_str(json).map_err(|e| format!("JSON parse error: {}", e))?;
+pub fn from_json(json: &str) -> Result<BindingPackage, BicError> {
+    let pkg: BindingPackage = serde_json::from_str(json)?;
     if pkg.schema_version > ir::SCHEMA_VERSION {
-        return Err(format!(
-            "unsupported schema version {} (this BIC supports up to {})",
-            pkg.schema_version,
-            ir::SCHEMA_VERSION
-        ));
+        return Err(BicError::SchemaVersion {
+            found: pkg.schema_version,
+            supported: ir::SCHEMA_VERSION,
+        });
     }
     Ok(pkg)
 }
@@ -257,7 +257,7 @@ mod integration_tests {
         let json = r#"{"schema_version": 99, "bic_version": "0.1.0", "source_path": null, "items": [], "diagnostics": []}"#;
         let result = from_json(json);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("unsupported schema version"));
+        assert!(matches!(result.unwrap_err(), BicError::SchemaVersion { .. }));
     }
 
     #[test]
