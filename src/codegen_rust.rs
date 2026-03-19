@@ -115,7 +115,7 @@ impl RustEmitter {
         let fields = r.fields.as_ref().unwrap();
         self.output.push_str(&format!("{} {} {{\n", keyword, name));
         for (i, field) in fields.iter().enumerate() {
-            let default_name = format!("_field{}", i);
+            let default_name = format!("__bindgen_anon_{}", i);
             let fname = field.name.as_deref().unwrap_or(&default_name);
             let ftype = self.render_type(&field.ty);
             self.output
@@ -178,7 +178,7 @@ impl RustEmitter {
             BindingType::ULongLong => "::core::ffi::c_ulonglong".into(),
             BindingType::Float => "f32".into(),
             BindingType::Double => "f64".into(),
-            BindingType::LongDouble => "f64".into(), // Approximation
+            BindingType::LongDouble => "[u8; 16]".into(), // long double (platform-dependent)
             BindingType::Pointer {
                 pointee,
                 const_pointee,
@@ -216,7 +216,7 @@ impl RustEmitter {
                 } else {
                     format!(" -> {}", self.render_type(return_type))
                 };
-                format!("Option<unsafe extern \"C\" fn({}){}> ", param_str, ret)
+                format!("unsafe extern \"C\" fn({}){}", param_str, ret)
             }
             BindingType::TypedefRef(name) => name.clone(),
             BindingType::RecordRef(name) => name.clone(),
@@ -354,6 +354,47 @@ mod tests {
     fn emit_const_void_pointer_return() {
         let out = gen("const void *find(void);");
         assert!(out.contains("*const ::core::ffi::c_void"));
+    }
+
+    #[test]
+    fn emit_long_double_as_byte_array() {
+        let out = gen("long double ld_func(long double x);");
+        assert!(out.contains("[u8; 16]"));
+        assert!(!out.contains("f64"));
+    }
+
+    #[test]
+    fn emit_function_pointer_without_option() {
+        let out = gen("typedef void (*cb_t)(int);");
+        assert!(out.contains("unsafe extern \"C\" fn("));
+        assert!(!out.contains("Option<"));
+    }
+
+    #[test]
+    fn emit_anonymous_field_bindgen_name() {
+        // A struct with an anonymous inner struct produces unnamed fields
+        let pkg = crate::ir::BindingPackage {
+            source_path: None,
+            items: vec![crate::ir::BindingItem::Record(crate::ir::RecordBinding {
+                kind: crate::ir::RecordKind::Struct,
+                name: Some("s".into()),
+                fields: Some(vec![
+                    crate::ir::FieldBinding {
+                        name: None,
+                        ty: crate::ir::BindingType::Int,
+                    },
+                    crate::ir::FieldBinding {
+                        name: Some("x".into()),
+                        ty: crate::ir::BindingType::Int,
+                    },
+                ]),
+                source_offset: None,
+            })],
+            diagnostics: Vec::new(),
+        };
+        let out = emit_rust_ffi(&pkg);
+        assert!(out.contains("__bindgen_anon_0"));
+        assert!(out.contains("pub x:"));
     }
 
     #[test]
