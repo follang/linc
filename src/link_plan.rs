@@ -16,9 +16,19 @@ pub struct ResolvedProvider {
     pub match_kind: ProviderMatchKind,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum RequirementResolution {
+    #[default]
+    Unresolved,
+    Resolved,
+    Ambiguous,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedLinkRequirement {
     pub declared: LinkInput,
+    #[serde(default)]
+    pub resolution: RequirementResolution,
     #[serde(default)]
     pub providers: Vec<ResolvedProvider>,
 }
@@ -54,9 +64,17 @@ pub fn resolve_link_plan_with_inventories(
         .ordered_inputs
         .iter()
         .cloned()
-        .map(|declared| ResolvedLinkRequirement {
-            providers: matching_providers(&declared, inventories),
-            declared,
+        .map(|declared| {
+            let providers = matching_providers(&declared, inventories);
+            ResolvedLinkRequirement {
+                resolution: match providers.len() {
+                    0 => RequirementResolution::Unresolved,
+                    1 => RequirementResolution::Resolved,
+                    _ => RequirementResolution::Ambiguous,
+                },
+                providers,
+                declared,
+            }
         })
         .collect();
 
@@ -153,6 +171,11 @@ mod tests {
         assert_eq!(plan.inputs, package.link.ordered_inputs);
         assert_eq!(plan.requirements.len(), 2);
         assert!(plan.requirements.iter().all(|req| req.providers.is_empty()));
+        assert!(
+            plan.requirements
+                .iter()
+                .all(|req| req.resolution == RequirementResolution::Unresolved)
+        );
     }
 
     #[test]
@@ -203,11 +226,56 @@ mod tests {
         let plan = resolve_link_plan_with_inventories(&package, &inventories);
         assert_eq!(plan.requirements.len(), 2);
         assert_eq!(plan.requirements[0].providers.len(), 1);
+        assert_eq!(plan.requirements[0].resolution, RequirementResolution::Resolved);
         assert_eq!(plan.requirements[0].providers[0].match_kind, ProviderMatchKind::LibraryName);
         assert_eq!(plan.requirements[1].providers.len(), 1);
+        assert_eq!(plan.requirements[1].resolution, RequirementResolution::Resolved);
         assert_eq!(
             plan.requirements[1].providers[0].match_kind,
             ProviderMatchKind::ExactArtifact
         );
+    }
+
+    #[test]
+    fn resolve_link_plan_marks_ambiguous_requirements() {
+        let mut package = BindingPackage::new();
+        package.link = BindingLinkSurface {
+            ordered_inputs: vec![LinkInput::Library(LinkLibrary {
+                name: "z".into(),
+                kind: LinkLibraryKind::Default,
+                source: LinkRequirementSource::Declared,
+            })],
+            ..BindingLinkSurface::default()
+        };
+        let inventories = vec![
+            SymbolInventory {
+                artifact_path: "/usr/lib/libz.so".into(),
+                format: ArtifactFormat::ElfSharedLibrary,
+                platform: ArtifactPlatform::Elf,
+                kind: ArtifactKind::SharedLibrary,
+                capabilities: ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: true,
+                },
+                dependency_edges: Vec::new(),
+                symbols: Vec::new(),
+            },
+            SymbolInventory {
+                artifact_path: "/opt/lib/libz.a".into(),
+                format: ArtifactFormat::ElfStaticLibrary,
+                platform: ArtifactPlatform::Elf,
+                kind: ArtifactKind::StaticLibrary,
+                capabilities: ArtifactCapabilities {
+                    exports_symbols: true,
+                    imports_symbols: false,
+                },
+                dependency_edges: Vec::new(),
+                symbols: Vec::new(),
+            },
+        ];
+
+        let plan = resolve_link_plan_with_inventories(&package, &inventories);
+        assert_eq!(plan.requirements[0].resolution, RequirementResolution::Ambiguous);
+        assert_eq!(plan.requirements[0].providers.len(), 2);
     }
 }

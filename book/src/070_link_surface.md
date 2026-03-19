@@ -184,9 +184,15 @@ providers:
 ```rust
 let plan = bic::resolve_link_plan_with_inventories(&package, &inventories);
 for requirement in &plan.requirements {
-    println!("providers: {}", requirement.providers.len());
+    println!("{:?}: {}", requirement.resolution, requirement.providers.len());
 }
 ```
 
 That keeps "what the package asked for" distinct from "what the current artifact set appears to
 provide".
+
+The requirement resolution state is explicit:
+
+- `Unresolved`
+- `Resolved`
+- `Ambiguous`
