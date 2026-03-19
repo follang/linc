@@ -631,6 +631,8 @@ pub struct RecordBinding {
     pub kind: RecordKind,
     pub name: Option<String>,
     pub fields: Option<Vec<FieldBinding>>,
+    #[serde(default)]
+    pub representation: Option<RecordRepresentation>,
     pub source_offset: Option<usize>,
 }
 
@@ -638,6 +640,16 @@ impl RecordBinding {
     pub fn is_opaque(&self) -> bool {
         self.fields.is_none()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordRepresentation {
+    #[serde(default)]
+    pub size: Option<u64>,
+    #[serde(default)]
+    pub align: Option<u64>,
+    #[serde(default)]
+    pub completeness: Option<String>,
 }
 
 /// One enum constant.
@@ -759,6 +771,7 @@ mod tests {
                 bit_width: None,
                 layout: None,
             }]),
+            representation: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -812,6 +825,7 @@ mod tests {
             kind: RecordKind::Struct,
             name: Some("point".into()),
             fields: None,
+            representation: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -899,6 +913,7 @@ mod tests {
             kind: RecordKind::Struct,
             name: Some("point".into()),
             fields: None,
+            representation: None,
             source_offset: Some(2),
         }));
         pkg.items.push(BindingItem::Enum(EnumBinding {
@@ -967,6 +982,7 @@ mod tests {
             kind: RecordKind::Struct,
             name: Some("FILE".into()),
             fields: None,
+            representation: None,
             source_offset: None,
         };
         assert!(rec.is_opaque());
@@ -991,10 +1007,23 @@ mod tests {
                     layout: None,
                 },
             ]),
+            representation: None,
             source_offset: None,
         };
         assert!(!rec.is_opaque());
         assert_eq!(rec.fields.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn record_representation_roundtrip() {
+        let representation = RecordRepresentation {
+            size: Some(16),
+            align: Some(8),
+            completeness: Some("Complete".into()),
+        };
+        let json = serde_json::to_string(&representation).unwrap();
+        let decoded: RecordRepresentation = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, representation);
     }
 
     #[test]

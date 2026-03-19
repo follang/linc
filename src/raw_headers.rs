@@ -927,6 +927,13 @@ fn attach_probe_field_offsets(
                 let Some(subject) = subject_map.get(subject_name.as_str()) else {
                     continue;
                 };
+                record.representation = Some(crate::ir::RecordRepresentation {
+                    size: Some(subject.layout.size),
+                    align: Some(subject.layout.align),
+                    completeness: subject
+                        .record_completeness
+                        .map(|completeness| format!("{:?}", completeness)),
+                });
                 let Some(fields) = record.fields.as_mut() else {
                     continue;
                 };
@@ -1891,6 +1898,20 @@ int compute(int x);
             .records()
             .find(|record| record.name.as_deref() == Some("widget"))
             .unwrap();
+        assert_eq!(
+            record
+                .representation
+                .as_ref()
+                .and_then(|representation| representation.size),
+            Some(16)
+        );
+        assert_eq!(
+            record
+                .representation
+                .as_ref()
+                .and_then(|representation| representation.align),
+            Some(8)
+        );
         let fields = record.fields.as_ref().unwrap();
         assert_eq!(fields[0].name.as_deref(), Some("a"));
         assert_eq!(

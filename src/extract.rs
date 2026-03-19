@@ -279,6 +279,7 @@ impl Extractor {
             kind,
             name,
             fields,
+            representation: None,
             source_offset: Some(offset),
         }));
     }

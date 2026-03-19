@@ -4,7 +4,8 @@ use bic::{
     MacroForm, MacroKind, MacroValue, MatchConfidence, ParameterBinding, ProbeConfidence,
     ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout, RecordCompleteness, TypeAliasBinding,
     TypeLayout, ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
-    ValidationPhaseReport, ValidationSummary, EnumRepresentation, FieldLayout, probe_type_layouts,
+    ValidationPhaseReport, ValidationSummary, EnumRepresentation, FieldLayout,
+    RecordRepresentation, probe_type_layouts,
 };
 
 #[test]
@@ -178,6 +179,18 @@ fn enum_representation_root_type_roundtrip() {
     };
     let json = serde_json::to_string(&representation).unwrap();
     let decoded: EnumRepresentation = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, representation);
+}
+
+#[test]
+fn record_representation_root_type_roundtrip() {
+    let representation = RecordRepresentation {
+        size: Some(16),
+        align: Some(8),
+        completeness: Some("Complete".into()),
+    };
+    let json = serde_json::to_string(&representation).unwrap();
+    let decoded: RecordRepresentation = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, representation);
 }
 
