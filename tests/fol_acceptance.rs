@@ -104,6 +104,21 @@ fn fol_should_gate_on_validation(report: &FolValidationGateReport) -> bool {
             .any(|m| matches!(m.status, MatchStatus::UnresolvedDeclaredLinkInputs | MatchStatus::DuplicateProviders))
 }
 
+fn fol_link_plan_is_ready(plan: &FolResolvedLinkPlan) -> bool {
+    !plan.requirements.is_empty()
+        && plan
+            .requirements
+            .iter()
+            .all(|requirement| {
+                requirement.resolution == bic::RequirementResolution::Resolved
+                    && !requirement.providers.is_empty()
+                    && requirement
+                        .providers
+                        .iter()
+                        .all(|provider| !provider.artifact_path.is_empty())
+            })
+}
+
 #[test]
 fn fol_acceptance_binding_scan_flow_stays_consumable() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/fixtures/tricky_layouts.h");
@@ -228,4 +243,46 @@ fn fol_acceptance_validation_findings_gate_generation() {
     assert!(fol_should_gate_on_validation(&duplicate_providers));
     assert_eq!(duplicate_providers.summary.duplicate_providers, 1);
     assert_eq!(duplicate_providers.matches[0].status, MatchStatus::DuplicateProviders);
+}
+
+#[test]
+fn fol_acceptance_resolved_link_plan_stays_consumable() {
+    let mut package: BindingPackage = extract_from_source("int demo_init(void);").unwrap();
+    package.link.platform_constraints.push("linux".into());
+    package.link.ordered_inputs.push(LinkInput::Library(LinkLibrary {
+        name: "demo".into(),
+        kind: LinkLibraryKind::Default,
+        source: LinkRequirementSource::Declared,
+    }));
+    package.link.libraries.push(LinkLibrary {
+        name: "demo".into(),
+        kind: LinkLibraryKind::Default,
+        source: LinkRequirementSource::Declared,
+    });
+
+    let inventory: SymbolInventory = serde_json::from_str(include_str!(
+        "../test/contracts/linux_elf_inventory_fixture.json"
+    ))
+    .unwrap();
+
+    let plan_json = serde_json::to_string(&resolve_link_plan_for_target(
+        &package,
+        std::slice::from_ref(&inventory),
+        Some("x86_64-unknown-linux-gnu"),
+    ))
+    .unwrap();
+    let consumed: FolResolvedLinkPlan = serde_json::from_str(&plan_json).unwrap();
+
+    assert!(fol_link_plan_is_ready(&consumed));
+    assert_eq!(consumed.platform_constraints, vec!["linux"]);
+    assert_eq!(consumed.requirements.len(), 1);
+    assert_eq!(
+        consumed.requirements[0].resolution,
+        bic::RequirementResolution::Resolved
+    );
+    assert_eq!(
+        consumed.requirements[0].providers[0].artifact_path,
+        "/usr/lib/libdemo.so"
+    );
+    assert_eq!(consumed.transitive_dependencies, vec!["libc.so.6"]);
 }
