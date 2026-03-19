@@ -884,12 +884,24 @@ fn canonicalize_binding_type(
         crate::ir::BindingType::Pointer {
             pointee,
             const_pointee,
+            qualifiers,
         } => canonicalize_binding_type(pointee, alias_map, alias_chain, seen_aliases).map(
             |resolved| crate::ir::BindingType::Pointer {
                 pointee: Box::new(resolved),
                 const_pointee: *const_pointee,
+                qualifiers: *qualifiers,
             },
         ),
+        crate::ir::BindingType::Qualified { ty, qualifiers } => canonicalize_binding_type(
+            ty,
+            alias_map,
+            alias_chain,
+            seen_aliases,
+        )
+        .map(|resolved| crate::ir::BindingType::Qualified {
+            ty: Box::new(resolved),
+            qualifiers: *qualifiers,
+        }),
         crate::ir::BindingType::Array(inner, len) => canonicalize_binding_type(
             inner,
             alias_map,
@@ -2110,6 +2122,7 @@ int compute(int x);
             crate::ir::BindingType::Pointer {
                 pointee: Box::new(crate::ir::BindingType::ULong),
                 const_pointee: true,
+                qualifiers: crate::ir::TypeQualifiers::default(),
             }
         );
 

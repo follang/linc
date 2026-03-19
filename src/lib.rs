@@ -198,7 +198,7 @@ pub use ir::{
     MacroBinding, MacroCategory, MacroEnvironmentEntry, MacroForm, MacroKind, MacroProvenance,
     MacroValue,
     NativeSurfaceKind,
-    ParameterBinding, RecordBinding, RecordKind, RecordRepresentation, TypeAliasBinding, TypeLayout, UnsupportedItem,
+    ParameterBinding, RecordBinding, RecordKind, RecordRepresentation, TypeAliasBinding, TypeLayout, TypeQualifiers, UnsupportedItem,
     VariableBinding, SCHEMA_VERSION,
 };
 pub use line_markers::{FileOriginMap, OriginFilter, SourceLocation, SourceOrigin};

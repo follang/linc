@@ -128,7 +128,7 @@ impl RustEmitter {
     }
 
     fn emit_function(&mut self, f: &FunctionBinding) {
-        let ret = if f.return_type == BindingType::Void {
+        let ret = if f.return_type.is_void() {
             String::new()
         } else {
             format!(" -> {}", self.render_type(&f.return_type))
@@ -185,9 +185,10 @@ impl RustEmitter {
             BindingType::Pointer {
                 pointee,
                 const_pointee,
+                ..
             } => {
                 let mutability = if *const_pointee { "*const" } else { "*mut" };
-                if **pointee == BindingType::Void {
+                if pointee.is_void() {
                     format!("{} ::core::ffi::c_void", mutability)
                 } else {
                     format!("{} {}", mutability, self.render_type(pointee))
@@ -200,6 +201,7 @@ impl RustEmitter {
                 // Flexible array member — represent as pointer
                 format!("*mut {} /* flexible array */", self.render_type(inner))
             }
+            BindingType::Qualified { ty, .. } => self.render_type(ty),
             BindingType::FunctionPointer {
                 return_type,
                 parameters,
@@ -214,7 +216,7 @@ impl RustEmitter {
                     }
                     param_str.push_str("...");
                 }
-                let ret = if **return_type == BindingType::Void {
+                let ret = if return_type.is_void() {
                     String::new()
                 } else {
                     format!(" -> {}", self.render_type(return_type))

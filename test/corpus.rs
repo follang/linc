@@ -348,12 +348,30 @@ fn string_h_const_correctness() {
         assert!(f.parameters.len() >= 3);
         assert_eq!(
             f.parameters[0].ty,
-            BindingType::ptr(BindingType::Void),
+            BindingType::Pointer {
+                pointee: Box::new(BindingType::Void),
+                const_pointee: false,
+                qualifiers: bic::TypeQualifiers {
+                    is_const: false,
+                    is_volatile: false,
+                    is_restrict: true,
+                    is_atomic: false,
+                },
+            },
             "memcpy dest should be void *"
         );
         assert_eq!(
             f.parameters[1].ty,
-            BindingType::const_ptr(BindingType::Void),
+            BindingType::Pointer {
+                pointee: Box::new(BindingType::Void),
+                const_pointee: true,
+                qualifiers: bic::TypeQualifiers {
+                    is_const: false,
+                    is_volatile: false,
+                    is_restrict: true,
+                    is_atomic: false,
+                },
+            },
             "memcpy src should be const void *"
         );
     }

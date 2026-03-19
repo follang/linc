@@ -9,6 +9,16 @@ pub struct Extractor {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+fn apply_type_qualifier(qualifiers: &mut TypeQualifiers, qualifier: &TypeQualifier) {
+    match qualifier {
+        TypeQualifier::Const => qualifiers.is_const = true,
+        TypeQualifier::Volatile => qualifiers.is_volatile = true,
+        TypeQualifier::Restrict => qualifiers.is_restrict = true,
+        TypeQualifier::Atomic => qualifiers.is_atomic = true,
+        TypeQualifier::Nonnull | TypeQualifier::NullUnspecified | TypeQualifier::Nullable => {}
+    }
+}
+
 impl Extractor {
     pub fn new() -> Self {
         Self {
@@ -118,12 +128,13 @@ impl Extractor {
         self.emit_derived_diagnostics(&fdef.declarator.node, &name, offset);
 
         let base_ty = self.resolve_base_type(&fdef.specifiers);
-        let base_is_const = self.has_const_qualifier(&fdef.specifiers);
+        let base_qualifiers = self.qualifiers_from_declaration_specifiers(&fdef.specifiers);
         let (mut return_type, params, variadic) =
             self.resolve_function_parts(&fdef.declarator.node, base_ty);
-        if base_is_const {
+        if base_qualifiers.is_const {
             return_type = self.mark_innermost_pointer_const(return_type);
         }
+        return_type = self.apply_base_qualifiers(return_type, base_qualifiers);
 
         self.items.push(BindingItem::Function(FunctionBinding {
             name,
@@ -196,12 +207,13 @@ impl Extractor {
         self.emit_derived_diagnostics(declarator, &name, offset);
 
         let base_ty = self.resolve_base_type(specifiers);
-        let base_is_const = self.has_const_qualifier(specifiers);
+        let base_qualifiers = self.qualifiers_from_declaration_specifiers(specifiers);
         let (mut return_type, params, variadic) =
             self.resolve_function_parts(declarator, base_ty);
-        if base_is_const {
+        if base_qualifiers.is_const {
             return_type = self.mark_innermost_pointer_const(return_type);
         }
+        return_type = self.apply_base_qualifiers(return_type, base_qualifiers);
 
         self.items.push(BindingItem::Function(FunctionBinding {
             name,
@@ -309,7 +321,7 @@ impl Extractor {
             return;
         }
 
-        let base_is_const = self.has_const_qualifier_sq(&field.specifiers);
+        let base_qualifiers = self.qualifiers_from_specifier_qualifiers(&field.specifiers);
 
         for sd in &field.declarators {
             let name = sd
@@ -343,9 +355,10 @@ impl Extractor {
                 ),
                 None => self.resolve_base_type_from_type_specs(&base_type_specs),
             };
-            if base_is_const {
+            if base_qualifiers.is_const {
                 ty = self.mark_innermost_pointer_const(ty);
             }
+            ty = self.apply_base_qualifiers(ty, base_qualifiers);
             out.push(FieldBinding {
                 name,
                 ty,
@@ -512,36 +525,18 @@ impl Extractor {
         declarator: &Declarator,
     ) -> BindingType {
         let base = self.resolve_base_type(specifiers);
-        let base_is_const = self.has_const_qualifier(specifiers);
+        let base_qualifiers = self.qualifiers_from_declaration_specifiers(specifiers);
         let mut ty = self.apply_derived_type(base, declarator);
 
         // If the base type had const and the outermost type is a pointer,
         // mark the innermost pointer's pointee as const.
         // In `const char *p`: base=Char(const), derived=[Pointer]
         // The result should be Pointer { pointee: Char, const_pointee: true }
-        if base_is_const {
+        if base_qualifiers.is_const {
             ty = self.mark_innermost_pointer_const(ty);
         }
 
-        ty
-    }
-
-    fn has_const_qualifier(&self, specifiers: &[Node<DeclarationSpecifier>]) -> bool {
-        specifiers.iter().any(|s| {
-            matches!(
-                s.node,
-                DeclarationSpecifier::TypeQualifier(ref tq) if tq.node == TypeQualifier::Const
-            )
-        })
-    }
-
-    fn has_const_qualifier_sq(&self, specifiers: &[Node<SpecifierQualifier>]) -> bool {
-        specifiers.iter().any(|s| {
-            matches!(
-                s.node,
-                SpecifierQualifier::TypeQualifier(ref tq) if tq.node == TypeQualifier::Const
-            )
-        })
+        self.apply_base_qualifiers(ty, base_qualifiers)
     }
 
     /// Mark the innermost pointer in a type as const_pointee.
@@ -552,19 +547,26 @@ impl Extractor {
             BindingType::Pointer {
                 pointee,
                 const_pointee: _,
+                qualifiers,
             } => {
                 // Check if the pointee is also a pointer — if so, recurse
                 match *pointee {
                     inner @ BindingType::Pointer { .. } => BindingType::Pointer {
                         pointee: Box::new(self.mark_innermost_pointer_const(inner)),
                         const_pointee: false,
+                        qualifiers,
                     },
                     other => BindingType::Pointer {
                         pointee: Box::new(other),
                         const_pointee: true,
+                        qualifiers,
                     },
                 }
             }
+            BindingType::Qualified { ty, qualifiers } => BindingType::Qualified {
+                ty: Box::new(self.mark_innermost_pointer_const(*ty)),
+                qualifiers,
+            },
             other => other, // Not a pointer, nothing to mark
         }
     }
@@ -576,18 +578,11 @@ impl Extractor {
         // In C declarator syntax, the derived list goes from innermost to outermost
         // Pointers are leftmost (first), arrays/functions are rightmost (last)
         // We need to split: pointers wrap inside-out, arrays/functions wrap outside-in
-        let mut pointers: Vec<bool> = Vec::new(); // true = const pointee
+        let mut pointers: Vec<TypeQualifiers> = Vec::new();
         for derived in &declarator.derived {
             match &derived.node {
                 DerivedDeclarator::Pointer(qualifiers) => {
-                    let is_const = qualifiers.iter().any(|q| {
-                        matches!(
-                            q.node,
-                            PointerQualifier::TypeQualifier(ref tq)
-                                if tq.node == TypeQualifier::Const
-                        )
-                    });
-                    pointers.push(is_const);
+                    pointers.push(self.qualifiers_from_pointer_qualifiers(qualifiers));
                 }
                 DerivedDeclarator::Array(arr) => {
                     let size = match &arr.node.size {
@@ -649,10 +644,11 @@ impl Extractor {
         // pointer qualifier Const means the pointer itself is const (`int * const p`),
         // which doesn't affect Rust FFI. The pointee constness comes from
         // the base specifiers and is handled by the caller via mark_innermost_pointer_const.
-        for _ptr_self_const in &pointers {
+        for pointer_qualifiers in &pointers {
             ty = BindingType::Pointer {
                 pointee: Box::new(ty),
                 const_pointee: false,
+                qualifiers: *pointer_qualifiers,
             };
         }
 
@@ -680,6 +676,7 @@ impl Extractor {
                     return_type = BindingType::Pointer {
                         pointee: Box::new(return_type),
                         const_pointee: false,
+                        qualifiers: TypeQualifiers::default(),
                     };
                 }
                 DerivedDeclarator::Function(fdecl) => {
@@ -717,17 +714,69 @@ impl Extractor {
                     .as_ref()
                     .and_then(|d| self.declarator_name(&d.node));
                 let base = self.resolve_base_type_from_param_specifiers(&p.node.specifiers);
-                let base_is_const = self.has_const_qualifier(&p.node.specifiers);
+                let base_qualifiers =
+                    self.qualifiers_from_declaration_specifiers(&p.node.specifiers);
                 let mut ty = match &p.node.declarator {
                     Some(d) => self.apply_derived_type(base, &d.node),
                     None => base,
                 };
-                if base_is_const {
+                if base_qualifiers.is_const {
                     ty = self.mark_innermost_pointer_const(ty);
                 }
+                ty = self.apply_base_qualifiers(ty, base_qualifiers);
                 ParameterBinding { name, ty }
             })
             .collect()
+    }
+
+    fn apply_base_qualifiers(
+        &self,
+        ty: BindingType,
+        mut qualifiers: TypeQualifiers,
+    ) -> BindingType {
+        if qualifiers.is_const && type_has_pointer_layer(&ty) {
+            qualifiers.is_const = false;
+        }
+        BindingType::qualified(ty, qualifiers)
+    }
+
+    fn qualifiers_from_declaration_specifiers(
+        &self,
+        specifiers: &[Node<DeclarationSpecifier>],
+    ) -> TypeQualifiers {
+        let mut qualifiers = TypeQualifiers::default();
+        for specifier in specifiers {
+            if let DeclarationSpecifier::TypeQualifier(type_qualifier) = &specifier.node {
+                apply_type_qualifier(&mut qualifiers, &type_qualifier.node);
+            }
+        }
+        qualifiers
+    }
+
+    fn qualifiers_from_specifier_qualifiers(
+        &self,
+        specifiers: &[Node<SpecifierQualifier>],
+    ) -> TypeQualifiers {
+        let mut qualifiers = TypeQualifiers::default();
+        for specifier in specifiers {
+            if let SpecifierQualifier::TypeQualifier(type_qualifier) = &specifier.node {
+                apply_type_qualifier(&mut qualifiers, &type_qualifier.node);
+            }
+        }
+        qualifiers
+    }
+
+    fn qualifiers_from_pointer_qualifiers(
+        &self,
+        qualifiers: &[Node<PointerQualifier>],
+    ) -> TypeQualifiers {
+        let mut resolved = TypeQualifiers::default();
+        for qualifier in qualifiers {
+            if let PointerQualifier::TypeQualifier(type_qualifier) = &qualifier.node {
+                apply_type_qualifier(&mut resolved, &type_qualifier.node);
+            }
+        }
+        resolved
     }
 
     fn resolve_base_type_from_param_specifiers(
@@ -844,40 +893,7 @@ impl Extractor {
                     }
                     _ => {}
                 },
-                DeclarationSpecifier::TypeQualifier(tq) => match &tq.node {
-                    TypeQualifier::Atomic => {
-                        self.diagnostics.push(
-                            Diagnostic::warning(
-                                DiagnosticKind::DeclarationPartial,
-                                format!("_Atomic qualifier ignored on '{}'", item_name),
-                            )
-                            .with_item(item_name)
-                            .with_location(None, offset),
-                        );
-                    }
-                    TypeQualifier::Restrict => {
-                        self.diagnostics.push(
-                            Diagnostic::warning(
-                                DiagnosticKind::DeclarationPartial,
-                                format!("restrict qualifier ignored on '{}'", item_name),
-                            )
-                            .with_item(item_name)
-                            .with_location(None, offset),
-                        );
-                    }
-                    TypeQualifier::Volatile => {
-                        self.diagnostics.push(
-                            Diagnostic::warning(
-                                DiagnosticKind::DeclarationPartial,
-                                format!("volatile qualifier ignored on '{}'", item_name),
-                            )
-                            .with_item(item_name)
-                            .with_location(None, offset),
-                        );
-                    }
-                    // Const is handled in type resolution, not a diagnostic
-                    _ => {}
-                },
+                DeclarationSpecifier::TypeQualifier(_) => {}
                 _ => {}
             }
         }
@@ -945,6 +961,14 @@ impl Extractor {
                 .with_location(None, offset),
             );
         }
+    }
+}
+
+fn type_has_pointer_layer(ty: &BindingType) -> bool {
+    match ty {
+        BindingType::Pointer { .. } => true,
+        BindingType::Qualified { ty, .. } => type_has_pointer_layer(ty),
+        _ => false,
     }
 }
 
@@ -1387,15 +1411,23 @@ mod tests {
     }
 
     #[test]
-    fn diag_atomic_qualifier() {
+    fn captures_atomic_qualifier() {
         let pkg = extract("_Atomic int counter(void);");
-        let atomics: Vec<_> = pkg
-            .diagnostics
-            .iter()
-            .filter(|d| d.message.contains("_Atomic"))
-            .collect();
-        assert_eq!(atomics.len(), 1);
-        assert_eq!(atomics[0].kind, DiagnosticKind::DeclarationPartial);
+        match &pkg.items[0] {
+            BindingItem::Function(f) => assert_eq!(
+                f.return_type,
+                BindingType::Qualified {
+                    ty: Box::new(BindingType::Int),
+                    qualifiers: TypeQualifiers {
+                        is_const: false,
+                        is_volatile: false,
+                        is_restrict: false,
+                        is_atomic: true,
+                    },
+                }
+            ),
+            other => panic!("expected Function, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1423,13 +1455,23 @@ mod tests {
     // Phase 17: qualifier/specifier diagnostics
 
     #[test]
-    fn diag_volatile_qualifier() {
+    fn captures_volatile_qualifier() {
         let pkg = extract("volatile int flag(void);");
-        let diags: Vec<_> = pkg.diagnostics.iter()
-            .filter(|d| d.message.contains("volatile"))
-            .collect();
-        assert_eq!(diags.len(), 1);
-        assert_eq!(diags[0].kind, DiagnosticKind::DeclarationPartial);
+        match &pkg.items[0] {
+            BindingItem::Function(f) => assert_eq!(
+                f.return_type,
+                BindingType::Qualified {
+                    ty: Box::new(BindingType::Int),
+                    qualifiers: TypeQualifiers {
+                        is_const: false,
+                        is_volatile: true,
+                        is_restrict: false,
+                        is_atomic: false,
+                    },
+                }
+            ),
+            other => panic!("expected Function, got {:?}", other),
+        }
     }
 
     // restrict is a pointer qualifier in C, not a declaration-level specifier.

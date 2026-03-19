@@ -3,7 +3,7 @@ use bic::{
     CallingConvention, EvidenceKind, FunctionBinding, HeaderConfig, LinkResolutionMode,
     MacroBinding, MacroCategory, MacroForm, MacroKind, MacroValue, MatchConfidence,
     ParameterBinding, ProbeConfidence, ProbeSubjectKind, ProbeSubjectReport, ProbedFieldLayout,
-    RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationDeclaration, ValidationEntry,
+    RecordCompleteness, TypeAliasBinding, TypeLayout, TypeQualifiers, ValidationDeclaration, ValidationEntry,
     ValidationEvidence, ValidationPhase, ValidationPhaseReport, ValidationSummary,
     EnumRepresentation, FieldLayout,
     RecordRepresentation, probe_type_layouts,
@@ -213,6 +213,19 @@ fn alias_resolution_root_type_roundtrip() {
     let json = serde_json::to_string(&resolution).unwrap();
     let decoded: AliasResolution = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, resolution);
+}
+
+#[test]
+fn type_qualifiers_root_type_roundtrip() {
+    let qualifiers = TypeQualifiers {
+        is_const: true,
+        is_volatile: true,
+        is_restrict: false,
+        is_atomic: false,
+    };
+    let json = serde_json::to_string(&qualifiers).unwrap();
+    let decoded: TypeQualifiers = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, qualifiers);
 }
 
 #[test]

@@ -535,8 +535,15 @@ pub enum BindingType {
     Pointer {
         pointee: Box<BindingType>,
         const_pointee: bool,
+        #[serde(default)]
+        qualifiers: TypeQualifiers,
     },
     Array(Box<BindingType>, Option<u64>),
+    Qualified {
+        ty: Box<BindingType>,
+        #[serde(default)]
+        qualifiers: TypeQualifiers,
+    },
     FunctionPointer {
         return_type: Box<BindingType>,
         parameters: Vec<BindingType>,
@@ -548,11 +555,24 @@ pub enum BindingType {
     Opaque(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct TypeQualifiers {
+    #[serde(default)]
+    pub is_const: bool,
+    #[serde(default)]
+    pub is_volatile: bool,
+    #[serde(default)]
+    pub is_restrict: bool,
+    #[serde(default)]
+    pub is_atomic: bool,
+}
+
 impl BindingType {
     pub fn ptr(pointee: BindingType) -> Self {
         BindingType::Pointer {
             pointee: Box::new(pointee),
             const_pointee: false,
+            qualifiers: TypeQualifiers::default(),
         }
     }
 
@@ -560,6 +580,26 @@ impl BindingType {
         BindingType::Pointer {
             pointee: Box::new(pointee),
             const_pointee: true,
+            qualifiers: TypeQualifiers::default(),
+        }
+    }
+
+    pub fn qualified(ty: BindingType, qualifiers: TypeQualifiers) -> Self {
+        if qualifiers == TypeQualifiers::default() {
+            ty
+        } else {
+            BindingType::Qualified {
+                ty: Box::new(ty),
+                qualifiers,
+            }
+        }
+    }
+
+    pub fn is_void(&self) -> bool {
+        match self {
+            BindingType::Void => true,
+            BindingType::Qualified { ty, .. } => ty.is_void(),
+            _ => false,
         }
     }
 }
