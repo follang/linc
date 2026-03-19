@@ -1,8 +1,8 @@
 use bic::{
-    from_json, resolve_link_plan_for_target, validate, AbiProbeReport, BindingItem,
-    BindingPackage, BindingType, CallingConvention, FunctionBinding, LinkInput, LinkLibrary,
-    LinkLibraryKind, LinkRequirementSource, MacroValue, ParameterBinding, SymbolInventory,
-    ValidationReport,
+    from_json, resolve_link_plan_for_target, resolve_link_plan_with_inventories, validate,
+    AbiProbeReport, BindingItem, BindingPackage, BindingType, CallingConvention, FunctionBinding,
+    LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource, MacroValue, ParameterBinding,
+    SymbolInventory, ValidationReport,
 };
 use bic::symbols::{ArtifactCapabilities, ArtifactFormat, ArtifactKind, ArtifactPlatform};
 use std::path::PathBuf;
@@ -198,6 +198,109 @@ fn regression_typedef_layout_fixture_validates_record_and_enum_aliases() {
     assert_eq!(report.matches.len(), 2);
     assert!(report.matches.iter().all(|entry| entry.status == bic::MatchStatus::Matched));
     assert_eq!(report.layout_backed_entries().len(), 2);
+}
+
+#[test]
+fn regression_link_plan_and_validation_agree_on_resolved_and_unresolved_providers() {
+    let mut resolved_package = BindingPackage::new();
+    resolved_package.items.push(BindingItem::Function(FunctionBinding {
+        name: "zlibVersion".into(),
+        calling_convention: CallingConvention::C,
+        parameters: Vec::new(),
+        return_type: BindingType::ptr(BindingType::Char),
+        variadic: false,
+        source_offset: None,
+    }));
+    resolved_package.link.ordered_inputs.push(LinkInput::Library(LinkLibrary {
+        name: "z".into(),
+        kind: LinkLibraryKind::Default,
+        source: LinkRequirementSource::Declared,
+    }));
+
+    let resolved_inventory = SymbolInventory {
+        artifact_path: "/usr/lib/libz.so".into(),
+        format: ArtifactFormat::ElfSharedLibrary,
+        platform: ArtifactPlatform::Elf,
+        kind: ArtifactKind::SharedLibrary,
+        capabilities: ArtifactCapabilities {
+            exports_symbols: true,
+            imports_symbols: true,
+        },
+        dependency_edges: vec!["libc.so.6".into()],
+        symbols: vec![bic::SymbolEntry {
+            name: "zlibVersion".into(),
+            raw_name: Some("zlibVersion".into()),
+            version: Some("ZLIB_1.2.0".into()),
+            direction: bic::SymbolDirection::Exported,
+            reexported_via: Vec::new(),
+            alias_of: None,
+            function_abi: None,
+            visibility: bic::SymbolVisibility::Default,
+            is_function: true,
+            binding: bic::SymbolBinding::Global,
+            size: None,
+            section: Some(".text".into()),
+            archive_member: None,
+        }],
+    };
+
+    let resolved_plan = resolve_link_plan_with_inventories(
+        &resolved_package,
+        std::slice::from_ref(&resolved_inventory),
+    );
+    let resolved_report = validate(&resolved_package, &resolved_inventory);
+    assert_eq!(resolved_plan.requirements.len(), 1);
+    assert_eq!(
+        resolved_plan.requirements[0].resolution,
+        bic::RequirementResolution::Resolved
+    );
+    assert_eq!(resolved_report.resolved_provider_entries().len(), 1);
+    assert_eq!(resolved_report.unresolved_provider_entries().len(), 0);
+
+    let mut unresolved_package = BindingPackage::new();
+    unresolved_package.items.push(BindingItem::Function(FunctionBinding {
+        name: "missing_symbol".into(),
+        calling_convention: CallingConvention::C,
+        parameters: Vec::new(),
+        return_type: BindingType::Void,
+        variadic: false,
+        source_offset: None,
+    }));
+    unresolved_package.link.ordered_inputs.push(LinkInput::Library(LinkLibrary {
+        name: "missing".into(),
+        kind: LinkLibraryKind::Default,
+        source: LinkRequirementSource::Declared,
+    }));
+
+    let unresolved_inventory = SymbolInventory {
+        artifact_path: "/tmp/other.so".into(),
+        format: ArtifactFormat::ElfSharedLibrary,
+        platform: ArtifactPlatform::Elf,
+        kind: ArtifactKind::SharedLibrary,
+        capabilities: ArtifactCapabilities {
+            exports_symbols: true,
+            imports_symbols: true,
+        },
+        dependency_edges: vec!["libdep.so".into()],
+        symbols: Vec::new(),
+    };
+
+    let unresolved_plan = resolve_link_plan_with_inventories(
+        &unresolved_package,
+        std::slice::from_ref(&unresolved_inventory),
+    );
+    let unresolved_report = validate(&unresolved_package, &unresolved_inventory);
+    assert_eq!(unresolved_plan.requirements.len(), 1);
+    assert_eq!(
+        unresolved_plan.requirements[0].resolution,
+        bic::RequirementResolution::Unresolved
+    );
+    assert_eq!(unresolved_report.resolved_provider_entries().len(), 0);
+    assert_eq!(unresolved_report.unresolved_provider_entries().len(), 1);
+    assert_eq!(
+        unresolved_report.entries[0].status,
+        bic::MatchStatus::UnresolvedDeclaredLinkInputs
+    );
 }
 
 #[test]
