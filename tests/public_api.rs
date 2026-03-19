@@ -2,8 +2,8 @@ use bic::{
     AbiProbeReport, BicError, BindingItem, BindingPackage, BindingType, CallingConvention,
     FunctionBinding, HeaderConfig, LinkResolutionMode, MacroBinding, MacroCategory, MacroForm,
     MacroKind, MacroValue, ParameterBinding, ProbeConfidence, ProbeSubjectKind,
-    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationPhase,
-    ValidationPhaseReport, probe_type_layouts,
+    ProbeSubjectReport, RecordCompleteness, TypeAliasBinding, TypeLayout, ValidationDeclaration,
+    ValidationEntry, ValidationEvidence, ValidationPhase, ValidationPhaseReport, probe_type_layouts,
 };
 
 #[test]
@@ -173,4 +173,23 @@ fn validation_phase_report_root_types_roundtrip() {
     let json = serde_json::to_string(&phase).unwrap();
     let decoded: ValidationPhaseReport = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, phase);
+}
+
+#[test]
+fn validation_entry_root_types_roundtrip() {
+    let entry = ValidationEntry {
+        declaration: ValidationDeclaration {
+            name: "malloc".into(),
+            item_kind: bic::ItemKind::Function,
+        },
+        status: bic::MatchStatus::Matched,
+        evidence: ValidationEvidence {
+            provider_artifacts: vec!["libc.so".into()],
+            raw_symbol_names: vec!["_malloc".into()],
+            visibility: Some(bic::SymbolVisibility::Default),
+        },
+    };
+    let json = serde_json::to_string(&entry).unwrap();
+    let decoded: ValidationEntry = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, entry);
 }

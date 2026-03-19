@@ -219,7 +219,8 @@ pub use symbols::{
 };
 #[cfg(feature = "symbols")]
 pub use validate::{
-    validate, validate_many, FunctionMatch, ItemKind, MatchStatus, SymbolMatch, ValidationPhase,
+    validate, validate_many, FunctionMatch, ItemKind, MatchStatus, SymbolMatch,
+    ValidationDeclaration, ValidationEntry, ValidationEvidence, ValidationPhase,
     ValidationPhaseReport, ValidationReport,
 };
 

@@ -127,6 +127,23 @@ This is useful for:
 - surfacing duplicate providers
 - building later link-resolution heuristics
 
+## Richer Report Entries
+
+`ValidationReport.entries` is the richer structured surface.
+Each `ValidationEntry` preserves:
+
+- the declaration identity (`name`, `item_kind`)
+- the resulting `status`
+- attached `ValidationEvidence`
+
+`ValidationEvidence` currently keeps:
+
+- `provider_artifacts`
+- `raw_symbol_names`
+- observed `visibility`
+
+The older `matches` list remains available as the flatter compatibility surface.
+
 ## How To Read A Report
 
 The most important first pass is:

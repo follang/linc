@@ -37,6 +37,28 @@ pub struct ValidationPhaseReport {
     pub completed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationDeclaration {
+    pub name: String,
+    pub item_kind: ItemKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationEvidence {
+    #[serde(default)]
+    pub provider_artifacts: Vec<String>,
+    #[serde(default)]
+    pub raw_symbol_names: Vec<String>,
+    pub visibility: Option<SymbolVisibility>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidationEntry {
+    pub declaration: ValidationDeclaration,
+    pub status: MatchStatus,
+    pub evidence: ValidationEvidence,
+}
+
 /// Renamed from FunctionMatch to support both functions and variables.
 pub type FunctionMatch = SymbolMatch;
 
@@ -59,6 +81,8 @@ pub struct SymbolMatch {
 pub struct ValidationReport {
     #[serde(default = "default_validation_phases")]
     pub phases: Vec<ValidationPhaseReport>,
+    #[serde(default)]
+    pub entries: Vec<ValidationEntry>,
     pub matches: Vec<SymbolMatch>,
 }
 
@@ -100,6 +124,7 @@ pub fn validate_many(
     inventories: &[SymbolInventory],
 ) -> ValidationReport {
     let mut matches = Vec::new();
+    let mut entries = Vec::new();
 
     for item in &package.items {
         let (name, kind, expect_function) = match item {
@@ -140,6 +165,11 @@ pub fn validate_many(
                     .map(move |symbol| (inventory, symbol))
             })
             .collect();
+        let raw_symbol_names = candidates
+            .iter()
+            .chain(decorated_candidates.iter())
+            .filter_map(|(_, symbol)| symbol.raw_name.clone())
+            .collect::<Vec<_>>();
         let (status, visibility) = match candidates.first() {
             Some(_) => {
                 let visible: Vec<_> = candidates
@@ -198,15 +228,28 @@ pub fn validate_many(
 
         matches.push(SymbolMatch {
             name: name.clone(),
-            item_kind: kind,
+            item_kind: kind.clone(),
+            status: status.clone(),
+            visibility: visibility.clone(),
+            provider_artifacts: provider_artifacts.clone(),
+        });
+        entries.push(ValidationEntry {
+            declaration: ValidationDeclaration {
+                name: name.clone(),
+                item_kind: kind,
+            },
             status,
-            visibility,
-            provider_artifacts,
+            evidence: ValidationEvidence {
+                provider_artifacts,
+                raw_symbol_names,
+                visibility,
+            },
         });
     }
 
     ValidationReport {
         phases: default_validation_phases(),
+        entries,
         matches,
     }
 }
@@ -504,6 +547,42 @@ mod tests {
                     completed: false,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn report_entries_preserve_richer_validation_evidence() {
+        let pkg = make_package(&["foo"]);
+        let inv = SymbolInventory {
+            artifact_path: "decorated.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![SymbolEntry {
+                name: "foo".into(),
+                raw_name: Some("_foo".into()),
+                visibility: SymbolVisibility::Default,
+                is_function: true,
+                binding: SymbolBinding::Global,
+                size: None,
+                section: None,
+                archive_member: None,
+            }],
+        };
+
+        let report = validate(&pkg, &inv);
+        assert_eq!(report.entries.len(), 1);
+        assert_eq!(report.entries[0].declaration.name, "foo");
+        assert_eq!(report.entries[0].evidence.provider_artifacts, vec!["decorated.o"]);
+        assert_eq!(report.entries[0].evidence.raw_symbol_names, vec!["_foo"]);
+        assert_eq!(
+            report.entries[0].evidence.visibility,
+            Some(SymbolVisibility::Default)
         );
     }
 
