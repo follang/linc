@@ -196,3 +196,7 @@ The requirement resolution state is explicit:
 - `Unresolved`
 - `Resolved`
 - `Ambiguous`
+
+When providers come from inspected shared libraries, their dependency edges are also preserved in
+the plan so downstream tooling can see the current known transitive native surface without losing
+the distinction between declared requirements and discovered dependency evidence.

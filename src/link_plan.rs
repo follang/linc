@@ -14,6 +14,8 @@ pub enum ProviderMatchKind {
 pub struct ResolvedProvider {
     pub artifact_path: String,
     pub match_kind: ProviderMatchKind,
+    #[serde(default)]
+    pub dependency_edges: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -49,6 +51,8 @@ pub struct ResolvedLinkPlan {
     pub inputs: Vec<LinkInput>,
     #[serde(default)]
     pub requirements: Vec<ResolvedLinkRequirement>,
+    #[serde(default)]
+    pub transitive_dependencies: Vec<String>,
 }
 
 pub fn resolve_link_plan(package: &BindingPackage) -> ResolvedLinkPlan {
@@ -59,7 +63,7 @@ pub fn resolve_link_plan_with_inventories(
     package: &BindingPackage,
     inventories: &[SymbolInventory],
 ) -> ResolvedLinkPlan {
-    let requirements = package
+    let requirements: Vec<ResolvedLinkRequirement> = package
         .link
         .ordered_inputs
         .iter()
@@ -78,12 +82,21 @@ pub fn resolve_link_plan_with_inventories(
         })
         .collect();
 
+    let transitive_dependencies = requirements
+        .iter()
+        .flat_map(|requirement| requirement.providers.iter())
+        .flat_map(|provider| provider.dependency_edges.iter().cloned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
     ResolvedLinkPlan {
         preferred_mode: package.link.preferred_mode,
         native_surface_kind: package.link.native_surface_kind,
         platform_constraints: package.link.platform_constraints.clone(),
         inputs: package.link.ordered_inputs.clone(),
         requirements,
+        transitive_dependencies,
     }
 }
 
@@ -95,12 +108,14 @@ fn matching_providers(input: &LinkInput, inventories: &[SymbolInventory]) -> Vec
                 Some(ResolvedProvider {
                     artifact_path: inventory.artifact_path.clone(),
                     match_kind: ProviderMatchKind::ExactArtifact,
+                    dependency_edges: inventory.dependency_edges.clone(),
                 })
             }
             LinkInput::Library(library) if inventory_matches_library_name(&inventory.artifact_path, &library.name) => {
                 Some(ResolvedProvider {
                     artifact_path: inventory.artifact_path.clone(),
                     match_kind: ProviderMatchKind::LibraryName,
+                    dependency_edges: inventory.dependency_edges.clone(),
                 })
             }
             LinkInput::Framework(framework)
@@ -109,6 +124,7 @@ fn matching_providers(input: &LinkInput, inventories: &[SymbolInventory]) -> Vec
                 Some(ResolvedProvider {
                     artifact_path: inventory.artifact_path.clone(),
                     match_kind: ProviderMatchKind::FrameworkName,
+                    dependency_edges: inventory.dependency_edges.clone(),
                 })
             }
             _ => None,
@@ -171,6 +187,7 @@ mod tests {
         assert_eq!(plan.inputs, package.link.ordered_inputs);
         assert_eq!(plan.requirements.len(), 2);
         assert!(plan.requirements.iter().all(|req| req.providers.is_empty()));
+        assert!(plan.transitive_dependencies.is_empty());
         assert!(
             plan.requirements
                 .iter()
@@ -206,7 +223,7 @@ mod tests {
                     exports_symbols: true,
                     imports_symbols: true,
                 },
-                dependency_edges: Vec::new(),
+                dependency_edges: vec!["libc.so.6".into()],
                 symbols: Vec::new(),
             },
             SymbolInventory {
@@ -228,12 +245,17 @@ mod tests {
         assert_eq!(plan.requirements[0].providers.len(), 1);
         assert_eq!(plan.requirements[0].resolution, RequirementResolution::Resolved);
         assert_eq!(plan.requirements[0].providers[0].match_kind, ProviderMatchKind::LibraryName);
+        assert_eq!(
+            plan.requirements[0].providers[0].dependency_edges,
+            vec!["libc.so.6".to_string()]
+        );
         assert_eq!(plan.requirements[1].providers.len(), 1);
         assert_eq!(plan.requirements[1].resolution, RequirementResolution::Resolved);
         assert_eq!(
             plan.requirements[1].providers[0].match_kind,
             ProviderMatchKind::ExactArtifact
         );
+        assert_eq!(plan.transitive_dependencies, vec!["libc.so.6".to_string()]);
     }
 
     #[test]
