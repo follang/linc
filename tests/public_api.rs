@@ -8,6 +8,9 @@ use bic::{
     RoutineAbiEvidence, RoutineAbiEvidenceKind,
     EnumRepresentation, FieldLayout,
     RecordRepresentation, probe_type_layouts,
+    // Intake types (Phase 1)
+    SourcePackage, SourceDeclaration, SourceFunction, SourceType, SourceRecord,
+    SourceEnum, SourceTypeAlias, SourceVariable, from_source_package, LincError,
 };
 
 #[test]
@@ -367,6 +370,54 @@ fn evidence_kind_root_type_roundtrip() {
     let json = serde_json::to_string(&EvidenceKind::WeakExported).unwrap();
     let decoded: EvidenceKind = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, EvidenceKind::WeakExported);
+}
+
+#[test]
+fn intake_types_reachable_from_root() {
+    let mut src = SourcePackage::default();
+    src.source_path = Some("api.h".to_string());
+    src.declarations.push(SourceDeclaration::Function(SourceFunction {
+        name: "init".into(),
+        parameters: vec![],
+        return_type: SourceType::Int,
+        variadic: false,
+        source_offset: None,
+    }));
+    src.declarations.push(SourceDeclaration::Record(SourceRecord {
+        name: Some("config".into()),
+        fields: Some(vec![]),
+        is_union: false,
+        source_offset: None,
+    }));
+    src.declarations.push(SourceDeclaration::Enum(SourceEnum {
+        name: Some("mode".into()),
+        variants: vec![],
+        source_offset: None,
+    }));
+    src.declarations.push(SourceDeclaration::TypeAlias(SourceTypeAlias {
+        name: "size_t".into(),
+        target: SourceType::ULong,
+        source_offset: None,
+    }));
+    src.declarations.push(SourceDeclaration::Variable(SourceVariable {
+        name: "errno".into(),
+        ty: SourceType::Int,
+        source_offset: None,
+    }));
+
+    let pkg = from_source_package(&src);
+
+    assert_eq!(pkg.item_count(), 5);
+    assert_eq!(pkg.function_count(), 1);
+    assert!(pkg.find_function("init").is_some());
+    assert!(pkg.find_record("config").is_some());
+    assert!(pkg.find_type_alias("size_t").is_some());
+}
+
+#[test]
+fn linc_error_alias_is_reachable() {
+    let err: Result<(), LincError> = Err(BicError::NoProbeTypes);
+    assert!(err.is_err());
 }
 
 #[test]
