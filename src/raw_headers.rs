@@ -648,13 +648,36 @@ impl HeaderConfig {
                 })
             }
             Err(pac::driver::Error::SyntaxError(e)) => {
-                let mut pkg = BindingPackage::new();
+                let source_desc = self
+                    .entry_headers
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let effective_macro_environment =
+                    build_effective_macro_environment(&macros, &macro_provenance);
+                let mut pkg = BindingPackage {
+                    source_path: Some(source_desc),
+                    target: self.binding_target(),
+                    inputs: self.binding_inputs(),
+                    macros,
+                    macro_provenance,
+                    effective_macro_environment,
+                    link: self.binding_link_surface(),
+                    ..BindingPackage::new()
+                };
                 pkg.diagnostics.push(
                     Diagnostic::error(
                         DiagnosticKind::ParseFailed,
                         format!("parse error: {}", e),
                     ),
                 );
+
+                if !self.probe_types.is_empty() {
+                    let probe_report = probe_type_layouts(self, &self.probe_types)?;
+                    pkg.layouts = probe_report.layouts;
+                }
+
                 Ok(RawHeaderResult {
                     package: pkg,
                     report: PreprocessingReport {
@@ -2093,6 +2116,54 @@ int compute(int x);
             enum_binding.abi_confidence,
             Some(AbiConfidence::RepresentationProbed)
         );
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn process_preserves_macros_and_probe_layouts_on_parse_failure() {
+        let dir = setup_test_dir("t");
+        let header = dir.join("broken_layouts.h");
+        std::fs::write(
+            &header,
+            "#include <stdint.h>\n\
+             #define API_LEVEL 7\n\
+             #define PACKED __attribute__((packed))\n\
+             typedef struct widget { int value; } widget;\n\
+             typedef struct PACKED packed_widget {\n\
+                 uint8_t tag;\n\
+                 uint16_t value;\n\
+             } packed_widget;\n",
+        )
+        .unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("struct widget")
+            .probe_type_layout("struct packed_widget")
+            .process()
+            .unwrap();
+
+        assert!(result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
+        assert!(result
+            .package
+            .macros
+            .iter()
+            .any(|macro_binding| macro_binding.name == "API_LEVEL"));
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "struct widget" && layout.size > 0));
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "struct packed_widget" && layout.size > 0));
 
         cleanup(&dir);
     }

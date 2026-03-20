@@ -38,3 +38,40 @@ fn torture_header_characterizes_current_parse_boundary() {
     assert!(diagnostic.message.contains("c_interop_torture.h"));
     assert!(diagnostic.message.contains("line 40"));
 }
+
+#[test]
+fn torture_header_still_supports_layout_probes() {
+    let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/linus/c_interop_torture.h");
+    let result = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .include_dir("/usr/include")
+        .include_dir("/usr/include/x86_64-linux-gnu")
+        .no_origin_filter()
+        .probe_type_layout("struct torture_config")
+        .probe_type_layout("struct torture_packet")
+        .probe_type_layout("struct torture_buffer")
+        .process()
+        .unwrap();
+
+    assert_eq!(result.package.diagnostics.len(), 1);
+    assert!(result
+        .package
+        .macros
+        .iter()
+        .any(|macro_binding| macro_binding.name == "TORTURE_API_LEVEL"));
+    assert!(result
+        .package
+        .layouts
+        .iter()
+        .any(|layout| layout.name == "struct torture_config" && layout.size > 0));
+    assert!(result
+        .package
+        .layouts
+        .iter()
+        .any(|layout| layout.name == "struct torture_packet" && layout.size > 0));
+    assert!(result
+        .package
+        .layouts
+        .iter()
+        .any(|layout| layout.name == "struct torture_buffer" && layout.size > 0));
+}
