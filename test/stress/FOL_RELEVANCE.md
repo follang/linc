@@ -78,13 +78,13 @@ loader simulator.
 
 - `libpcap` prerequisite typedef sensitivity
   - reason: this is mostly an environment/header-composition concern rather than a missing core
-    extraction surface
+    extraction surface, and the main remaining gap is still host-package reproducibility
 - `libcurl` macro-surface selectivity
   - reason: `fol` can still consume the declarations and the retained macro set without assuming
     that every option macro is a first-class bindable constant
 - `OpenSSL` opaque-handle policy
   - reason: the correct downstream behavior is to preserve opacity, not to force fake layout
-    certainty
+    certainty, and the current evidence model already supports that posture
 
 ### `future`
 
