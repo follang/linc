@@ -96,13 +96,15 @@ loader simulator.
 
 ### `blocking`
 
-- none currently observed in the combined daemon fixture after the first stress-cycle fixes
+- none currently observed in the combined daemon fixture after the deeper daemon-core evidence path
+  landed
 
 ### `non-blocking`
 
 - mixed subsystem availability remains downstream policy
-  - reason: the combined target is intentionally a contract surface, not proof that SocketCAN,
-    packet capture, TLS, and plugin paths are all present in one deployment
+  - reason: the combined target now has a concrete daemon-core validation path, but that still does
+    not turn optional SocketCAN, packet capture, TLS, and plugin availability into a library-level
+    guarantee
 - explicit `dl` metadata is only host/runtime-loader intent
   - reason: `fol` still needs its own runtime-loader and packaging policy, and `bic` should not
     pretend otherwise
@@ -110,5 +112,5 @@ loader simulator.
 ### `future`
 
 - end-to-end combined native bundle validation
-  - reason: valuable for deeper confidence, but not required for `fol` to consume the current
-    combined analysis surface and apply its own deployment policy
+  - reason: valuable for deeper confidence beyond the daemon-core fixture, but not required for
+    `fol` to consume the current combined analysis surface and apply its own deployment policy
