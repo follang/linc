@@ -797,4 +797,52 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    #[test]
+    fn abi_probe_report_json_roundtrip() {
+        let report = AbiProbeReport {
+            target: BindingTarget::default(),
+            compiler_command: "cc".into(),
+            entry_headers: vec!["api.h".into()],
+            subjects: vec![
+                ProbeSubjectReport {
+                    name: "my_struct".into(),
+                    kind: ProbeSubjectKind::Record,
+                    confidence: ProbeConfidence::MeasuredLayout,
+                    record_completeness: Some(RecordCompleteness::Complete),
+                    enum_underlying_size: None,
+                    enum_is_signed: None,
+                    fields: vec![
+                        ProbedFieldLayout { name: "x".into(), offset_bytes: Some(0), bit_width: None },
+                        ProbedFieldLayout { name: "y".into(), offset_bytes: Some(4), bit_width: None },
+                    ],
+                    layout: TypeLayout { name: "my_struct".into(), size: 8, align: 4 },
+                },
+                ProbeSubjectReport {
+                    name: "my_enum".into(),
+                    kind: ProbeSubjectKind::Enum,
+                    confidence: ProbeConfidence::MeasuredLayout,
+                    record_completeness: None,
+                    enum_underlying_size: Some(4),
+                    enum_is_signed: Some(true),
+                    fields: Vec::new(),
+                    layout: TypeLayout { name: "my_enum".into(), size: 4, align: 4 },
+                },
+            ],
+            layouts: vec![
+                TypeLayout { name: "my_struct".into(), size: 8, align: 4 },
+                TypeLayout { name: "my_enum".into(), size: 4, align: 4 },
+            ],
+        };
+
+        let json = serde_json::to_string_pretty(&report).unwrap();
+        let restored: AbiProbeReport = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(report.subjects.len(), restored.subjects.len());
+        assert_eq!(report.layouts.len(), restored.layouts.len());
+        assert_eq!(restored.subjects[0].name, "my_struct");
+        assert_eq!(restored.subjects[0].fields.len(), 2);
+        assert_eq!(restored.subjects[1].enum_underlying_size, Some(4));
+        assert_eq!(restored.compiler_command, "cc");
+    }
 }
