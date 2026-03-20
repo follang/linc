@@ -2337,6 +2337,49 @@ int compute(int x);
     }
 
     #[test]
+    fn process_recovers_aligned_typedef_attribute_extraction() {
+        let dir = setup_test_dir("aligned_typedef_recovery");
+        let header = dir.join("aligned_typedefs.h");
+        std::fs::write(
+            &header,
+            "#include <stdint.h>\n\
+             #define ALIGN16 __attribute__((aligned(16)))\n\
+             typedef struct ALIGN16 aligned_widget {\n\
+                 uint32_t code;\n\
+                 uint64_t payload_len;\n\
+             } aligned_widget;\n\
+             extern unsigned long aligned_widget_size(const aligned_widget *widget);\n",
+        )
+        .unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("struct aligned_widget")
+            .process()
+            .unwrap();
+
+        assert!(result.package.find_record("aligned_widget").is_some());
+        assert!(result.package.find_function("aligned_widget_size").is_some());
+        assert!(result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
+        assert!(!result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "struct aligned_widget" && layout.size > 0));
+
+        cleanup(&dir);
+    }
+
+    #[test]
     fn process_records_probe_failure_for_incomplete_type_without_aborting_scan() {
         let dir = setup_test_dir("incomplete_probe");
         let header = dir.join("opaque_probe.h");
