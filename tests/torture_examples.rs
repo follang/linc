@@ -89,7 +89,7 @@ fn torture_header_still_supports_layout_probes() {
 }
 
 #[test]
-fn aligned_torture_header_characterizes_current_boundary() {
+fn aligned_torture_header_recovers_aligned_typedef_declarations() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/linus/c_interop_torture_aligned.h");
     let result = bic::HeaderConfig::new()
@@ -105,11 +105,18 @@ fn aligned_torture_header_characterizes_current_boundary() {
         .report
         .preprocessed_source
         .contains("torture_aligned_size"));
-    assert!(result
+    assert!(result.package.find_record("torture_aligned_packet").is_some());
+    assert!(result.package.find_function("torture_aligned_size").is_some());
+    assert!(!result
         .package
         .diagnostics
         .iter()
         .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
+    assert!(result
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
     assert!(result
         .package
         .macros

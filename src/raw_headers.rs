@@ -953,8 +953,12 @@ fn sanitize_attribute_bearing_record_typedefs(source: &str) -> Option<String> {
     let patterns = [
         ("typedef struct __attribute__((packed)) ", "typedef struct "),
         ("typedef struct __attribute__((__packed__)) ", "typedef struct "),
+        ("typedef struct __attribute__((aligned(16))) ", "typedef struct "),
+        ("typedef struct __attribute__((__aligned__(16))) ", "typedef struct "),
         ("typedef union __attribute__((packed)) ", "typedef union "),
         ("typedef union __attribute__((__packed__)) ", "typedef union "),
+        ("typedef union __attribute__((aligned(16))) ", "typedef union "),
+        ("typedef union __attribute__((__aligned__(16))) ", "typedef union "),
     ];
 
     let mut sanitized = source.to_string();
