@@ -1512,4 +1512,113 @@ Dynamic section at offset 0x2de0 contains 3 entries:
         std::fs::remove_file(&so_path).ok();
         std::fs::remove_dir(&dir).ok();
     }
+
+    #[test]
+    fn symbol_inventory_json_roundtrip() {
+        let inv = SymbolInventory {
+            artifact_path: "libfoo.so".into(),
+            format: ArtifactFormat::ElfSharedLibrary,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::SharedLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: true,
+            },
+            dependency_edges: vec!["libm.so.6".into()],
+            symbols: vec![
+                SymbolEntry {
+                    name: "foo_init".into(),
+                    raw_name: None,
+                    version: Some("FOO_1.0".into()),
+                    direction: SymbolDirection::Exported,
+                    reexported_via: Vec::new(),
+                    alias_of: None,
+                    visibility: SymbolVisibility::Default,
+                    is_function: true,
+                    binding: SymbolBinding::Global,
+                    size: Some(42),
+                    section: Some(".text".into()),
+                    archive_member: None,
+                    function_abi: None,
+                },
+                SymbolEntry {
+                    name: "foo_data".into(),
+                    raw_name: None,
+                    version: None,
+                    direction: SymbolDirection::Exported,
+                    reexported_via: Vec::new(),
+                    alias_of: None,
+                    visibility: SymbolVisibility::Default,
+                    is_function: false,
+                    binding: SymbolBinding::Global,
+                    size: Some(8),
+                    section: Some(".data".into()),
+                    archive_member: None,
+                    function_abi: None,
+                },
+            ],
+        };
+
+        let json = serde_json::to_string_pretty(&inv).unwrap();
+        let restored: SymbolInventory = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(inv.artifact_path, restored.artifact_path);
+        assert_eq!(inv.symbols.len(), restored.symbols.len());
+        assert!(restored.has_symbol("foo_init"));
+        assert!(restored.has_symbol("foo_data"));
+        assert_eq!(restored.function_names(), vec!["foo_init"]);
+        assert_eq!(restored.dependency_edges, vec!["libm.so.6"]);
+    }
+
+    #[test]
+    fn has_symbol_and_function_names_queries() {
+        let inv = SymbolInventory {
+            artifact_path: "test.o".into(),
+            format: ArtifactFormat::ElfObject,
+            platform: ArtifactPlatform::Elf,
+            kind: ArtifactKind::Object,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: false,
+            },
+            dependency_edges: Vec::new(),
+            symbols: vec![
+                SymbolEntry {
+                    name: "alpha".into(),
+                    raw_name: None,
+                    version: None,
+                    direction: SymbolDirection::Exported,
+                    reexported_via: Vec::new(),
+                    alias_of: None,
+                    visibility: SymbolVisibility::Default,
+                    is_function: true,
+                    binding: SymbolBinding::Global,
+                    size: None,
+                    section: None,
+                    archive_member: None,
+                    function_abi: None,
+                },
+                SymbolEntry {
+                    name: "beta".into(),
+                    raw_name: None,
+                    version: None,
+                    direction: SymbolDirection::Exported,
+                    reexported_via: Vec::new(),
+                    alias_of: None,
+                    visibility: SymbolVisibility::Default,
+                    is_function: false,
+                    binding: SymbolBinding::Global,
+                    size: None,
+                    section: None,
+                    archive_member: None,
+                    function_abi: None,
+                },
+            ],
+        };
+
+        assert!(inv.has_symbol("alpha"));
+        assert!(inv.has_symbol("beta"));
+        assert!(!inv.has_symbol("gamma"));
+        assert_eq!(inv.function_names(), vec!["alpha"]);
+    }
 }
