@@ -692,4 +692,96 @@ mod integration_tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn intake_source_package_to_binding_package() {
+        let mut src_pkg = SourcePackage::default();
+        src_pkg.source_path = Some("demo.h".into());
+        src_pkg.declarations.push(SourceDeclaration::Function(SourceFunction {
+            name: "init".into(),
+            parameters: vec![SourceParameter {
+                name: Some("flags".into()),
+                ty: SourceType::UInt,
+            }],
+            return_type: SourceType::Int,
+            variadic: false,
+            source_offset: None,
+        }));
+        src_pkg.declarations.push(SourceDeclaration::Record(SourceRecord {
+            name: Some("config".into()),
+            is_union: false,
+            fields: Some(vec![SourceField {
+                name: Some("version".into()),
+                ty: SourceType::UInt,
+                bit_width: None,
+            }]),
+            source_offset: None,
+        }));
+        src_pkg.declarations.push(SourceDeclaration::Variable(SourceVariable {
+            name: "errno".into(),
+            ty: SourceType::Int,
+            source_offset: None,
+        }));
+        src_pkg.link_requirements.push(intake::SourceLinkRequirement {
+            name: "mylib".into(),
+            kind: intake::source::SourceLinkKind::DynamicLibrary,
+        });
+
+        let pkg = from_source_package(&src_pkg);
+        assert_eq!(pkg.source_path.as_deref(), Some("demo.h"));
+        assert_eq!(pkg.function_count(), 1);
+        assert_eq!(pkg.record_count(), 1);
+        assert_eq!(pkg.variable_count(), 1);
+        assert_eq!(pkg.find_function("init").unwrap().name, "init");
+        assert_eq!(pkg.link.libraries.len(), 1);
+        assert_eq!(pkg.link.libraries[0].name, "mylib");
+
+        // JSON roundtrip
+        let json = to_json(&pkg).unwrap();
+        let pkg2 = from_json(&json).unwrap();
+        assert_eq!(pkg, pkg2);
+    }
+
+    #[test]
+    fn intake_roundtrip_preserves_all_declaration_types() {
+        let mut src_pkg = SourcePackage::default();
+        src_pkg.declarations.push(SourceDeclaration::Function(SourceFunction {
+            name: "foo".into(),
+            parameters: vec![],
+            return_type: SourceType::Void,
+            variadic: false,
+            source_offset: Some(10),
+        }));
+        src_pkg.declarations.push(SourceDeclaration::Record(SourceRecord {
+            name: Some("s".into()),
+            is_union: false,
+            fields: Some(vec![]),
+            source_offset: Some(20),
+        }));
+        src_pkg.declarations.push(SourceDeclaration::Enum(SourceEnum {
+            name: Some("e".into()),
+            variants: vec![intake::SourceEnumVariant {
+                name: "A".into(),
+                value: Some(0),
+            }],
+            source_offset: Some(30),
+        }));
+        src_pkg.declarations.push(SourceDeclaration::TypeAlias(SourceTypeAlias {
+            name: "myint".into(),
+            target: SourceType::Int,
+            source_offset: Some(40),
+        }));
+        src_pkg.declarations.push(SourceDeclaration::Variable(SourceVariable {
+            name: "var".into(),
+            ty: SourceType::Int,
+            source_offset: Some(50),
+        }));
+
+        let pkg = from_source_package(&src_pkg);
+        assert_eq!(pkg.function_count(), 1);
+        assert_eq!(pkg.record_count(), 1);
+        assert_eq!(pkg.enum_count(), 1);
+        assert_eq!(pkg.type_alias_count(), 1);
+        assert_eq!(pkg.variable_count(), 1);
+    }
+
 }
