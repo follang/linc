@@ -1943,7 +1943,7 @@ mod tests {
         assert_eq!(macros.len(), 2);
         assert_eq!(provenance.len(), 2);
         assert_eq!(provenance[0].macro_name, "API_LEVEL");
-        assert_eq!(provenance[0].source_origin, Some(crate::SourceOrigin::Entry));
+        assert_eq!(provenance[0].source_origin, Some(crate::line_markers::SourceOrigin::Entry));
         assert_eq!(
             provenance[0].source_location.as_ref().and_then(|loc| loc.line),
             Some(3)
@@ -2140,7 +2140,7 @@ int compute(int x);
             .macro_provenance
             .iter()
             .any(|prov| prov.macro_name == "API_LEVEL"
-                && prov.source_origin == Some(crate::SourceOrigin::Entry)
+                && prov.source_origin == Some(crate::line_markers::SourceOrigin::Entry)
                 && prov.source_location.is_some()));
         assert!(result
             .package
@@ -2190,7 +2190,7 @@ int compute(int x);
         let provenance = result.package.item_provenance(0).unwrap();
         assert_eq!(provenance.item_kind, Some(BindingItemKind::TypeAlias));
         assert_eq!(provenance.item_name.as_deref(), Some("value_t"));
-        assert_eq!(provenance.source_origin, Some(crate::SourceOrigin::Entry));
+        assert_eq!(provenance.source_origin, Some(crate::line_markers::SourceOrigin::Entry));
         assert!(provenance.source_location.is_some());
         let record = result
             .package
