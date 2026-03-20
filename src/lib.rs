@@ -148,7 +148,7 @@ pub use ir::{
     ParameterBinding, RecordBinding, RecordKind, RecordRepresentation, TypeAliasBinding, TypeLayout, TypeQualifiers, UnsupportedItem,
     VariableBinding, SCHEMA_VERSION,
 };
-pub use line_markers::{FileOriginMap, OriginFilter, SourceLocation, SourceOrigin};
+// line_markers types are used internally by ir and raw_headers — not re-exported.
 pub use link_plan::{
     resolve_link_plan, resolve_link_plan_for_target, resolve_link_plan_with_inventories,
     ProviderMatchKind, ProviderProvenance, RequirementResolution, ResolvedLinkPlan,
