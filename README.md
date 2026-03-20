@@ -26,6 +26,13 @@ The current stress cycle also tightened three previously open limits:
 - declared library requirements can now match versioned shared-library filenames such as
   `libssl.so.3`
 
+Current remaining open areas are narrower:
+
+- some Linux system examples still depend on host-installed headers
+- most real-library ladder examples still depend on host development packages
+- mixed-target deployment/runtime availability is still downstream policy rather than a `bic`
+  responsibility
+
 Consumers should treat `bic` as an evidence-producing library:
 
 - declarations come from `BindingPackage`

@@ -19,6 +19,12 @@ For the current non-Windows scope, `bic` should be read as:
   - plugin/runtime-loader examples
   - a combined daemon-style mixed surface
 
+The main remaining open items after the current follow-up cycle are:
+
+- host-header dependence for some Linux system examples
+- host-package dependence for most of the real-library ladder beyond the vendored `zlib` baseline
+- downstream deployment/runtime policy for plugin and mixed-subsystem activation paths
+
 ## Subsystem Scorecard
 
 ### Header Extraction
