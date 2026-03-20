@@ -51,6 +51,16 @@ The intended high-confidence flow is:
 5. serialize or pass the resulting structured values to `fol`
 6. let `fol` decide what to generate, reject, or gate behind policy
 
+When `fol` applies probe-aware gating, it should read retained probe diagnostics intentionally:
+
+- `ProbeUnavailable` means the requested type did not produce honest layout evidence and should
+  usually be treated as "do not lower by value unless you have another trusted reason"
+- `ProbeFailed` means the probe mechanism itself was not trustworthy for that request and should
+  normally block generation until fixed
+
+That distinction matters because an opaque-handle API and a broken probe request are not the same
+problem, even though both can leave `BindingPackage.layouts` without the requested subject.
+
 ## Contract Boundaries
 
 The key contract boundaries are:

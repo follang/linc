@@ -129,6 +129,43 @@ for bitfields when the probe path cannot establish one safely.
 
 The older `layouts` array is still preserved as a flattened compatibility surface.
 
+## Probe Degradation Semantics
+
+Probe requests do not all fail for the same reason.
+
+When `HeaderConfig::process()` keeps a scan alive after probe trouble, downstream consumers should
+distinguish:
+
+- `ProbeUnavailable`: the requested subject did not have a safely probeable layout in the current
+  compilation model
+- `ProbeFailed`: the probe mechanism itself failed operationally or compiled invalid probe input
+
+In practice, `ProbeUnavailable` is the expected result for shapes such as:
+
+- incomplete record declarations
+- intentionally opaque handles
+- subjects where `sizeof` / `_Alignof` cannot be applied honestly
+
+`ProbeFailed` is the stronger warning. It means the request path itself needs attention, for
+example:
+
+- an invalid probe subject string
+- a compiler-side operational problem
+- a probe translation unit that did not compile for reasons unrelated to an intentionally opaque
+  type boundary
+
+The package-level helper surface reflects this split directly:
+
+- `BindingPackage::probe_unavailable_count()`
+- `BindingPackage::probe_failure_count()`
+- `BindingPackage::has_probe_unavailable_diagnostics()`
+
+That allows a downstream generator to keep an intentional policy such as:
+
+- tolerate `ProbeUnavailable` for explicitly opaque inputs
+- require layouts for by-value ABI-sensitive records and typedef-backed value types
+- treat any `ProbeFailed` result as suspicious until the probe path is fixed or explicitly waived
+
 Current confidence/completeness semantics are intentionally conservative:
 
 - `MeasuredLayout` means the compiler successfully measured the layout
