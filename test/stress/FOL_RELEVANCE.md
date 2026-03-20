@@ -56,15 +56,16 @@ loader simulator.
 
 - host-path discovery for Linux headers
   - reason: `fol` can still construct the scan in code once the deployment/toolchain contract is
-    known
+    known, and the remaining issue is environment reproducibility rather than a missing analysis
+    surface
 - runtime success of `socket(AF_CAN, SOCK_RAW, CAN_RAW)`
   - reason: this is a deployment/runtime fact, not a missing header-analysis capability
 
 ### `future`
 
-- hermetic Linux-header fixtures for system examples
+- a hermetic SocketCAN-oriented Linux-header fixture path
   - reason: useful for reproducibility, but not required for `fol` to consume the current
-    code-driven analysis surface
+    code-driven analysis surface or the explicit runtime-boundary split
 
 ## Real-Library Ladder Classification
 
