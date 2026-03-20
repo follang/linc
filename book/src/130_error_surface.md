@@ -8,7 +8,7 @@ It is intentionally explicit because one of the main goals of the new roadmap is
 
 LINC currently has two different public error styles:
 
-- typed errors via `BicError`
+- typed errors via `BicError` (also available as the `LincError` alias)
 - unstructured `Result<_, String>` returns on several operational APIs
 
 That split is functional, but it is not yet the final intended API shape.
@@ -22,14 +22,15 @@ The clearest typed error boundary today is around JSON transport:
 
 This is currently the most structured part of the error model.
 
-## Remaining Public `String`-Returning APIs
+## Remaining `String`-Returning APIs
 
-The current public APIs still returning `Result<_, String>` are:
+The current APIs still returning `Result<_, String>` are:
 
 | API | Area | Why it currently uses `String` |
 |---|---|---|
-| `extract_from_source` | direct extraction | parser/extractor plumbing still uses stringly operational failures |
 | `HeaderConfig::process` | raw-header scan | preprocessing, parsing, probe, and scan orchestration errors are not yet normalized |
+
+Note: `extract_from_source` has been narrowed to `pub(crate)` and is no longer part of the public API surface. New consumers should use `from_source_package` (intake) instead.
 
 These are precisely the APIs targeted by the next error-model workstream.
 
