@@ -617,11 +617,7 @@ impl HeaderConfig {
                 package.provenance = build_item_provenance(&package.items, &origin_map);
                 attach_canonical_alias_resolution(&mut package.items);
 
-                if !self.probe_types.is_empty() {
-                    let probe_report = probe_type_layouts(self, &self.probe_types)?;
-                    package.layouts = probe_report.layouts;
-                    attach_probe_evidence(&mut package.items, &probe_report.subjects);
-                }
+                self.attach_requested_probes(&mut package)?;
 
                 // Apply origin filtering if configured
                 if let Some(ref filter) = self.origin_filter {
@@ -684,10 +680,7 @@ impl HeaderConfig {
                     ),
                 );
 
-                if !self.probe_types.is_empty() {
-                    let probe_report = probe_type_layouts(self, &self.probe_types)?;
-                    pkg.layouts = probe_report.layouts;
-                }
+                self.attach_requested_probes(&mut pkg)?;
 
                 Ok(RawHeaderResult {
                     package: pkg,
@@ -754,11 +747,7 @@ impl HeaderConfig {
         package.provenance = build_item_provenance(&package.items, &origin_map);
         attach_canonical_alias_resolution(&mut package.items);
 
-        if !self.probe_types.is_empty() {
-            let probe_report = probe_type_layouts(self, &self.probe_types)?;
-            package.layouts = probe_report.layouts;
-            attach_probe_evidence(&mut package.items, &probe_report.subjects);
-        }
+        self.attach_requested_probes(&mut package)?;
 
         if let Some(ref filter) = self.origin_filter {
             package.filter_by_origin(&origin_map, filter);
@@ -835,6 +824,29 @@ impl HeaderConfig {
                     value: value.clone(),
                 })
                 .collect(),
+        }
+    }
+
+    fn attach_requested_probes(&self, package: &mut BindingPackage) -> Result<(), BicError> {
+        if self.probe_types.is_empty() {
+            return Ok(());
+        }
+
+        match probe_type_layouts(self, &self.probe_types) {
+            Ok(probe_report) => {
+                package.layouts = probe_report.layouts;
+                attach_probe_evidence(&mut package.items, &probe_report.subjects);
+                Ok(())
+            }
+            Err(error @ BicError::InvalidConfig { .. }) => Err(error),
+            Err(error @ BicError::NoProbeTypes) => Err(error),
+            Err(error) => {
+                package.diagnostics.push(Diagnostic::warning(
+                    DiagnosticKind::ProbeFailed,
+                    format!("probe failed: {}", error),
+                ));
+                Ok(())
+            }
         }
     }
 
@@ -2316,6 +2328,35 @@ int compute(int x);
             .layouts
             .iter()
             .any(|layout| layout.name == "struct packed_widget" && layout.size > 0));
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn process_records_probe_failure_for_incomplete_type_without_aborting_scan() {
+        let dir = setup_test_dir("incomplete_probe");
+        let header = dir.join("opaque_probe.h");
+        std::fs::write(
+            &header,
+            "typedef struct opaque_widget opaque_widget;\n\
+             extern int opaque_use(opaque_widget *widget);\n",
+        )
+        .unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("struct opaque_widget")
+            .process()
+            .unwrap();
+
+        assert!(result.package.find_function("opaque_use").is_some());
+        assert!(result.package.find_type_alias("opaque_widget").is_some());
+        assert!(result.package.layouts.is_empty());
+        assert!(result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeFailed));
 
         cleanup(&dir);
     }

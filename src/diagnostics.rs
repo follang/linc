@@ -10,6 +10,7 @@ pub enum Severity {
 pub enum DiagnosticKind {
     PreprocessingFailed,
     ParseFailed,
+    ProbeFailed,
     DeclarationUnsupported,
     DeclarationPartial,
     SymbolMissing,
