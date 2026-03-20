@@ -46,6 +46,40 @@ That split is important for downstream consumers such as `fol`.
 They should use `bic` to understand the C surface and native requirements, then apply their own
 runtime/build policy on top.
 
+## Linux System Findings
+
+Current Linux system-example findings from `socketcan.rs`, `epoll.rs`, and
+`linux_event_loop.rs`:
+
+- code-driven construction works well for Linux system APIs that are primarily header- and
+  libc-backed
+- host-path discovery still matters because several headers can live either in `/usr/include` or in
+  multiarch directories such as `/usr/include/x86_64-linux-gnu`
+- layout probing is the most stable part of these examples:
+  - `struct can_frame`
+  - `struct sockaddr_can`
+  - `struct epoll_event`
+  - `struct signalfd_siginfo`
+- macro capture is useful for system APIs where constants are part of the public contract, such as
+  `CAN_EFF_FLAG`
+- attaching explicit Linux target constraints and an explicit `c` link requirement keeps the
+  resulting package honest about what is platform-specific and what runtime is expected
+
+Current limitations exposed by these examples:
+
+- the examples still rely on host-installed Linux headers instead of a hermetic fixture toolchain
+- the strongest runtime proof currently exists only for SocketCAN, where the repo explicitly tests
+  the `socket(AF_CAN, SOCK_RAW, CAN_RAW)` boundary
+- event-loop examples currently prove header and layout consumption, not end-to-end runtime event
+  loop behavior
+
+What this means for downstream consumers:
+
+- `bic` is already a good fit for Linux system-header analysis when consumers want code-driven
+  inputs
+- downstream generators should treat runtime behavior as a separate policy layer instead of assuming
+  that a successful scan proves runtime availability
+
 ## Planned Torture Target
 
 The synthetic torture target is meant to concentrate difficult C interop constructs into one
