@@ -14,6 +14,8 @@ Current examples:
 
 - `socketcan.rs`: analyze the Linux SocketCAN headers, attach explicit Linux/link metadata, and
   request ABI-sensitive layout probes entirely from code
+- `epoll.rs`: analyze `sys/epoll.h`, attach Linux/libc metadata, and request a layout probe for
+  `struct epoll_event`
 
 ## SocketCAN Runtime Boundary
 

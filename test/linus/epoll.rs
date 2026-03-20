@@ -1,0 +1,56 @@
+use std::path::{Path, PathBuf};
+
+use bic::{BicError, HeaderConfig, RawHeaderResult};
+
+const EPOLL_HEADER_CANDIDATES: &[&str] = &[
+    "/usr/include/sys/epoll.h",
+    "/usr/include/x86_64-linux-gnu/sys/epoll.h",
+];
+const INCLUDE_DIR_CANDIDATES: &[&str] = &["/usr/include", "/usr/include/x86_64-linux-gnu"];
+const EPOLL_PROBE_TYPES: &[&str] = &["struct epoll_event"];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EpollEnvironment {
+    pub header: PathBuf,
+    pub include_dirs: Vec<PathBuf>,
+}
+
+pub fn epoll_environment() -> Result<EpollEnvironment, BicError> {
+    let header = EPOLL_HEADER_CANDIDATES
+        .iter()
+        .find(|path| Path::new(path).exists())
+        .map(PathBuf::from)
+        .ok_or_else(|| BicError::InvalidConfig {
+            reason: "epoll example requires a sys/epoll.h header".into(),
+        })?;
+
+    let include_dirs = INCLUDE_DIR_CANDIDATES
+        .iter()
+        .filter(|dir| Path::new(dir).exists())
+        .map(PathBuf::from)
+        .collect();
+
+    Ok(EpollEnvironment { header, include_dirs })
+}
+
+pub fn epoll_header_config() -> Result<HeaderConfig, BicError> {
+    let environment = epoll_environment()?;
+    let mut cfg = HeaderConfig::new()
+        .target_constraint("linux")
+        .link_lib("c")
+        .no_origin_filter()
+        .entry_header(&environment.header);
+
+    for include_dir in &environment.include_dirs {
+        cfg = cfg.include_dir(include_dir);
+    }
+    for probe_type in EPOLL_PROBE_TYPES {
+        cfg = cfg.probe_type_layout(*probe_type);
+    }
+
+    Ok(cfg)
+}
+
+pub fn analyze_epoll() -> Result<RawHeaderResult, BicError> {
+    epoll_header_config()?.process()
+}

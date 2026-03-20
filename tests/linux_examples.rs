@@ -1,6 +1,39 @@
 #[cfg(target_os = "linux")]
+#[path = "../test/linus/epoll.rs"]
+mod epoll;
+
+#[cfg(target_os = "linux")]
 #[path = "../test/linus/socketcan.rs"]
 mod socketcan;
+
+#[cfg(target_os = "linux")]
+#[test]
+fn epoll_example_is_code_driven_and_consumable() {
+    let Ok(environment) = epoll::epoll_environment() else {
+        return;
+    };
+
+    let config = epoll::epoll_header_config().unwrap();
+    let result = epoll::analyze_epoll().unwrap();
+
+    assert!(environment.header.ends_with("sys/epoll.h"));
+    assert!(config
+        .linking()
+        .link_libraries
+        .iter()
+        .any(|library| library.name == "c"));
+    assert!(config
+        .probing()
+        .probe_types
+        .iter()
+        .any(|probe_type| probe_type == "struct epoll_event"));
+    assert!(result
+        .package
+        .layouts
+        .iter()
+        .any(|layout| layout.name == "struct epoll_event" && layout.size > 0));
+    assert!(result.report.preprocessed_source.contains("epoll_event"));
+}
 
 #[cfg(target_os = "linux")]
 #[test]
