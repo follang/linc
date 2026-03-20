@@ -45,3 +45,23 @@ If the answer to questions 1 or 2 is no, the finding is usually `blocking`.
 If the answer to question 3 is no but the target is runtime-loaded by design, the finding is often
 `non-blocking` because it belongs to downstream policy rather than `bic` pretending to be a full
 loader simulator.
+
+## SocketCAN Classification
+
+### `blocking`
+
+- none currently observed in the SocketCAN example
+
+### `non-blocking`
+
+- host-path discovery for Linux headers
+  - reason: `fol` can still construct the scan in code once the deployment/toolchain contract is
+    known
+- runtime success of `socket(AF_CAN, SOCK_RAW, CAN_RAW)`
+  - reason: this is a deployment/runtime fact, not a missing header-analysis capability
+
+### `future`
+
+- hermetic Linux-header fixtures for system examples
+  - reason: useful for reproducibility, but not required for `fol` to consume the current
+    code-driven analysis surface
