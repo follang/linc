@@ -194,6 +194,7 @@ fn inventory_matches_library_name(path: &str, name: &str) -> bool {
     if file_name == format!("lib{}.a", name)
         || file_name == format!("lib{}.so", name)
         || file_name == format!("lib{}.dylib", name)
+        || file_name == format!("lib{}.tbd", name)
     {
         return true;
     }
@@ -202,6 +203,7 @@ fn inventory_matches_library_name(path: &str, name: &str) -> bool {
     let dylib_prefix = format!("lib{}.", name);
     file_name.starts_with(&so_prefix)
         || (file_name.starts_with(&dylib_prefix) && file_name.ends_with(".dylib"))
+        || (file_name.starts_with(&dylib_prefix) && file_name.ends_with(".tbd"))
 }
 
 fn inventory_matches_framework_name(path: &str, name: &str) -> bool {
@@ -431,5 +433,38 @@ mod tests {
             "/usr/lib/x86_64-linux-gnu/libssl.so.3"
         );
         assert_eq!(plan.transitive_dependencies, vec!["libcrypto.so.3".to_string()]);
+    }
+
+    #[test]
+    fn resolve_link_plan_matches_macos_text_stub_library_names() {
+        let mut package = BindingPackage::new();
+        package.link.ordered_inputs.push(LinkInput::Library(LinkLibrary {
+            name: "System".into(),
+            kind: LinkLibraryKind::Default,
+            source: LinkRequirementSource::Declared,
+        }));
+
+        let inventories = vec![SymbolInventory {
+            artifact_path: "/usr/lib/libSystem.tbd".into(),
+            format: ArtifactFormat::MachODylib,
+            platform: ArtifactPlatform::MachO,
+            kind: ArtifactKind::SharedLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: true,
+                imports_symbols: true,
+            },
+            dependency_edges: vec!["/usr/lib/libc++.1.dylib".into()],
+            symbols: Vec::new(),
+        }];
+
+        let plan = resolve_link_plan_with_inventories(&package, &inventories);
+        assert_eq!(plan.requirements.len(), 1);
+        assert_eq!(plan.requirements[0].resolution, RequirementResolution::Resolved);
+        assert_eq!(plan.requirements[0].providers.len(), 1);
+        assert_eq!(
+            plan.requirements[0].providers[0].artifact_path,
+            "/usr/lib/libSystem.tbd"
+        );
+        assert_eq!(plan.transitive_dependencies, vec!["/usr/lib/libc++.1.dylib".to_string()]);
     }
 }

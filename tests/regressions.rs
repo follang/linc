@@ -378,7 +378,7 @@ fn regression_link_plan_and_validation_agree_on_resolved_and_unresolved_provider
 }
 
 #[test]
-fn regression_macos_text_stub_provider_is_currently_unresolved() {
+fn regression_macos_text_stub_provider_resolves_after_name_refinement() {
     let mut package = BindingPackage::new();
     package.link.ordered_inputs.push(LinkInput::Library(LinkLibrary {
         name: "System".into(),
@@ -401,8 +401,12 @@ fn regression_macos_text_stub_provider_is_currently_unresolved() {
 
     let plan = resolve_link_plan_with_inventories(&package, &inventories);
     assert_eq!(plan.requirements.len(), 1);
-    assert_eq!(plan.requirements[0].resolution, bic::RequirementResolution::Unresolved);
-    assert!(plan.requirements[0].providers.is_empty());
+    assert_eq!(plan.requirements[0].resolution, bic::RequirementResolution::Resolved);
+    assert_eq!(plan.requirements[0].providers.len(), 1);
+    assert_eq!(
+        plan.requirements[0].providers[0].artifact_path,
+        "/usr/lib/libSystem.tbd"
+    );
 }
 
 #[test]
