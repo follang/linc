@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use bic::SymbolInventory;
+
 #[path = "../test/stress/daemon/max_pain.rs"]
 mod max_pain;
 
@@ -38,4 +40,19 @@ fn combined_daemon_fixture_is_code_driven_and_consumable() {
         .layouts
         .iter()
         .any(|layout| layout.name == "struct bic_daemon_packet" && layout.size > 0));
+}
+
+#[test]
+fn combined_daemon_inventory_fixture_is_consumable() {
+    let inventory: SymbolInventory = serde_json::from_str(include_str!(
+        "../test/contracts/daemon_core_inventory_fixture.json"
+    ))
+    .unwrap();
+
+    assert_eq!(inventory.artifact_path, "test/stress/daemon/max_pain.o");
+    assert_eq!(inventory.symbols.len(), 6);
+    assert!(inventory
+        .symbols
+        .iter()
+        .any(|symbol| symbol.name == "bic_daemon_enable_tls" && symbol.is_function));
 }
