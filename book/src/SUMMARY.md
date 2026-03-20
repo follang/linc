@@ -19,6 +19,7 @@
   - [Failure Model](./160_failure_model.md)
   - [Schema Version Review](./170_schema_review.md)
   - [Stable Usage Patterns](./190_stable_usage_patterns.md)
+- [BIC vs bindgen](./vsBINDGEN.md)
 - [End-To-End Workflows](./110_workflows.md)
 - [Operations And Release](./205_operations_and_release.md)
   - [Platform Support](./180_platform_support.md)
