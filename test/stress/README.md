@@ -12,6 +12,21 @@ Current ladder:
 - `libcurl.rs`: macro volume, enums, callbacks, and option-heavy API surface
 - `openssl.rs`: opaque handles, macro pressure, and intentionally incomplete public records
 
+## Reproducibility Classification
+
+The current stress/example surfaces are not equally hermetic.
+
+| Surface | Current classification | Why |
+|---|---|---|
+| `zlib.rs` | mostly hermetic | vendored fixture path exists and the example does not depend on host system headers for its default useful path |
+| `libpcap.rs` | host-dependent | depends on host-installed development headers and whatever prerequisite system typedef visibility those headers pull in |
+| `libcurl.rs` | host-dependent | depends on host-installed development headers and macro surface chosen by that host package |
+| `openssl.rs` | host-dependent | depends on host-installed development headers and host-side opaque API packaging |
+| `plugin.rs` | hermetic | uses repo-owned fixture headers and producer-side metadata only |
+| Linux `epoll` / event-loop examples | host-dependent today | depend on host Linux headers and multiarch include discovery |
+| Linux `socketcan` analysis | host-dependent today | depends on host Linux SocketCAN headers |
+| Linux `socketcan` runtime smoke | host-dependent and opt-in | depends on host kernel/runtime support and `BIC_RUN_SYSTEM_SOCKETCAN` |
+
 ## Findings Matrix
 
 | Library | Main stress area | Current confidence | Main note |
