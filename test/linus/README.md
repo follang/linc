@@ -15,6 +15,33 @@ Current examples:
 - `socketcan.rs`: analyze the Linux SocketCAN headers, attach explicit Linux/link metadata, and
   request ABI-sensitive layout probes entirely from code
 
+## SocketCAN Runtime Boundary
+
+SocketCAN is intentionally useful here because it is not a standalone library boundary.
+
+What comes from header analysis:
+
+- constants and macros from `linux/can.h` and `linux/can/raw.h`
+- record layouts such as `struct can_frame`, `struct canfd_frame`, and `struct sockaddr_can`
+- Linux-only native metadata such as the `linux` platform constraint and the explicit `c` link
+  requirement attached in code
+
+What comes from runtime behavior:
+
+- actual socket creation happens through the libc/kernel entry point
+  `socket(AF_CAN, SOCK_RAW, CAN_RAW)`
+- success or expected kernel errors such as unsupported-address-family results are runtime facts,
+  not declaration-extraction facts
+
+The example keeps those layers separate on purpose:
+
+- `analyze_socketcan()` exercises the header-analysis path
+- `socketcan_runtime_smoke_check()` exercises the syscall/libc boundary
+
+That split is important for downstream consumers such as `fol`.
+They should use `bic` to understand the C surface and native requirements, then apply their own
+runtime/build policy on top.
+
 ## Planned Torture Target
 
 The synthetic torture target is meant to concentrate difficult C interop constructs into one
