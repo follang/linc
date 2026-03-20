@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use bic::{DiagnosticKind, Severity};
+use bic::DiagnosticKind;
 
 #[test]
 fn torture_header_scans_through_public_header_config() {
@@ -18,7 +18,7 @@ fn torture_header_scans_through_public_header_config() {
 }
 
 #[test]
-fn torture_header_characterizes_current_parse_boundary() {
+fn torture_header_recovers_packed_typedef_declarations() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test/linus/c_interop_torture.h");
     let result = bic::HeaderConfig::new()
         .entry_header(&header)
@@ -28,15 +28,22 @@ fn torture_header_characterizes_current_parse_boundary() {
         .process()
         .unwrap();
 
-    assert_eq!(result.package.item_count(), 0);
-    assert_eq!(result.package.unsupported_count(), 0);
-    assert_eq!(result.package.diagnostics.len(), 1);
-
-    let diagnostic = &result.package.diagnostics[0];
-    assert_eq!(diagnostic.kind, DiagnosticKind::ParseFailed);
-    assert_eq!(diagnostic.severity, Severity::Error);
-    assert!(diagnostic.message.contains("c_interop_torture.h"));
-    assert!(diagnostic.message.contains("line 40"));
+    assert!(result.package.item_count() >= 7);
+    assert!(result.package.find_record("torture_config").is_some());
+    assert!(result.package.find_record("torture_packet").is_some());
+    assert!(result.package.find_record("torture_buffer").is_some());
+    assert!(result.package.find_function("torture_open").is_some());
+    assert!(result.package.find_function("torture_send").is_some());
+    assert!(!result
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
+    assert!(result
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
 }
 
 #[test]
@@ -53,7 +60,12 @@ fn torture_header_still_supports_layout_probes() {
         .process()
         .unwrap();
 
-    assert_eq!(result.package.diagnostics.len(), 1);
+    assert!(result.package.diagnostics.len() >= 1);
+    assert!(result
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
     assert!(result
         .package
         .macros

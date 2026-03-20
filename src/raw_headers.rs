@@ -648,6 +648,17 @@ impl HeaderConfig {
                 })
             }
             Err(pac::driver::Error::SyntaxError(e)) => {
+                if let Some(recovered) =
+                    self.try_recover_items_from_preprocessed_source(&e.source)
+                {
+                    let report = PreprocessingReport {
+                        command,
+                        args,
+                        preprocessed_source: e.source,
+                    };
+                    return Ok(self.package_from_recovered_parse(recovered, macros, macro_provenance, report)?);
+                }
+
                 let source_desc = self
                     .entry_headers
                     .iter()
@@ -688,6 +699,72 @@ impl HeaderConfig {
                 })
             }
         }
+    }
+
+    fn try_recover_items_from_preprocessed_source(
+        &self,
+        source: &str,
+    ) -> Option<RecoveredParse> {
+        let sanitized_source = sanitize_attribute_bearing_record_typedefs(source)?;
+        let flavor = self.flavor.unwrap_or(Flavor::GnuC11).to_pac();
+        let unit = pac::parse::translation_unit(&sanitized_source, flavor).ok()?;
+        let extractor = Extractor::new();
+        let (items, mut diagnostics) = extractor.extract(&unit);
+        diagnostics.push(Diagnostic::warning(
+            DiagnosticKind::DeclarationPartial,
+            "recovered declaration extraction after sanitizing packed record typedef attributes",
+        ));
+        Some(RecoveredParse {
+            source: sanitized_source,
+            items,
+            diagnostics,
+        })
+    }
+
+    fn package_from_recovered_parse(
+        &self,
+        recovered: RecoveredParse,
+        macros: Vec<MacroBinding>,
+        macro_provenance: Vec<MacroProvenance>,
+        report: PreprocessingReport,
+    ) -> Result<RawHeaderResult, BicError> {
+        let source_desc = self
+            .entry_headers
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let effective_macro_environment =
+            build_effective_macro_environment(&macros, &macro_provenance);
+
+        let mut package = BindingPackage {
+            source_path: Some(source_desc),
+            target: self.binding_target(),
+            inputs: self.binding_inputs(),
+            macros,
+            macro_provenance,
+            effective_macro_environment,
+            link: self.binding_link_surface(),
+            items: recovered.items,
+            diagnostics: recovered.diagnostics,
+            ..BindingPackage::new()
+        };
+
+        let origin_map = FileOriginMap::parse(&recovered.source, &self.entry_headers);
+        package.provenance = build_item_provenance(&package.items, &origin_map);
+        attach_canonical_alias_resolution(&mut package.items);
+
+        if !self.probe_types.is_empty() {
+            let probe_report = probe_type_layouts(self, &self.probe_types)?;
+            package.layouts = probe_report.layouts;
+            attach_probe_evidence(&mut package.items, &probe_report.subjects);
+        }
+
+        if let Some(ref filter) = self.origin_filter {
+            package.filter_by_origin(&origin_map, filter);
+        }
+
+        Ok(RawHeaderResult { package, report })
     }
 
     fn build_combined_source(&self) -> String {
@@ -852,6 +929,32 @@ impl HeaderConfig {
             Flavor::StdC11 => "std-c11".into(),
         }
     }
+}
+
+struct RecoveredParse {
+    source: String,
+    items: Vec<BindingItem>,
+    diagnostics: Vec<Diagnostic>,
+}
+
+fn sanitize_attribute_bearing_record_typedefs(source: &str) -> Option<String> {
+    let patterns = [
+        ("typedef struct __attribute__((packed)) ", "typedef struct "),
+        ("typedef struct __attribute__((__packed__)) ", "typedef struct "),
+        ("typedef union __attribute__((packed)) ", "typedef union "),
+        ("typedef union __attribute__((__packed__)) ", "typedef union "),
+    ];
+
+    let mut sanitized = source.to_string();
+    let mut changed = false;
+    for (pattern, replacement) in patterns {
+        if sanitized.contains(pattern) {
+            sanitized = sanitized.replace(pattern, replacement);
+            changed = true;
+        }
+    }
+
+    changed.then_some(sanitized)
 }
 
 fn attach_canonical_alias_resolution(items: &mut [BindingItem]) {
@@ -2121,7 +2224,7 @@ int compute(int x);
     }
 
     #[test]
-    fn process_preserves_macros_and_probe_layouts_on_parse_failure() {
+    fn process_preserves_macros_and_probe_layouts_on_partial_recovery() {
         let dir = setup_test_dir("t");
         let header = dir.join("broken_layouts.h");
         std::fs::write(
@@ -2148,17 +2251,66 @@ int compute(int x);
             .package
             .diagnostics
             .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
+        assert!(!result
+            .package
+            .diagnostics
+            .iter()
             .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
         assert!(result
             .package
             .macros
             .iter()
             .any(|macro_binding| macro_binding.name == "API_LEVEL"));
+        assert!(result.package.find_record("packed_widget").is_some());
         assert!(result
             .package
             .layouts
             .iter()
             .any(|layout| layout.name == "struct widget" && layout.size > 0));
+        assert!(result
+            .package
+            .layouts
+            .iter()
+            .any(|layout| layout.name == "struct packed_widget" && layout.size > 0));
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn process_recovers_packed_typedef_attribute_extraction() {
+        let dir = setup_test_dir("packed_typedef_recovery");
+        let header = dir.join("packed_typedefs.h");
+        std::fs::write(
+            &header,
+            "#include <stdint.h>\n\
+             #define PACKED __attribute__((packed))\n\
+             typedef struct PACKED packed_widget {\n\
+                 uint8_t tag;\n\
+                 uint16_t value;\n\
+             } packed_widget;\n\
+             extern int packed_send(const packed_widget *widget);\n",
+        )
+        .unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("struct packed_widget")
+            .process()
+            .unwrap();
+
+        assert!(result.package.find_record("packed_widget").is_some());
+        assert!(result.package.find_function("packed_send").is_some());
+        assert!(result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::DeclarationPartial));
+        assert!(!result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::ParseFailed));
         assert!(result
             .package
             .layouts
