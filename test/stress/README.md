@@ -55,3 +55,29 @@ So the runtime-loaded rule is:
 
 - use `bic` to model the ABI contract
 - use downstream runtime policy to model `dlopen`/`dlsym` discovery and failure handling
+
+## Plugin Findings
+
+Current findings from the plugin ABI stress fixture:
+
+- `bic` models the plugin ABI header well as a normal C surface:
+  - callback typedefs
+  - opaque handles
+  - descriptor records
+  - exported descriptor factory function
+- layout probing is useful for concrete ABI records such as `bic_plugin_descriptor`
+- the explicit `dl` link requirement is useful as metadata, but it should not be mistaken for proof
+  that runtime loading will succeed in deployment
+
+Current limitations exposed by this fixture:
+
+- there is no direct notion of “symbol must be discovered by `dlsym` under this policy” in the core
+  validation model yet
+- link planning can describe host-side native requirements, but runtime plugin discovery remains a
+  downstream responsibility
+
+Practical implication:
+
+- use `bic` to define and check the plugin ABI contract
+- do not use `bic` as a substitute for runtime loader policy, plugin search paths, or deployment-time
+  symbol lookup handling
