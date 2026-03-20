@@ -49,6 +49,17 @@ Kinds:
 - `Static`
 - `Dynamic`
 
+Provider matching for declared library names is intentionally tolerant of ordinary platform naming
+shapes. Today that includes:
+
+- `lib{name}.a`
+- `lib{name}.so`
+- `lib{name}.so.*`
+- `lib{name}.dylib`
+- `lib{name}.*.dylib`
+- `lib{name}.tbd`
+- `lib{name}.*.tbd`
+
 Examples:
 
 ```rust
@@ -213,6 +224,9 @@ The requirement resolution state is explicit:
 When providers come from inspected shared libraries, their dependency edges are also preserved in
 the plan so downstream tooling can see the current known transitive native surface without losing
 the distinction between declared requirements and discovered dependency evidence.
+
+That means a planning inventory can legitimately resolve against macOS text stubs such as
+`/usr/lib/libSystem.tbd` even when later runtime or deployment policy is handled somewhere else.
 
 Requirement and provider provenance are also preserved explicitly:
 
