@@ -2,6 +2,9 @@
 
 This directory carries code-driven stress examples for real libraries with increasing difficulty.
 
+The rolling findings ledger for these examples lives in
+[FINDINGS.md](/home/bresilla/data/code/bresilla/bic/test/stress/FINDINGS.md).
+
 Current ladder:
 
 - `zlib.rs`: clean baseline library surface with good function and typedef coverage
