@@ -1,8 +1,8 @@
 use bic::{
     from_json, resolve_link_plan_for_target, resolve_link_plan_with_inventories, validate,
-    AbiProbeReport, BindingItem, BindingPackage, BindingType, CallingConvention, FunctionBinding,
-    LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource, MacroValue, ParameterBinding,
-    SymbolInventory, ValidationReport,
+    AbiProbeReport, BindingItem, BindingPackage, BindingType, CallingConvention, DiagnosticKind,
+    FunctionBinding, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource, MacroValue,
+    ParameterBinding, SymbolInventory, ValidationReport,
 };
 use bic::symbols::{ArtifactCapabilities, ArtifactFormat, ArtifactKind, ArtifactPlatform};
 use std::path::PathBuf;
@@ -84,6 +84,56 @@ fn regression_probe_record_fixture_keeps_record_and_enum_metadata() {
     assert_eq!(report.subjects.len(), 2);
     assert_eq!(report.subjects[0].layout.name, "struct widget");
     assert_eq!(report.subjects[1].enum_underlying_size, Some(4));
+}
+
+#[test]
+fn regression_probe_diagnostics_distinguish_unavailable_and_operational_failures() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "bic_regression_probe_split_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&temp_root).unwrap();
+    let header = temp_root.join("probe_split.h");
+    std::fs::write(
+        &header,
+        "typedef struct opaque_widget opaque_widget;\n\
+         extern int opaque_use(opaque_widget *widget);\n\
+         extern int concrete_use(int value);\n",
+    )
+    .unwrap();
+
+    let unavailable = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .probe_type_layout("struct opaque_widget")
+        .process()
+        .unwrap();
+    assert_eq!(unavailable.package.probe_unavailable_count(), 1);
+    assert_eq!(unavailable.package.probe_failure_count(), 0);
+    assert!(unavailable
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeUnavailable));
+
+    let failed = bic::HeaderConfig::new()
+        .entry_header(&header)
+        .probe_type_layout("struct invalid[")
+        .process()
+        .unwrap();
+    assert_eq!(failed.package.probe_unavailable_count(), 0);
+    assert_eq!(failed.package.probe_failure_count(), 1);
+    assert!(failed
+        .package
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeFailed));
+
+    std::fs::remove_file(&header).ok();
+    std::fs::remove_dir_all(&temp_root).ok();
 }
 
 #[test]
