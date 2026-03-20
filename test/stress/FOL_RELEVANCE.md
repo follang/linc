@@ -90,3 +90,24 @@ loader simulator.
 - deeper hermetic fixtures for the real-library ladder
   - reason: useful for stronger reproducibility and CI portability, but not currently stopping
     `fol` from consuming the existing library-first evidence surfaces
+
+## Combined Daemon Classification
+
+### `blocking`
+
+- none currently observed in the combined daemon fixture after the first stress-cycle fixes
+
+### `non-blocking`
+
+- mixed subsystem availability remains downstream policy
+  - reason: the combined target is intentionally a contract surface, not proof that SocketCAN,
+    packet capture, TLS, and plugin paths are all present in one deployment
+- explicit `dl` metadata is only host/runtime-loader intent
+  - reason: `fol` still needs its own runtime-loader and packaging policy, and `bic` should not
+    pretend otherwise
+
+### `future`
+
+- end-to-end combined native bundle validation
+  - reason: valuable for deeper confidence, but not required for `fol` to consume the current
+    combined analysis surface and apply its own deployment policy
