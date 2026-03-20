@@ -2,6 +2,8 @@
 mod libcurl;
 #[path = "../test/stress/libpcap.rs"]
 mod libpcap;
+#[path = "../test/stress/openssl.rs"]
+mod openssl;
 #[path = "../test/stress/zlib.rs"]
 mod zlib;
 
@@ -74,4 +76,36 @@ fn libcurl_example_is_code_driven_and_consumable() {
         .layouts
         .iter()
         .any(|layout| layout.name == "struct curl_blob" && layout.size > 0));
+}
+
+#[test]
+fn openssl_example_is_code_driven_and_consumable() {
+    let Ok(environment) = openssl::openssl_environment() else {
+        return;
+    };
+
+    let config = openssl::openssl_header_config().unwrap();
+    let result = openssl::analyze_openssl().unwrap();
+
+    assert!(environment.header.ends_with("ssl.h"));
+    assert!(config
+        .linking()
+        .link_libraries
+        .iter()
+        .any(|library| library.name == "ssl"));
+    assert!(config
+        .linking()
+        .link_libraries
+        .iter()
+        .any(|library| library.name == "crypto"));
+    assert!(result.package.find_function("SSL_new").is_some());
+    assert!(result.package.find_function("SSL_CTX_new").is_some());
+    assert!(result.package.find_type_alias("SSL").is_some());
+    assert!(result.package.find_type_alias("SSL_CTX").is_some());
+    assert!(result
+        .package
+        .macros
+        .iter()
+        .any(|macro_binding| macro_binding.name == "OPENSSL_VERSION_NUMBER"));
+    assert!(result.package.layouts.is_empty() || result.package.layouts.iter().all(|layout| layout.name != "struct ssl_st"));
 }
