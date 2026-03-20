@@ -842,7 +842,7 @@ impl HeaderConfig {
             Err(error @ BicError::NoProbeTypes) => Err(error),
             Err(error) => {
                 package.diagnostics.push(Diagnostic::warning(
-                    DiagnosticKind::ProbeFailed,
+                    classify_probe_diagnostic_kind(&error),
                     format!("probe failed: {}", error),
                 ));
                 Ok(())
@@ -940,6 +940,23 @@ impl HeaderConfig {
             Flavor::ClangC11 => "clang-c11".into(),
             Flavor::StdC11 => "std-c11".into(),
         }
+    }
+}
+
+fn classify_probe_diagnostic_kind(error: &BicError) -> DiagnosticKind {
+    match error {
+        BicError::ProbeCompile { stderr, .. }
+            if stderr.contains("incomplete type")
+                || stderr.contains("incomplete typedef")
+                || stderr.contains("invalid application of 'sizeof'")
+                || stderr.contains("invalid application of 'alignof'")
+                || stderr.contains("invalid application of ‘sizeof’")
+                || stderr.contains("invalid application of ‘_Alignof’")
+                || stderr.contains("invalid application of '__alignof__'") =>
+        {
+            DiagnosticKind::ProbeUnavailable
+        }
+        _ => DiagnosticKind::ProbeFailed,
     }
 }
 
@@ -2399,6 +2416,56 @@ int compute(int x);
         assert!(result.package.find_function("opaque_use").is_some());
         assert!(result.package.find_type_alias("opaque_widget").is_some());
         assert!(result.package.layouts.is_empty());
+        assert!(result
+            .package
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeUnavailable));
+        assert_eq!(
+            result
+                .package
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeUnavailable)
+                .count(),
+            1
+        );
+
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn process_records_generic_probe_failures_separately_from_unavailable_layouts() {
+        let dir = setup_test_dir("function_probe");
+        let header = dir.join("function_probe.h");
+        std::fs::write(&header, "extern int function_probe(int value);\n").unwrap();
+
+        let result = HeaderConfig::new()
+            .header(&header)
+            .probe_type_layout("struct invalid[")
+            .process()
+            .unwrap();
+
+        assert!(result.package.find_function("function_probe").is_some());
+        assert!(result.package.layouts.is_empty());
+        assert_eq!(
+            result
+                .package
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeUnavailable)
+                .count(),
+            0
+        );
+        assert_eq!(
+            result
+                .package
+                .diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeFailed)
+                .count(),
+            1
+        );
         assert!(result
             .package
             .diagnostics
