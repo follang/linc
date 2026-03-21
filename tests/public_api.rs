@@ -1,7 +1,6 @@
 mod common;
 use linc::{
     analyze_source_package,
-    from_source_package,
     probe_type_layouts,
     AbiConfidence,
     AbiProbeReport,
@@ -14,10 +13,8 @@ use linc::{
     EvidenceKind,
     FieldLayout,
     FunctionBinding,
-    HeaderConfig,
     LinkAnalysisPackage,
     LincError,
-    LinkResolutionMode,
     MacroBinding,
     MacroCategory,
     MacroForm,
@@ -106,26 +103,8 @@ fn binding_package_public_helpers_are_available_from_root() {
 }
 
 #[test]
-fn header_config_validation_is_publicly_reachable() {
-    let config = HeaderConfig::new()
-        .entry_header("demo.h")
-        .add_include_dir("include")
-        .define_flag("DEBUG")
-        .prefer_dynamic_linking();
-
-    config.validate().unwrap();
-    assert_eq!(
-        config.linking().preferred_link_mode,
-        LinkResolutionMode::PreferDynamic
-    );
-
-    let invalid = HeaderConfig::new().entry_header("");
-    assert!(invalid.validate().is_err());
-}
-
-#[test]
 fn process_rejects_invalid_config_before_execution() {
-    let err = common::process(&HeaderConfig::new()
+    let err = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header("demo.h")
         .add_include_dir(""))
         .unwrap_err();
@@ -459,7 +438,7 @@ fn intake_types_reachable_from_root() {
             source_offset: None,
         }));
 
-    let pkg = from_source_package(&src);
+    let pkg = linc::intake::adapters::to_binding_package(&src);
 
     assert_eq!(pkg.item_count(), 5);
     assert_eq!(pkg.function_count(), 1);

@@ -116,7 +116,7 @@ fn regression_probe_diagnostics_distinguish_unavailable_and_operational_failures
     )
     .unwrap();
 
-    let unavailable = common::process(&linc::HeaderConfig::new()
+    let unavailable = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("struct opaque_widget"))
         .unwrap();
@@ -128,7 +128,7 @@ fn regression_probe_diagnostics_distinguish_unavailable_and_operational_failures
         .iter()
         .any(|diagnostic| diagnostic.kind == DiagnosticKind::ProbeUnavailable));
 
-    let failed = common::process(&linc::HeaderConfig::new()
+    let failed = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("struct invalid["))
         .unwrap();
@@ -185,7 +185,7 @@ fn regression_function_abi_questionable_fixture_stays_consumable() {
 #[test]
 fn regression_tricky_layout_fixture_stays_consumable() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tricky_layouts.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("struct packed_flags")
         .probe_type_layout("enum widget_mode"))
@@ -215,7 +215,7 @@ fn regression_tricky_layout_fixture_stays_consumable() {
 fn regression_typedef_layout_fixture_validates_record_and_enum_aliases() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/typedef_layout_bridge.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("widget_t")
         .probe_type_layout("mode_t"))
@@ -278,7 +278,7 @@ fn regression_typedef_layout_fixture_validates_record_and_enum_aliases() {
 fn regression_packed_bitfield_fixture_preserves_partial_layout_signal() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/packed_bitfield_extreme.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("struct packed_registers")
         .probe_type_layout("packed_registers_t"))
@@ -462,7 +462,7 @@ fn regression_macos_text_stub_provider_resolves_after_name_refinement() {
 #[test]
 fn regression_tricky_macro_fixture_stays_consumable() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tricky_macros.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header))
         .unwrap();
 
@@ -503,7 +503,7 @@ fn regression_tricky_macro_fixture_stays_consumable() {
 fn regression_macro_public_api_fixture_preserves_configuration_and_abi_macros() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/macro_public_api.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header))
         .unwrap();
 

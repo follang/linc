@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use linc::{HeaderConfig, LincError, RawHeaderResult};
+use linc::raw_headers::{HeaderConfig, RawHeaderResult};
+use linc::LincError;
 
 const HEADER_CANDIDATES: &[&str] = &["/usr/include/pcap/pcap.h", "/usr/include/pcap.h"];
 const SUPPORT_HEADER_CANDIDATES: &[&str] = &[

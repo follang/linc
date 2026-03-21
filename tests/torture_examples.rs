@@ -6,7 +6,7 @@ use linc::DiagnosticKind;
 #[test]
 fn torture_header_scans_through_public_header_config() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/linus/c_interop_torture.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .include_dir("/usr/include")
         .include_dir("/usr/include/x86_64-linux-gnu")
@@ -23,7 +23,7 @@ fn torture_header_scans_through_public_header_config() {
 #[test]
 fn torture_header_recovers_packed_typedef_declarations() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/linus/c_interop_torture.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .include_dir("/usr/include")
         .include_dir("/usr/include/x86_64-linux-gnu")
@@ -51,7 +51,7 @@ fn torture_header_recovers_packed_typedef_declarations() {
 #[test]
 fn torture_header_still_supports_layout_probes() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/linus/c_interop_torture.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .include_dir("/usr/include")
         .include_dir("/usr/include/x86_64-linux-gnu")
@@ -93,7 +93,7 @@ fn torture_header_still_supports_layout_probes() {
 fn aligned_torture_header_recovers_aligned_typedef_declarations() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/linus/c_interop_torture_aligned.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .include_dir("/usr/include")
         .include_dir("/usr/include/x86_64-linux-gnu")

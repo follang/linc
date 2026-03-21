@@ -5,12 +5,11 @@ LINC needs from a frontend without coupling to any specific parser AST.
 
 ## SourcePackage
 
-The primary intake type is `SourcePackage`. A frontend (like `parc`) produces
-this after scanning and extracting source-level information.
+The primary intake type is `SourcePackage`. A frontend such as `parc`
+produces this after scanning and extracting source-level information.
 
 ```rust
-use linc::{SourcePackage, SourceDeclaration, SourceFunction, SourceType};
-use linc::from_source_package;
+use linc::{analyze_source_package, SourceDeclaration, SourceFunction, SourcePackage, SourceType};
 
 let mut src = SourcePackage::default();
 src.source_path = Some("mylib.h".into());
@@ -22,7 +21,8 @@ src.declarations.push(SourceDeclaration::Function(SourceFunction {
     source_offset: None,
 }));
 
-let package = from_source_package(&src);
+let analysis = analyze_source_package(&src);
+assert!(analysis.resolved_link_plan.is_some());
 ```
 
 ## Declaration Types
@@ -46,12 +46,17 @@ The intake layer supports these declaration kinds:
 - References: `TypedefRef(name)`, `RecordRef(name)`, `EnumRef(name)`
 - Qualifiers: `Const(inner)`, `Volatile(inner)`
 
-## Adapters
+## Low-Level Intake Support
 
-The `intake::adapters` module provides bidirectional conversion:
+The `intake::adapters` module still exists as low-level support while `linc`
+finishes shedding historical IR assumptions.
 
-- `from_binding_package` — convert existing `BindingPackage` to `SourcePackage`
-- `to_binding_package` — convert `SourcePackage` to `BindingPackage` (used by `from_source_package`)
+New downstream code should not treat those adapters as the normal integration
+surface. The intended public story is:
+
+- produce `SourcePackage`
+- call `analyze_source_package`
+- consume `LinkAnalysisPackage`
 
 ## Design Principles
 

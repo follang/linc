@@ -1,8 +1,7 @@
 # LINC (link and binary evidence)
 
-LINC is a Rust library for
-link-surface analysis, native-symbol inspection, ABI probing, validation,
-and binary evidence production.
+LINC is a Rust library for link-surface analysis, native-symbol inspection,
+ABI probing, validation, and binary evidence production.
 
 It sits in the `PARC -> LINC -> GERC` pipeline:
 
@@ -13,8 +12,7 @@ It sits in the `PARC -> LINC -> GERC` pipeline:
 
 ## What LINC Produces
 
-- `BindingPackage` — machine-readable binding metadata with declarations, macros,
-  layouts, link surface, and diagnostics
+- `LinkAnalysisPackage` — machine-readable link and binary evidence derived from a source contract
 - `SymbolInventory` — exported/imported symbols from ELF, Mach-O, COFF, and PE artifacts
 - `ValidationReport` — declaration-vs-artifact match evidence
 - `ResolvedLinkPlan` — normalized link plan with provider matching
@@ -22,34 +20,26 @@ It sits in the `PARC -> LINC -> GERC` pipeline:
 ## Usage
 
 ```rust
-use linc::{from_source_package, SourcePackage, to_json};
+use linc::{analyze_source_package, SourcePackage};
 
 // Build a source package from any frontend
 let mut src = SourcePackage::default();
 // ... populate declarations, macros, link requirements ...
 
 // Convert to LINC's analysis package
-let package = from_source_package(&src);
+let analysis = analyze_source_package(&src);
 
 // Serialize for downstream tooling
-let json = to_json(&package).unwrap();
+let json = serde_json::to_string_pretty(&analysis).unwrap();
 ```
 
-For raw-header scanning (transitional, uses `parc` internally):
-
-```rust
-use linc::HeaderConfig;
-
-let result = HeaderConfig::new()
-    .header("mylib.h")
-    .include_dir("/usr/local/include")
-    .process()
-    .unwrap();
-```
+Raw-header scanning still exists as a repo-local bootstrap path, but it is not
+the normal `linc` API story. New downstream code should start from a source
+contract produced by `parc` or another compatible frontend.
 
 For ABI-sensitive workflows:
 
-1. Inspect `package.diagnostics`
+1. Inspect `analysis.diagnostics`
 2. Probe layouts with `probe_type_layouts(...)`
 3. Inspect artifacts with `inspect_symbols(...)`
 4. Validate with `validate(...)`

@@ -22,10 +22,11 @@ The resulting file now contains:
 - optional probe/validation attachment points
 - target and input provenance
 
-## Workflow 2: Transitional Raw-Header Bootstrap
+## Workflow 2: Repo-Local Raw-Header Bootstrap
 
 ```rust
-use linc::{analyze_source_package, HeaderConfig};
+use linc::analyze_source_package;
+use linc::raw_headers::HeaderConfig;
 
 let result = HeaderConfig::new()
     .header("include/demo.h")
@@ -36,8 +37,8 @@ let source = linc::intake::adapters::from_binding_package(&result.package);
 let analysis = analyze_source_package(&source);
 ```
 
-This still exists so the repository can bootstrap itself from real headers while
-`parc` finishes taking over frontend ownership.
+This exists only as a repo-local bootstrap path while difficult test fixtures
+and stress scenarios are being moved fully onto `parc`.
 
 ## Workflow 3: Inspect A Native Artifact
 
@@ -60,10 +61,10 @@ Typical reasons:
 ## Workflow 4: Validate Source-Derived Bindings Against Artifacts
 
 ```rust
-use linc::{from_source_package, inspect_symbols, validate, SourcePackage};
+use linc::{inspect_symbols, validate, SourcePackage};
 
 let source = SourcePackage::default();
-let binding = from_source_package(&source);
+let binding = linc::intake::adapters::to_binding_package(&source);
 let inventory = inspect_symbols("build/libdemo.so")?;
 let report = validate(&binding, &inventory);
 ```
@@ -73,10 +74,10 @@ This is the first serious consistency check between source intent and native rea
 For a split native surface:
 
 ```rust
-use linc::{from_source_package, inspect_symbols, validate_many, SourcePackage};
+use linc::{inspect_symbols, validate_many, SourcePackage};
 
 let source = SourcePackage::default();
-let binding = from_source_package(&source);
+let binding = linc::intake::adapters::to_binding_package(&source);
 let core = inspect_symbols("build/libcore.so")?;
 let support = inspect_symbols("build/libsupport.a")?;
 let report = validate_many(&binding, &[core, support]);
@@ -102,7 +103,8 @@ This is the useful boundary if a downstream tool only wants:
 For packages with important struct ABI:
 
 ```rust
-use linc::{from_source_package, HeaderConfig, inspect_symbols, validate};
+use linc::{inspect_symbols, validate};
+use linc::raw_headers::HeaderConfig;
 
 let result = HeaderConfig::new()
     .header("include/api.h")
@@ -111,7 +113,7 @@ let result = HeaderConfig::new()
     .process()?;
 
 let source = linc::intake::adapters::from_binding_package(&result.package);
-let binding = from_source_package(&source);
+let binding = linc::intake::adapters::to_binding_package(&source);
 let inventory = inspect_symbols("build/libapi.so")?;
 let report = validate(&binding, &inventory);
 ```

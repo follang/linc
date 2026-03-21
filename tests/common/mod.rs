@@ -9,12 +9,9 @@
 
 use linc::raw_headers::{
     attach_canonical_alias_resolution, build_effective_macro_environment, build_item_provenance,
-    RecoveredParse,
+    HeaderConfig, PreprocessingReport, RawHeaderResult, RecoveredParse,
 };
-use linc::{
-    BindingPackage, Diagnostic, DiagnosticKind, HeaderConfig, LincError, PreprocessingReport,
-    RawHeaderResult,
-};
+use linc::{BindingPackage, Diagnostic, DiagnosticKind, LincError};
 
 // ─── parc adapter functions ───────────────────────────────────────────
 

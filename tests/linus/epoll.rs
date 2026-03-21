@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use linc::{HeaderConfig, LincError, RawHeaderResult};
+use linc::raw_headers::{HeaderConfig, RawHeaderResult};
+use linc::LincError;
 
 const EPOLL_HEADER_CANDIDATES: &[&str] = &[
     "/usr/include/sys/epoll.h",

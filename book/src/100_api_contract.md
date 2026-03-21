@@ -54,8 +54,6 @@ These are the APIs downstream users should prefer first.
 |---|---|---|
 | `analyze_source_package` | source-contract to link-analysis contract | preferred public entry point |
 | `LinkAnalysisPackage` | machine-readable link-analysis contract | preferred public contract |
-| `HeaderConfig` | raw-header scanning | transitional bootstrap entry point |
-| `BindingPackage` and re-exported IR types | migration bridge and low-level IR | transitional public contract |
 | `probe_type_layouts` | compiler-assisted ABI evidence | preferred advanced root API |
 | `inspect_symbols` | native artifact inventory | preferred advanced root API |
 | `validate` / `validate_many` | declaration-vs-artifact checks | preferred advanced root API |
@@ -70,7 +68,7 @@ These modules are public and useful, but they are closer to the implementation.
 |---|---|---|
 | `extract` | useful for direct extraction flows | lower-level than crate-root workflows |
 | `probe` | useful for direct probe control | less curated than root API |
-| `raw_headers` | exposes scan orchestration details | crate root already re-exports the important types |
+| `raw_headers` | exposes scan orchestration details | transitional repo-facing surface, not the normal downstream API |
 | `symbols` | useful for direct artifact work | implementation-shaped details still live here |
 | `validate` | useful for direct report logic | root re-exports are preferred |
 
@@ -99,7 +97,7 @@ Prefer:
 - `analyze_source_package` for contract-first intake
 - `LinkAnalysisPackage` as the durable downstream link contract
 - root-level validation and symbol APIs
-- `HeaderConfig` only when bootstrapping from raw headers inside the repo
+- final contracts over internal IR bridges
 
 For long-lived downstream integrations, also prefer:
 
@@ -119,9 +117,9 @@ This inventory is honest about the present state.
 The following are still true today:
 
 - some public APIs still return `Result<_, String>`
-- some module boundaries are more historical than deliberate
+- some module boundaries are still more historical than deliberate
 - the root exports a large raw IR surface because downstream tools genuinely need it
-- `BindingPackage` is still present as migration scaffolding
+- parts of the internal IR are still more public than the final architecture wants
 
 That is why the next plan phase starts with API cleanup and error-model hardening.
 
