@@ -2,32 +2,16 @@ mod common;
 use linc::{
     analyze_source_package,
     probe_type_layouts,
-    AbiConfidence,
     AbiProbeReport,
-    AliasResolution,
-    BindingItem,
-    BindingPackage,
-    BindingType,
-    CallingConvention,
-    EnumRepresentation,
     EvidenceKind,
-    FieldLayout,
-    FunctionBinding,
     LinkAnalysisPackage,
     LincError,
-    MacroBinding,
-    MacroCategory,
-    MacroForm,
-    MacroKind,
-    MacroValue,
     MatchConfidence,
-    ParameterBinding,
     ProbeConfidence,
     ProbeSubjectKind,
     ProbeSubjectReport,
     ProbedFieldLayout,
     RecordCompleteness,
-    RecordRepresentation,
     RoutineAbiConfidence,
     RoutineAbiEvidence,
     RoutineAbiEvidenceKind,
@@ -42,15 +26,18 @@ use linc::{
     SourceType,
     SourceTypeAlias,
     SourceVariable,
-    TypeAliasBinding,
-    TypeLayout,
-    TypeQualifiers,
     ValidationDeclaration,
     ValidationEntry,
     ValidationEvidence,
     ValidationPhase,
     ValidationPhaseReport,
     ValidationSummary,
+};
+use linc::ir::{
+    AbiConfidence, AliasResolution, BindingItem, BindingPackage, BindingTarget, BindingType,
+    CallingConvention, EnumRepresentation, FieldLayout, FunctionBinding, MacroBinding,
+    MacroCategory, MacroForm, MacroKind, MacroValue, ParameterBinding, RecordRepresentation,
+    TypeAliasBinding, TypeLayout, TypeQualifiers,
 };
 
 #[test]
@@ -128,7 +115,7 @@ fn probe_rejects_invalid_config_before_execution() {
 #[test]
 fn abi_probe_report_root_types_roundtrip() {
     let report = AbiProbeReport {
-        target: linc::BindingTarget {
+        target: BindingTarget {
             target_triple: Some("x86_64-unknown-linux-gnu".into()),
             compiler_command: Some("clang".into()),
             compiler_version: Some("clang 18.0.0".into()),
@@ -283,9 +270,9 @@ fn type_qualifiers_root_type_roundtrip() {
 
 #[test]
 fn calling_convention_root_type_roundtrip() {
-    let json = serde_json::to_string(&linc::CallingConvention::Stdcall).unwrap();
-    let decoded: linc::CallingConvention = serde_json::from_str(&json).unwrap();
-    assert_eq!(decoded, linc::CallingConvention::Stdcall);
+    let json = serde_json::to_string(&CallingConvention::Stdcall).unwrap();
+    let decoded: CallingConvention = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, CallingConvention::Stdcall);
 }
 
 #[test]

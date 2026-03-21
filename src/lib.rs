@@ -131,20 +131,11 @@ pub mod validate;
 pub use diagnostics::{Diagnostic, DiagnosticKind, Severity};
 pub use error::LincError;
 pub use analysis::LinkAnalysisPackage;
+pub use ir::SCHEMA_VERSION;
 pub use intake::{
     SourceDeclaration, SourceEnum, SourceEnumVariant, SourceField, SourceFunction,
     SourceLinkKind, SourceLinkRequirement, SourceMacro, SourcePackage, SourceParameter,
     SourceRecord, SourceType, SourceTypeAlias, SourceVariable,
-};
-pub use ir::{
-    AbiConfidence, AliasResolution, BindingDefine, BindingInputs, BindingItem, BindingItemKind,
-    BindingLinkSurface, BindingPackage, BindingTarget, BindingType, CallingConvention,
-    DeclarationProvenance, EnumBinding, EnumRepresentation, EnumVariant, FieldBinding, FieldLayout,
-    FunctionBinding, LinkArtifact, LinkArtifactKind, LinkFramework, LinkInput, LinkLibrary,
-    LinkLibraryKind, LinkRequirementSource, LinkResolutionMode, MacroBinding, MacroCategory,
-    MacroEnvironmentEntry, MacroForm, MacroKind, MacroProvenance, MacroValue, NativeSurfaceKind,
-    ParameterBinding, RecordBinding, RecordKind, RecordRepresentation, TypeAliasBinding,
-    TypeLayout, TypeQualifiers, UnsupportedItem, VariableBinding, SCHEMA_VERSION,
 };
 pub use link_plan::{
     resolve_link_plan, resolve_link_plan_for_target, resolve_link_plan_with_inventories,
@@ -176,38 +167,6 @@ pub use validate::{
 pub fn analyze_source_package(source: &SourcePackage) -> LinkAnalysisPackage {
     let binding = intake::adapters::to_binding_package(source);
     LinkAnalysisPackage::from_binding_package(&binding)
-}
-
-/// Serialize a BindingPackage to a deterministic JSON string.
-///
-/// Compatibility notes:
-///
-/// - the serialized payload includes `schema_version`
-/// - the semantic contract is the data model, not the exact whitespace layout
-/// - additive fields should prefer serde defaults where backward compatibility is intended
-pub fn to_json(package: &BindingPackage) -> Result<String, LincError> {
-    serde_json::to_string_pretty(package).map_err(LincError::from)
-}
-
-/// Deserialize a BindingPackage from a JSON string.
-///
-/// Compatibility notes:
-///
-/// - older payloads that omit newer defaultable fields should deserialize successfully
-/// - payloads with a future `schema_version` are rejected
-/// - downstream users should treat `schema_version` as the compatibility gate, not
-///   `linc_version`
-///
-/// Returns an error if the schema version is newer than what this version of BIC supports.
-pub fn from_json(json: &str) -> Result<BindingPackage, LincError> {
-    let pkg: BindingPackage = serde_json::from_str(json)?;
-    if pkg.schema_version > ir::SCHEMA_VERSION {
-        return Err(LincError::SchemaVersion {
-            found: pkg.schema_version,
-            supported: ir::SCHEMA_VERSION,
-        });
-    }
-    Ok(pkg)
 }
 
 #[cfg(test)]
@@ -319,119 +278,18 @@ mod integration_tests {
         assert!(package.find_function("init").is_some());
         assert!(package.find_function("shutdown").is_some());
         assert_eq!(package.record_count(), 1);
-        let json = to_json(&package).unwrap();
+        let json = serde_json::to_string_pretty(&package).unwrap();
         assert!(json.contains("\"init\""));
         assert!(json.contains("\"config\""));
     }
 
     #[test]
-    fn schema_version_present_in_json() {
-        let pkg = intake::adapters::to_binding_package(&SourcePackage::default());
-        let json = to_json(&pkg).unwrap();
-        assert!(json.contains("\"schema_version\": 1"));
-        assert!(json.contains("\"linc_version\""));
-    }
-
-    #[test]
-    fn schema_version_roundtrip() {
+    fn binding_package_json_roundtrip() {
         let pkg = intake::adapters::to_binding_package(&SourcePackage::default());
         assert_eq!(pkg.schema_version, SCHEMA_VERSION);
-        let json = to_json(&pkg).unwrap();
-        let pkg2 = from_json(&json).unwrap();
+        let json = serde_json::to_string_pretty(&pkg).unwrap();
+        let pkg2: ir::BindingPackage = serde_json::from_str(&json).unwrap();
         assert_eq!(pkg2.schema_version, SCHEMA_VERSION);
-    }
-
-    #[test]
-    fn reject_future_schema_version() {
-        let json = r#"{"schema_version": 99, "linc_version": "0.1.0", "source_path": null, "items": [], "diagnostics": []}"#;
-        let result = from_json(json);
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            LincError::SchemaVersion { .. }
-        ));
-    }
-
-    #[test]
-    fn accept_missing_schema_version_defaults_to_current() {
-        let json = r#"{"source_path": null, "items": [], "diagnostics": []}"#;
-        let pkg = from_json(json).unwrap();
-        assert_eq!(pkg.schema_version, SCHEMA_VERSION);
-    }
-
-    #[test]
-    fn contract_fixture_v0_minimal_binding_package_deserializes() {
-        let json = include_str!("../tests/contracts/v0_minimal_binding_package.json");
-        let pkg = from_json(json).unwrap();
-        assert_eq!(pkg.schema_version, SCHEMA_VERSION);
-        assert!(pkg.items.is_empty());
-        assert!(pkg.diagnostics.is_empty());
-    }
-
-    #[test]
-    fn contract_fixture_v1_empty_nested_objects_deserializes() {
-        let json = include_str!("../tests/contracts/v1_empty_nested_objects.json");
-        let pkg = from_json(json).unwrap();
-        assert_eq!(pkg.schema_version, 1);
-        assert!(pkg.target.target_triple.is_none());
-        assert!(pkg.inputs.entry_headers.is_empty());
-        assert!(pkg.link.libraries.is_empty());
-    }
-
-    #[test]
-    fn schema_compatibility_matrix() {
-        enum Expectation {
-            OkCurrent,
-            OkSchema(u32),
-            FutureSchemaError,
-        }
-
-        let cases = [
-            (
-                "missing schema version defaults",
-                r#"{"source_path": null, "items": [], "diagnostics": []}"#,
-                Expectation::OkCurrent,
-            ),
-            (
-                "v0 fixture",
-                include_str!("../tests/contracts/v0_minimal_binding_package.json"),
-                Expectation::OkCurrent,
-            ),
-            (
-                "v1 empty nested objects fixture",
-                include_str!("../tests/contracts/v1_empty_nested_objects.json"),
-                Expectation::OkSchema(1),
-            ),
-            (
-                "future schema rejected",
-                r#"{"schema_version": 999, "linc_version": "0.1.0", "source_path": null, "items": [], "diagnostics": []}"#,
-                Expectation::FutureSchemaError,
-            ),
-        ];
-
-        for (label, json, expectation) in cases {
-            match expectation {
-                Expectation::OkCurrent => {
-                    let pkg = from_json(json).unwrap_or_else(|err| {
-                        panic!("{label} should deserialize successfully: {err}")
-                    });
-                    assert_eq!(pkg.schema_version, SCHEMA_VERSION, "{label}");
-                }
-                Expectation::OkSchema(expected) => {
-                    let pkg = from_json(json).unwrap_or_else(|err| {
-                        panic!("{label} should deserialize successfully: {err}")
-                    });
-                    assert_eq!(pkg.schema_version, expected, "{label}");
-                }
-                Expectation::FutureSchemaError => {
-                    let err = from_json(json).unwrap_err();
-                    assert!(
-                        matches!(err, LincError::SchemaVersion { .. }),
-                        "{label} should reject future schema versions"
-                    );
-                }
-            }
-        }
     }
 
     #[test]
@@ -446,18 +304,12 @@ mod integration_tests {
 
         let symbol_read = inspect_symbols("/nonexistent/path.o").unwrap_err();
         assert!(matches!(symbol_read, LincError::SymbolRead { .. }));
-
-        let future_schema = from_json(
-            r#"{"schema_version": 999, "linc_version": "0.1.0", "source_path": null, "items": [], "diagnostics": []}"#,
-        )
-        .unwrap_err();
-        assert!(matches!(future_schema, LincError::SchemaVersion { .. }));
     }
 
     #[test]
     fn contract_snapshot_simple_api_package_is_consumable() {
         let json = include_str!("../tests/contracts/simple_api_package.json");
-        let pkg = from_json(json).unwrap();
+        let pkg: ir::BindingPackage = serde_json::from_str(json).unwrap();
         assert_eq!(pkg.source_path.as_deref(), Some("demo.h"));
         assert_eq!(pkg.macros.len(), 1);
         assert_eq!(pkg.layouts.len(), 1);
@@ -468,7 +320,7 @@ mod integration_tests {
     #[test]
     fn contract_snapshot_symbol_validation_fixture_is_consumable() {
         let json = include_str!("../tests/contracts/symbol_validation_fixture.json");
-        let pkg = from_json(json).unwrap();
+        let pkg: ir::BindingPackage = serde_json::from_str(json).unwrap();
         assert_eq!(pkg.items.len(), 2);
         assert_eq!(pkg.link.libraries.len(), 1);
         assert_eq!(pkg.link.ordered_inputs.len(), 1);
@@ -477,11 +329,11 @@ mod integration_tests {
     #[test]
     fn contract_snapshot_binding_package_contract_is_consumable() {
         let json = include_str!("../tests/contracts/binding_package_contract_snapshot.json");
-        let pkg = from_json(json).unwrap();
+        let pkg: ir::BindingPackage = serde_json::from_str(json).unwrap();
         assert_eq!(pkg.source_path.as_deref(), Some("demo.h"));
         assert_eq!(pkg.macros.len(), 2);
-        assert_eq!(pkg.macros[0].value, Some(MacroValue::Integer(3)));
-        assert_eq!(pkg.macros[1].form, MacroForm::FunctionLike);
+        assert_eq!(pkg.macros[0].value, Some(ir::MacroValue::Integer(3)));
+        assert_eq!(pkg.macros[1].form, ir::MacroForm::FunctionLike);
         assert_eq!(pkg.layouts.len(), 1);
         assert_eq!(pkg.link.libraries.len(), 1);
         assert_eq!(pkg.items.len(), 1);
@@ -490,7 +342,7 @@ mod integration_tests {
     #[test]
     fn contract_snapshot_fol_minimal_contract_is_consumable() {
         let json = include_str!("../tests/contracts/fol_minimal_contract.json");
-        let pkg = from_json(json).unwrap();
+        let pkg: ir::BindingPackage = serde_json::from_str(json).unwrap();
         assert_eq!(pkg.items.len(), 1);
         assert!(pkg.macros.is_empty());
         assert!(pkg.layouts.is_empty());
@@ -499,17 +351,17 @@ mod integration_tests {
     #[test]
     fn contract_snapshot_fol_extended_contract_is_consumable() {
         let json = include_str!("../tests/contracts/fol_extended_contract.json");
-        let pkg = from_json(json).unwrap();
+        let pkg: ir::BindingPackage = serde_json::from_str(json).unwrap();
         assert_eq!(pkg.items.len(), 1);
         assert_eq!(pkg.macros.len(), 1);
-        assert_eq!(pkg.macros[0].value, Some(MacroValue::Integer(3)));
+        assert_eq!(pkg.macros[0].value, Some(ir::MacroValue::Integer(3)));
         assert_eq!(pkg.layouts.len(), 1);
         assert_eq!(pkg.link.libraries.len(), 1);
     }
 
     #[test]
-    fn from_json_invalid_json() {
-        let result = from_json("not json at all");
+    fn binding_package_json_invalid() {
+        let result: Result<ir::BindingPackage, _> = serde_json::from_str("not json at all");
         assert!(result.is_err());
     }
 
@@ -564,8 +416,8 @@ mod integration_tests {
         assert_eq!(pkg.link.libraries.len(), 1);
         assert_eq!(pkg.link.libraries[0].name, "mylib");
 
-        let json = to_json(&pkg).unwrap();
-        let pkg2 = from_json(&json).unwrap();
+        let json = serde_json::to_string_pretty(&pkg).unwrap();
+        let pkg2: ir::BindingPackage = serde_json::from_str(&json).unwrap();
         assert_eq!(pkg, pkg2);
     }
 
@@ -735,8 +587,8 @@ mod integration_tests {
         );
         assert_eq!(plan.transitive_dependencies, vec!["libc.so.6"]);
 
-        let json = to_json(&pkg).unwrap();
-        let pkg2 = from_json(&json).unwrap();
+        let json = serde_json::to_string_pretty(&pkg).unwrap();
+        let pkg2: ir::BindingPackage = serde_json::from_str(&json).unwrap();
         assert_eq!(pkg.item_count(), pkg2.item_count());
     }
 }

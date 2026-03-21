@@ -8,6 +8,7 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use linc::*;
+use linc::ir::{BindingItem, BindingType, TypeQualifiers};
 
 /// Path to the vendored test corpus.
 fn corpus_dir() -> PathBuf {
@@ -152,8 +153,8 @@ fn zlib_vendored_package_and_json_roundtrip() {
     );
 
     // JSON roundtrip
-    let json = linc::to_json(&result.package).unwrap();
-    let pkg2 = linc::from_json(&json).unwrap();
+    let json = serde_json::to_string_pretty(&result.package).unwrap();
+    let pkg2: linc::ir::BindingPackage = serde_json::from_str(&json).unwrap();
     assert_eq!(result.package, pkg2);
 }
 
@@ -173,8 +174,8 @@ fn zlib_vendored_determinism() {
         .no_origin_filter())
         .unwrap();
 
-    let json1 = linc::to_json(&r1.package).unwrap();
-    let json2 = linc::to_json(&r2.package).unwrap();
+    let json1 = serde_json::to_string_pretty(&r1.package).unwrap();
+    let json2 = serde_json::to_string_pretty(&r2.package).unwrap();
     assert_eq!(json1, json2, "JSON output should be deterministic");
 }
 
@@ -338,7 +339,7 @@ fn string_h_const_correctness() {
             BindingType::Pointer {
                 pointee: Box::new(BindingType::Void),
                 const_pointee: false,
-                qualifiers: linc::TypeQualifiers {
+                qualifiers: TypeQualifiers {
                     is_const: false,
                     is_volatile: false,
                     is_restrict: true,
@@ -352,7 +353,7 @@ fn string_h_const_correctness() {
             BindingType::Pointer {
                 pointee: Box::new(BindingType::Void),
                 const_pointee: true,
-                qualifiers: linc::TypeQualifiers {
+                qualifiers: TypeQualifiers {
                     is_const: false,
                     is_volatile: false,
                     is_restrict: true,
@@ -413,8 +414,8 @@ fn zlib_system_parse_filtered() {
     );
 
     // JSON roundtrip
-    let json = linc::to_json(&result.package).unwrap();
-    let pkg2 = linc::from_json(&json).unwrap();
+    let json = serde_json::to_string_pretty(&result.package).unwrap();
+    let pkg2: linc::ir::BindingPackage = serde_json::from_str(&json).unwrap();
     assert_eq!(result.package, pkg2);
 }
 

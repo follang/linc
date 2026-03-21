@@ -15,12 +15,15 @@ That split is functional, but it is not yet the final intended API shape.
 
 ## Typed Error Surface Today
 
-The clearest typed error boundary today is around JSON transport:
+The clearest typed error boundary today is around the explicit workflow APIs:
 
-- `to_json(...) -> Result<String, LincError>`
-- `from_json(...) -> Result<BindingPackage, LincError>`
+- `probe_type_layouts(...) -> Result<AbiProbeReport, LincError>`
+- `inspect_symbols(...) -> Result<SymbolInventory, LincError>`
+- `HeaderConfig::validate() -> Result<(), LincError>`
 
-This is currently the most structured part of the error model.
+By contrast, JSON transport now goes through `serde_json` directly instead of LINC-owned helper
+functions, so serialization failures are normal serde transport errors unless a consumer wraps
+them at its own boundary.
 
 ## Remaining `String`-Returning APIs
 
@@ -30,7 +33,8 @@ The current APIs still returning `Result<_, String>` are:
 |---|---|---|
 | `HeaderConfig::process` | raw-header scan | preprocessing, parsing, probe, and scan orchestration errors are not yet normalized |
 
-Note: `extract_from_source` has been narrowed to `pub(crate)` and is no longer part of the public API surface. New consumers should use `from_source_package` (intake) instead.
+Note: `extract_from_source` has been narrowed to `pub(crate)` and is no longer part of the public
+API surface. New consumers should use `SourcePackage` intake instead.
 
 These are precisely the APIs targeted by the next error-model workstream.
 

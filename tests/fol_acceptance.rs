@@ -1,9 +1,9 @@
 mod common;
 use linc::{
-    resolve_link_plan_for_target, validate, BindingPackage, LinkInput,
-    LinkLibrary, LinkLibraryKind, LinkRequirementSource, MatchStatus, SourceDeclaration,
-    SourceFunction, SourcePackage, SourceType, SymbolInventory,
+    resolve_link_plan_for_target, validate, MatchStatus, SourceDeclaration, SourceFunction,
+    SourcePackage, SourceType, SymbolInventory,
 };
+use linc::ir::{BindingPackage, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::PathBuf;
