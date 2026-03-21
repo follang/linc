@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::{io, os::raw::c_int};
 
-use linc::{HeaderConfig, LincError, RawHeaderResult};
+use linc::raw_headers::{HeaderConfig, RawHeaderResult};
+use linc::LincError;
 
 const SOCKETCAN_HEADERS: &[&str] = &["/usr/include/linux/can.h", "/usr/include/linux/can/raw.h"];
 const OPTIONAL_HEADERS: &[&str] = &[

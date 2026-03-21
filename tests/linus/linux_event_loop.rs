@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use linc::{HeaderConfig, LincError, RawHeaderResult};
+use linc::raw_headers::{HeaderConfig, RawHeaderResult};
+use linc::LincError;
 
 const REQUIRED_HEADERS: &[&str] = &[
     "/usr/include/sys/epoll.h",

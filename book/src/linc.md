@@ -13,16 +13,15 @@ In practice LINC sits between:
 
 ## What LINC Produces
 
-The core output is a `BindingPackage`.
+The core output is a `LinkAnalysisPackage`.
 
-That package is intentionally machine-oriented. It contains:
+That package is intentionally narrower than the historical all-in-one IR. It contains:
 
-- binding items (ingested from a frontend-neutral source contract)
-- target/compiler metadata for the scan
+- target/compiler metadata for the analysis
 - declared and normalized native link inputs
-- captured macro inventory
-- compiler-probed type layouts
 - diagnostics produced during analysis
+- optional resolved link-plan data
+- optional probe and validation attachment points
 
 When native artifacts are involved, LINC can also produce:
 
@@ -36,7 +35,7 @@ When native artifacts are involved, LINC can also produce:
 PARC (parc)
     -> SourcePackage (frontend-neutral contract)
     -> LINC (linc)
-    -> BindingPackage / link and binary evidence
+    -> LinkAnalysisPackage / link and binary evidence
     -> GERC (gec)
     -> Rust projection / emitted crate
 ```
@@ -62,13 +61,12 @@ PARC (parc)
 
 Most users touch one or more of these library entry points:
 
-- `from_source_package` for ingesting a `SourcePackage` from any frontend
-- `HeaderConfig` for scanning raw headers (transitional, uses `parc` internally)
+- `analyze_source_package` for ingesting a `SourcePackage` from any frontend
 - `probe_type_layouts` for compiler-assisted ABI layout probing
 - `inspect_symbols` for reading native artifact symbols
 - `validate` and `validate_many` for declaration-vs-artifact checks
 - `resolve_link_plan` for link-plan construction
-- `to_json` and `from_json` for JSON transport
+- `serde_json` over the final explicit contracts when transport is needed
 
 ## Recommended Reading Order
 

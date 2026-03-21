@@ -26,9 +26,6 @@
 //!
 //! - [`analyze_source_package`] to turn a frontend-neutral [`SourcePackage`]
 //!   into a [`LinkAnalysisPackage`]
-//! - [`from_source_package`] only when a transitional [`BindingPackage`]
-//!   bridge is still required
-//! - [`HeaderConfig`] only for transitional raw-header scanning
 //! - [`probe_type_layouts`] for compiler-assisted ABI layout probing
 //! - [`inspect_symbols`] for native artifact inventory
 //! - [`validate`] and [`validate_many`] for declaration-vs-artifact validation
@@ -41,7 +38,7 @@
 //! - [`symbols`]: Binary symbol inspection
 //! - [`validate`]: Declaration-vs-artifact validation
 //! - [`link_plan`]: Link-plan construction and resolution
-//! - [`raw_headers`]: Header scanning (transitional)
+//! - [`raw_headers`]: Transitional raw-header bootstrap kept out of the normal API story
 //! - [`diagnostics`]: Diagnostic types
 //! - [`error`]: Error surface
 //!
@@ -123,6 +120,7 @@ pub mod line_markers;
 pub mod analysis;
 pub mod link_plan;
 pub mod probe;
+#[doc(hidden)]
 pub mod raw_headers;
 
 #[cfg(feature = "symbols")]
@@ -157,7 +155,6 @@ pub use probe::{
     probe_type_layouts, AbiProbeReport, ProbeConfig, ProbeConfidence, ProbeSubjectKind,
     ProbeSubjectReport, ProbedFieldLayout, RecordCompleteness,
 };
-pub use raw_headers::{HeaderConfig, PreprocessingReport, RawHeaderResult};
 #[cfg(feature = "symbols")]
 pub use symbols::{
     inspect_file as inspect_symbols, FunctionAbiHint, SymbolBinding, SymbolDirection, SymbolEntry,
@@ -171,30 +168,14 @@ pub use validate::{
     ValidationPhaseReport, ValidationReport, ValidationSummary,
 };
 
-/// Construct a [`BindingPackage`] from a frontend-neutral [`SourcePackage`].
-///
-/// This is the preferred intake path for LINC. Frontends should produce a
-/// [`SourcePackage`] and pass it here instead of using parser-specific APIs.
-pub fn from_source_package(source: &SourcePackage) -> BindingPackage {
-    intake::adapters::to_binding_package(source)
-}
-
-/// Construct a [`LinkAnalysisPackage`] from a legacy [`BindingPackage`].
-///
-/// This is the bridge from the old all-in-one contract to the explicit
-/// link-analysis contract that downstream generators should consume.
-pub fn link_analysis_from_binding_package(package: &BindingPackage) -> LinkAnalysisPackage {
-    LinkAnalysisPackage::from_binding_package(package)
-}
-
 /// Analyze a frontend-neutral [`SourcePackage`] into the explicit
 /// [`LinkAnalysisPackage`] contract.
 ///
 /// This is the preferred contract-first entrypoint for downstream consumers
 /// that do not want to traffic in `BindingPackage`.
 pub fn analyze_source_package(source: &SourcePackage) -> LinkAnalysisPackage {
-    let binding = from_source_package(source);
-    link_analysis_from_binding_package(&binding)
+    let binding = intake::adapters::to_binding_package(source);
+    LinkAnalysisPackage::from_binding_package(&binding)
 }
 
 /// Serialize a BindingPackage to a deterministic JSON string.
@@ -255,7 +236,7 @@ mod integration_tests {
                 variadic: false,
                 source_offset: None,
             }));
-        let pkg = from_source_package(&src_pkg);
+        let pkg = intake::adapters::to_binding_package(&src_pkg);
         let inv = SymbolInventory {
             artifact_path: "test.o".into(),
             format: symbols::ArtifactFormat::ElfObject,
@@ -333,7 +314,7 @@ mod integration_tests {
                 ]),
                 source_offset: None,
             }));
-        let package = from_source_package(&src_pkg);
+        let package = intake::adapters::to_binding_package(&src_pkg);
         assert_eq!(package.function_count(), 2);
         assert!(package.find_function("init").is_some());
         assert!(package.find_function("shutdown").is_some());
@@ -345,7 +326,7 @@ mod integration_tests {
 
     #[test]
     fn schema_version_present_in_json() {
-        let pkg = from_source_package(&SourcePackage::default());
+        let pkg = intake::adapters::to_binding_package(&SourcePackage::default());
         let json = to_json(&pkg).unwrap();
         assert!(json.contains("\"schema_version\": 1"));
         assert!(json.contains("\"linc_version\""));
@@ -353,7 +334,7 @@ mod integration_tests {
 
     #[test]
     fn schema_version_roundtrip() {
-        let pkg = from_source_package(&SourcePackage::default());
+        let pkg = intake::adapters::to_binding_package(&SourcePackage::default());
         assert_eq!(pkg.schema_version, SCHEMA_VERSION);
         let json = to_json(&pkg).unwrap();
         let pkg2 = from_json(&json).unwrap();
@@ -574,7 +555,7 @@ mod integration_tests {
                 kind: intake::source::SourceLinkKind::DynamicLibrary,
             });
 
-        let pkg = from_source_package(&src_pkg);
+        let pkg = intake::adapters::to_binding_package(&src_pkg);
         assert_eq!(pkg.source_path.as_deref(), Some("demo.h"));
         assert_eq!(pkg.function_count(), 1);
         assert_eq!(pkg.record_count(), 1);
@@ -633,7 +614,7 @@ mod integration_tests {
                 source_offset: Some(50),
             }));
 
-        let pkg = from_source_package(&src_pkg);
+        let pkg = intake::adapters::to_binding_package(&src_pkg);
         assert_eq!(pkg.function_count(), 1);
         assert_eq!(pkg.record_count(), 1);
         assert_eq!(pkg.enum_count(), 1);
@@ -672,7 +653,7 @@ mod integration_tests {
             ..SourcePackage::default()
         };
 
-        let mut pkg = from_source_package(&src);
+        let mut pkg = intake::adapters::to_binding_package(&src);
         pkg.link
             .ordered_inputs
             .push(ir::LinkInput::Library(ir::LinkLibrary {

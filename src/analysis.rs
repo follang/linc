@@ -64,8 +64,8 @@ impl LinkAnalysisPackage {
         Self::default()
     }
 
-    /// Build a link-analysis contract from the legacy all-in-one binding package.
-    pub fn from_binding_package(package: &BindingPackage) -> Self {
+    /// Build a link-analysis contract from LINC's current internal binding IR.
+    pub(crate) fn from_binding_package(package: &BindingPackage) -> Self {
         Self {
             schema_version: schema_version(),
             linc_version: linc_version(),

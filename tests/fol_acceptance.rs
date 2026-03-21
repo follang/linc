@@ -1,6 +1,6 @@
 mod common;
 use linc::{
-    from_source_package, resolve_link_plan_for_target, validate, BindingPackage, LinkInput,
+    resolve_link_plan_for_target, validate, BindingPackage, LinkInput,
     LinkLibrary, LinkLibraryKind, LinkRequirementSource, MatchStatus, SourceDeclaration,
     SourceFunction, SourcePackage, SourceType, SymbolInventory,
 };
@@ -123,7 +123,7 @@ fn fol_link_plan_is_ready(plan: &FolResolvedLinkPlan) -> bool {
 #[test]
 fn fol_acceptance_binding_scan_flow_stays_consumable() {
     let header = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tricky_layouts.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("struct packed_flags")
         .probe_type_layout("enum widget_mode"))
@@ -160,7 +160,7 @@ fn fol_acceptance_binding_scan_flow_stays_consumable() {
 fn fol_acceptance_layout_backed_binding_flow_stays_consumable() {
     let header =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/typedef_layout_bridge.h");
-    let result = common::process(&linc::HeaderConfig::new()
+    let result = common::process(&linc::raw_headers::HeaderConfig::new()
         .entry_header(&header)
         .probe_type_layout("widget_t")
         .probe_type_layout("mode_t"))
@@ -190,7 +190,7 @@ fn fol_acceptance_layout_backed_binding_flow_stays_consumable() {
 
 #[test]
 fn fol_acceptance_native_binding_and_link_flow_stays_consumable() {
-    let mut package: BindingPackage = from_source_package(&SourcePackage {
+    let mut package: BindingPackage = linc::intake::adapters::to_binding_package(&SourcePackage {
         declarations: vec![SourceDeclaration::Function(SourceFunction {
             name: "demo_init".into(),
             parameters: vec![],
@@ -292,7 +292,7 @@ fn fol_acceptance_validation_findings_gate_generation() {
 
 #[test]
 fn fol_acceptance_resolved_link_plan_stays_consumable() {
-    let mut package: BindingPackage = from_source_package(&SourcePackage {
+    let mut package: BindingPackage = linc::intake::adapters::to_binding_package(&SourcePackage {
         declarations: vec![SourceDeclaration::Function(SourceFunction {
             name: "demo_init".into(),
             parameters: vec![],

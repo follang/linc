@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use linc::{HeaderConfig, LincError, RawHeaderResult, SymbolInventory};
+use linc::raw_headers::{HeaderConfig, RawHeaderResult};
+use linc::{LincError, SymbolInventory};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaxPainEnvironment {
