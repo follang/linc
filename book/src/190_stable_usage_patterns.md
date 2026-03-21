@@ -14,10 +14,10 @@ The recommended entry points are:
 
 - `HeaderConfig`
 - `PreprocessedInput`
-- `to_json` / `from_json`
 - `probe_type_layouts`
 - `inspect_symbols`
 - `validate` / `validate_many`
+- `analyze_source_package`
 
 This is safer than building a workflow around deep module imports unless you are deliberately
 writing advanced integration code.
@@ -31,7 +31,7 @@ A typical flow is:
 1. scan headers or parse preprocessed input
 2. inspect `package.diagnostics`
 3. optionally attach or compare native evidence
-4. serialize the package only when crossing a tool boundary
+4. serialize the package with `serde_json` only when crossing a tool boundary
 
 This is more stable than reconstructing intent from raw AST-level details.
 

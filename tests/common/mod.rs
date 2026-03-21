@@ -11,59 +11,62 @@ use linc::raw_headers::{
     attach_canonical_alias_resolution, build_effective_macro_environment, build_item_provenance,
     HeaderConfig, PreprocessingReport, RawHeaderResult, RecoveredParse,
 };
-use linc::{BindingPackage, Diagnostic, DiagnosticKind, LincError};
+use linc::ir::{
+    BindingItem, BindingPackage, BindingType, CallingConvention, EnumBinding, EnumVariant,
+    FieldBinding, FunctionBinding, MacroBinding, ParameterBinding, RecordBinding, TypeAliasBinding,
+    TypeQualifiers, VariableBinding,
+};
+use linc::{Diagnostic, DiagnosticKind, LincError};
 
 // ─── parc adapter functions ───────────────────────────────────────────
 
 /// Convert a parc `SourceType` into a linc `BindingType`.
-pub fn parc_type_to_binding(ty: &parc::ir::SourceType) -> linc::BindingType {
+pub fn parc_type_to_binding(ty: &parc::ir::SourceType) -> BindingType {
     use parc::ir::SourceType as PT;
     match ty {
-        PT::Void => linc::BindingType::Void,
-        PT::Bool => linc::BindingType::Bool,
-        PT::Char => linc::BindingType::Char,
-        PT::SChar => linc::BindingType::SChar,
-        PT::UChar => linc::BindingType::UChar,
-        PT::Short => linc::BindingType::Short,
-        PT::UShort => linc::BindingType::UShort,
-        PT::Int => linc::BindingType::Int,
-        PT::UInt => linc::BindingType::UInt,
-        PT::Long => linc::BindingType::Long,
-        PT::ULong => linc::BindingType::ULong,
-        PT::LongLong => linc::BindingType::LongLong,
-        PT::ULongLong => linc::BindingType::ULongLong,
-        PT::Float => linc::BindingType::Float,
-        PT::Double => linc::BindingType::Double,
-        PT::LongDouble => linc::BindingType::LongDouble,
-        PT::Int128 | PT::UInt128 => linc::BindingType::Opaque(format!("{ty:?}")),
+        PT::Void => BindingType::Void,
+        PT::Bool => BindingType::Bool,
+        PT::Char => BindingType::Char,
+        PT::SChar => BindingType::SChar,
+        PT::UChar => BindingType::UChar,
+        PT::Short => BindingType::Short,
+        PT::UShort => BindingType::UShort,
+        PT::Int => BindingType::Int,
+        PT::UInt => BindingType::UInt,
+        PT::Long => BindingType::Long,
+        PT::ULong => BindingType::ULong,
+        PT::LongLong => BindingType::LongLong,
+        PT::ULongLong => BindingType::ULongLong,
+        PT::Float => BindingType::Float,
+        PT::Double => BindingType::Double,
+        PT::LongDouble => BindingType::LongDouble,
+        PT::Int128 | PT::UInt128 => BindingType::Opaque(format!("{ty:?}")),
         PT::Pointer {
             pointee,
             qualifiers,
-        } => linc::BindingType::Pointer {
+        } => BindingType::Pointer {
             pointee: Box::new(parc_type_to_binding(pointee)),
             const_pointee: qualifiers.is_const,
-            qualifiers: linc::ir::TypeQualifiers {
+            qualifiers: TypeQualifiers {
                 is_const: false,
                 is_volatile: qualifiers.is_volatile,
                 is_restrict: qualifiers.is_restrict,
                 is_atomic: qualifiers.is_atomic,
             },
         },
-        PT::Array(elem, size) => {
-            linc::BindingType::Array(Box::new(parc_type_to_binding(elem)), *size)
-        }
+        PT::Array(elem, size) => BindingType::Array(Box::new(parc_type_to_binding(elem)), *size),
         PT::Qualified {
             ty: inner,
             qualifiers,
         } => {
             let base = parc_type_to_binding(inner);
-            let q = linc::ir::TypeQualifiers {
+            let q = TypeQualifiers {
                 is_const: qualifiers.is_const,
                 is_volatile: qualifiers.is_volatile,
                 is_restrict: qualifiers.is_restrict,
                 is_atomic: qualifiers.is_atomic,
             };
-            linc::BindingType::Qualified {
+            BindingType::Qualified {
                 ty: Box::new(base),
                 qualifiers: q,
             }
@@ -72,29 +75,29 @@ pub fn parc_type_to_binding(ty: &parc::ir::SourceType) -> linc::BindingType {
             return_type,
             parameters,
             variadic,
-        } => linc::BindingType::FunctionPointer {
+        } => BindingType::FunctionPointer {
             return_type: Box::new(parc_type_to_binding(return_type)),
             parameters: parameters.iter().map(parc_type_to_binding).collect(),
             variadic: *variadic,
         },
-        PT::TypedefRef(name) => linc::BindingType::TypedefRef(name.clone()),
-        PT::RecordRef(name) => linc::BindingType::RecordRef(name.clone()),
-        PT::EnumRef(name) => linc::BindingType::EnumRef(name.clone()),
-        PT::Opaque(name) => linc::BindingType::Opaque(name.clone()),
+        PT::TypedefRef(name) => BindingType::TypedefRef(name.clone()),
+        PT::RecordRef(name) => BindingType::RecordRef(name.clone()),
+        PT::EnumRef(name) => BindingType::EnumRef(name.clone()),
+        PT::Opaque(name) => BindingType::Opaque(name.clone()),
     }
 }
 
 /// Convert a parc `SourceItem` into a linc `BindingItem`.
-pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::BindingItem> {
+pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<BindingItem> {
     use parc::ir::SourceItem as PI;
     match item {
-        PI::Function(f) => Some(linc::BindingItem::Function(linc::FunctionBinding {
+        PI::Function(f) => Some(BindingItem::Function(FunctionBinding {
             name: f.name.clone(),
-            calling_convention: linc::CallingConvention::C,
+            calling_convention: CallingConvention::C,
             parameters: f
                 .parameters
                 .iter()
-                .map(|p| linc::ParameterBinding {
+                .map(|p| ParameterBinding {
                     name: p.name.clone(),
                     ty: parc_type_to_binding(&p.ty),
                 })
@@ -103,7 +106,7 @@ pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::Binding
             variadic: f.variadic,
             source_offset: f.source_offset,
         })),
-        PI::Record(r) => Some(linc::BindingItem::Record(linc::RecordBinding {
+        PI::Record(r) => Some(BindingItem::Record(RecordBinding {
             kind: match r.kind {
                 parc::ir::RecordKind::Struct => linc::ir::RecordKind::Struct,
                 parc::ir::RecordKind::Union => linc::ir::RecordKind::Union,
@@ -112,7 +115,7 @@ pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::Binding
             fields: r.fields.as_ref().map(|fields| {
                 fields
                     .iter()
-                    .map(|f| linc::FieldBinding {
+                    .map(|f| FieldBinding {
                         name: f.name.clone(),
                         ty: parc_type_to_binding(&f.ty),
                         bit_width: f.bit_width,
@@ -124,12 +127,12 @@ pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::Binding
             representation: None,
             abi_confidence: None,
         })),
-        PI::Enum(e) => Some(linc::BindingItem::Enum(linc::EnumBinding {
+        PI::Enum(e) => Some(BindingItem::Enum(EnumBinding {
             name: e.name.clone(),
             variants: e
                 .variants
                 .iter()
-                .map(|v| linc::EnumVariant {
+                .map(|v| EnumVariant {
                     name: v.name.clone(),
                     value: v.value,
                 })
@@ -138,19 +141,19 @@ pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::Binding
             representation: None,
             abi_confidence: None,
         })),
-        PI::TypeAlias(t) => Some(linc::BindingItem::TypeAlias(linc::TypeAliasBinding {
+        PI::TypeAlias(t) => Some(BindingItem::TypeAlias(TypeAliasBinding {
             name: t.name.clone(),
             target: parc_type_to_binding(&t.target),
             source_offset: t.source_offset,
             canonical_resolution: None,
             abi_confidence: None,
         })),
-        PI::Variable(v) => Some(linc::BindingItem::Variable(linc::VariableBinding {
+        PI::Variable(v) => Some(BindingItem::Variable(VariableBinding {
             name: v.name.clone(),
             ty: parc_type_to_binding(&v.ty),
             source_offset: v.source_offset,
         })),
-        PI::Unsupported(u) => Some(linc::BindingItem::Unsupported(linc::ir::UnsupportedItem {
+        PI::Unsupported(u) => Some(BindingItem::Unsupported(linc::ir::UnsupportedItem {
             name: u.name.clone(),
             reason: u.reason.clone(),
             source_offset: None,
@@ -160,7 +163,7 @@ pub fn parc_item_to_binding(item: &parc::ir::SourceItem) -> Option<linc::Binding
 
 /// Convert a parc `SourcePackage` into a linc `BindingPackage`.
 pub fn from_parc_package(src: &parc::ir::SourcePackage) -> BindingPackage {
-    let items: Vec<linc::BindingItem> = src.items.iter().filter_map(parc_item_to_binding).collect();
+    let items: Vec<BindingItem> = src.items.iter().filter_map(parc_item_to_binding).collect();
     BindingPackage {
         source_path: src.source_path.clone(),
         items,
@@ -252,7 +255,7 @@ fn try_recover_items_from_preprocessed_source(
 fn package_from_recovered_parse(
     config: &HeaderConfig,
     recovered: RecoveredParse,
-    macros: Vec<linc::MacroBinding>,
+    macros: Vec<MacroBinding>,
     macro_provenance: Vec<linc::ir::MacroProvenance>,
     report: PreprocessingReport,
 ) -> Result<RawHeaderResult, LincError> {

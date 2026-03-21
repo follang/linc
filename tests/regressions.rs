@@ -1,16 +1,20 @@
 mod common;
 use linc::symbols::{ArtifactCapabilities, ArtifactFormat, ArtifactKind, ArtifactPlatform};
 use linc::{
-    from_json, resolve_link_plan_for_target, resolve_link_plan_with_inventories, validate,
-    AbiProbeReport, BindingItem, BindingPackage, BindingType, CallingConvention, DiagnosticKind,
-    FunctionBinding, LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource, MacroValue,
-    ParameterBinding, SymbolInventory, ValidationReport,
+    resolve_link_plan_for_target, resolve_link_plan_with_inventories, validate, AbiProbeReport,
+    DiagnosticKind, SymbolBinding, SymbolDirection, SymbolEntry, SymbolInventory,
+    SymbolVisibility, ValidationReport,
+};
+use linc::ir::{
+    AbiConfidence, BindingItem, BindingPackage, BindingType, CallingConvention, FunctionBinding,
+    LinkInput, LinkLibrary, LinkLibraryKind, LinkRequirementSource, MacroCategory, MacroValue,
+    ParameterBinding,
 };
 use std::path::PathBuf;
 
 #[test]
 fn regression_old_json_with_empty_nested_objects_stays_consumable() {
-    let pkg = from_json(include_str!(
+    let pkg: BindingPackage = serde_json::from_str(include_str!(
         "../tests/contracts/v1_empty_nested_objects.json"
     ))
     .unwrap();
@@ -78,7 +82,7 @@ fn regression_decorated_fixture_validates_against_normalized_name() {
 
 #[test]
 fn regression_extended_contract_fixture_keeps_macro_value() {
-    let pkg = from_json(include_str!(
+    let pkg: BindingPackage = serde_json::from_str(include_str!(
         "../tests/contracts/fol_extended_contract.json"
     ))
     .unwrap();
@@ -198,7 +202,7 @@ fn regression_tricky_layout_fixture_stays_consumable() {
     let record = result.package.find_record("packed_flags").unwrap();
     assert_eq!(
         record.abi_confidence,
-        Some(linc::AbiConfidence::PartialBitfieldLayout)
+        Some(AbiConfidence::PartialBitfieldLayout)
     );
     let fields = record.fields.as_ref().unwrap();
     assert_eq!(fields[0].bit_width, Some(3));
@@ -207,7 +211,7 @@ fn regression_tricky_layout_fixture_stays_consumable() {
     let widget_mode = result.package.find_enum("widget_mode").unwrap();
     assert_eq!(
         widget_mode.abi_confidence,
-        Some(linc::AbiConfidence::RepresentationProbed)
+        Some(AbiConfidence::RepresentationProbed)
     );
 }
 
@@ -232,32 +236,32 @@ fn regression_typedef_layout_fixture_validates_record_and_enum_aliases() {
         },
         dependency_edges: Vec::new(),
         symbols: vec![
-            linc::SymbolEntry {
+            SymbolEntry {
                 name: "widget_global".into(),
                 raw_name: None,
                 version: None,
-                direction: linc::SymbolDirection::Exported,
+                direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
                 alias_of: None,
                 function_abi: None,
-                visibility: linc::SymbolVisibility::Default,
+                visibility: SymbolVisibility::Default,
                 is_function: false,
-                binding: linc::SymbolBinding::Global,
+                binding: SymbolBinding::Global,
                 size: Some(16),
                 section: Some(".data".into()),
                 archive_member: None,
             },
-            linc::SymbolEntry {
+            SymbolEntry {
                 name: "current_mode".into(),
                 raw_name: None,
                 version: None,
-                direction: linc::SymbolDirection::Exported,
+                direction: SymbolDirection::Exported,
                 reexported_via: Vec::new(),
                 alias_of: None,
                 function_abi: None,
-                visibility: linc::SymbolVisibility::Default,
+                visibility: SymbolVisibility::Default,
                 is_function: false,
-                binding: linc::SymbolBinding::Global,
+                binding: SymbolBinding::Global,
                 size: Some(4),
                 section: Some(".data".into()),
                 archive_member: None,
@@ -287,7 +291,7 @@ fn regression_packed_bitfield_fixture_preserves_partial_layout_signal() {
     let record = result.package.find_record("packed_registers").unwrap();
     assert_eq!(
         record.abi_confidence,
-        Some(linc::AbiConfidence::PartialBitfieldLayout)
+        Some(AbiConfidence::PartialBitfieldLayout)
     );
     let representation = record.representation.as_ref().unwrap();
     assert!(representation.size.is_some());
@@ -340,17 +344,17 @@ fn regression_link_plan_and_validation_agree_on_resolved_and_unresolved_provider
             imports_symbols: true,
         },
         dependency_edges: vec!["libc.so.6".into()],
-        symbols: vec![linc::SymbolEntry {
+        symbols: vec![SymbolEntry {
             name: "zlibVersion".into(),
             raw_name: Some("zlibVersion".into()),
             version: Some("ZLIB_1.2.0".into()),
-            direction: linc::SymbolDirection::Exported,
+            direction: SymbolDirection::Exported,
             reexported_via: Vec::new(),
             alias_of: None,
             function_abi: None,
-            visibility: linc::SymbolVisibility::Default,
+            visibility: SymbolVisibility::Default,
             is_function: true,
-            binding: linc::SymbolBinding::Global,
+            binding: SymbolBinding::Global,
             size: None,
             section: Some(".text".into()),
             archive_member: None,
@@ -488,7 +492,7 @@ fn regression_tricky_macro_fixture_stays_consumable() {
         .iter()
         .find(|entry| entry.macro_name == "WIDGET_PACK")
         .unwrap();
-    assert_eq!(abi_macro.category, linc::MacroCategory::AbiAffecting);
+    assert_eq!(abi_macro.category, MacroCategory::AbiAffecting);
 
     let function_like = result
         .package
@@ -514,7 +518,7 @@ fn regression_macro_public_api_fixture_preserves_configuration_and_abi_macros() 
         .find(|entry| entry.name == "WIDGET_API_LEVEL")
         .unwrap();
     assert_eq!(api_level.value, Some(MacroValue::Integer(12)));
-    assert_eq!(api_level.category, linc::MacroCategory::BindableConstant);
+    assert_eq!(api_level.category, MacroCategory::BindableConstant);
 
     let fast_path = result
         .package
@@ -522,7 +526,7 @@ fn regression_macro_public_api_fixture_preserves_configuration_and_abi_macros() 
         .iter()
         .find(|entry| entry.macro_name == "WIDGET_ENABLE_FAST_PATH")
         .unwrap();
-    assert_eq!(fast_path.category, linc::MacroCategory::ConfigurationFlag);
+    assert_eq!(fast_path.category, MacroCategory::ConfigurationFlag);
 
     let abi_macro = result
         .package
@@ -530,7 +534,7 @@ fn regression_macro_public_api_fixture_preserves_configuration_and_abi_macros() 
         .iter()
         .find(|entry| entry.name == "WIDGET_PACKED")
         .unwrap();
-    assert_eq!(abi_macro.category, linc::MacroCategory::AbiAffecting);
+    assert_eq!(abi_macro.category, MacroCategory::AbiAffecting);
 
     let function_like = result
         .package
@@ -566,7 +570,7 @@ fn regression_linux_elf_mixed_fixture_preserves_versions_and_imports() {
     assert_eq!(inventory.symbols[0].version.as_deref(), Some("WIDGET_1.0"));
     assert_eq!(
         inventory.symbols[1].direction,
-        linc::SymbolDirection::Imported
+        SymbolDirection::Imported
     );
     assert_eq!(inventory.symbols[1].reexported_via, vec!["libm.so.6"]);
     assert_eq!(inventory.symbols[2].size, Some(4));
@@ -640,7 +644,7 @@ fn regression_macos_dylib_mixed_fixture_preserves_imported_and_exported_symbols(
     );
     assert_eq!(
         inventory.symbols[1].direction,
-        linc::SymbolDirection::Imported
+        SymbolDirection::Imported
     );
     assert_eq!(
         inventory.symbols[1].reexported_via,
@@ -675,6 +679,6 @@ fn regression_windows_import_library_fixture_stays_consumable() {
     assert!(inventory.capabilities.imports_symbols);
     assert_eq!(
         inventory.symbols[0].direction,
-        linc::SymbolDirection::Imported
+        SymbolDirection::Imported
     );
 }
