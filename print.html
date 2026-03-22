@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-90245d7c.js";
+            window.path_to_searchindex_js = "searchindex-96ee6983.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-cb0f06eb.js"></script>
@@ -1751,6 +1751,12 @@ repository, and it is reasonable for controlled internal use.</p>
 <li>treat Apple support as useful but still maturing</li>
 <li>treat Windows-native linker/artifact support as incomplete</li>
 </ul>
+<p>For the Level 1 production claim, interpret that as:</p>
+<ul>
+<li>Linux/ELF = primary production platform</li>
+<li>Apple/Mach-O = secondary confidence scope</li>
+<li>Windows/COFF = tested but non-primary confidence scope</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fol-integration-guide"><a class="header" href="#fol-integration-guide"><code>fol</code> Integration Guide</a></h1>
 <p>This chapter describes the intended producer/consumer contract between LINC
@@ -1947,6 +1953,10 @@ available
 </li>
 <li>confirm failure suites still reject duplicate, unresolved, hidden, decorated,
 and ABI-questionable cases conservatively</li>
+<li>confirm plugin-style <code>dl</code> surfaces still produce explicit runtime-boundary
+notes instead of over-claiming runtime truth</li>
+<li>confirm the hermetic ELF static, Mach-O framework, and Windows PE fixture
+suite still passes</li>
 <li>confirm determinism anchors still hold on the canonical large surfaces</li>
 </ul>
 <h2 id="contract-surfaces"><a class="header" href="#contract-surfaces">Contract Surfaces</a></h2>
@@ -1983,6 +1993,7 @@ ladder.</p>
 <li>vendored libpng</li>
 <li>plugin ABI fixtures</li>
 <li>combined daemon and max-pain fixtures</li>
+<li>explicit ELF / Mach-O / Windows inventory confidence-floor fixtures</li>
 </ul>
 <p>These surfaces prove that LINC can:</p>
 <ul>
@@ -2010,6 +2021,9 @@ than vendored toy cases.</p>
 <li>hidden or decorated symbol mismatches</li>
 <li>ABI-questionable fixtures</li>
 <li>partial or missing layout evidence</li>
+<li>typed operational errors for unreadable artifacts, unsupported formats, and
+malformed serialized input</li>
+<li>explicit Mach-O framework and dylib provider-policy checks</li>
 </ul>
 <p>Those are release-positive tests when they stay:</p>
 <ul>
@@ -2023,6 +2037,7 @@ than vendored toy cases.</p>
 <li>vendored zlib</li>
 <li>vendored libpng</li>
 <li>combined daemon fixture</li>
+<li>confidence-floor inventory fixtures</li>
 <li>OpenSSL when available</li>
 <li>Linux event-loop analysis</li>
 </ul>
@@ -2042,6 +2057,11 @@ score directly to the current hardening ladder.</p>
 <li>still dependent on host availability for the largest OpenSSL and Linux-system
 ladders</li>
 </ul>
+<p>For whole-pipeline claims, this score is also capped by downstream <code>gerc</code>
+anchors that ingest <code>linc</code> evidence in tests/examples.</p>
+<p>For Level 1 production, this score should be read as Linux/ELF-first. Apple
+and Windows readiness should raise confidence, not redefine the primary
+production envelope.</p>
 <h2 id="subsystem-scorecard"><a class="header" href="#subsystem-scorecard">Subsystem Scorecard</a></h2>
 <ul>
 <li>source-shaped intake: high</li>
@@ -2061,6 +2081,7 @@ ladders</li>
 <li>vendored libpng</li>
 <li>plugin ABI fixture</li>
 <li>combined daemon fixture</li>
+<li>difficult-record evidence fixtures</li>
 <li>OpenSSL when available</li>
 <li>Linux event-loop analysis when available</li>
 </ul>

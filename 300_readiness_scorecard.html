@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-90245d7c.js";
+            window.path_to_searchindex_js = "searchindex-96ee6983.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-cb0f06eb.js"></script>
@@ -187,6 +187,11 @@ score directly to the current hardening ladder.</p>
 <li>still dependent on host availability for the largest OpenSSL and Linux-system
 ladders</li>
 </ul>
+<p>For whole-pipeline claims, this score is also capped by downstream <code>gerc</code>
+anchors that ingest <code>linc</code> evidence in tests/examples.</p>
+<p>For Level 1 production, this score should be read as Linux/ELF-first. Apple
+and Windows readiness should raise confidence, not redefine the primary
+production envelope.</p>
 <h2 id="subsystem-scorecard"><a class="header" href="#subsystem-scorecard">Subsystem Scorecard</a></h2>
 <ul>
 <li>source-shaped intake: high</li>
@@ -206,6 +211,7 @@ ladders</li>
 <li>vendored libpng</li>
 <li>plugin ABI fixture</li>
 <li>combined daemon fixture</li>
+<li>difficult-record evidence fixtures</li>
 <li>OpenSSL when available</li>
 <li>Linux event-loop analysis when available</li>
 </ul>

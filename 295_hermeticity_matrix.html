@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-90245d7c.js";
+            window.path_to_searchindex_js = "searchindex-96ee6983.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-cb0f06eb.js"></script>
@@ -186,6 +186,7 @@ ladder.</p>
 <li>vendored libpng</li>
 <li>plugin ABI fixtures</li>
 <li>combined daemon and max-pain fixtures</li>
+<li>explicit ELF / Mach-O / Windows inventory confidence-floor fixtures</li>
 </ul>
 <p>These surfaces prove that LINC can:</p>
 <ul>
@@ -213,6 +214,9 @@ than vendored toy cases.</p>
 <li>hidden or decorated symbol mismatches</li>
 <li>ABI-questionable fixtures</li>
 <li>partial or missing layout evidence</li>
+<li>typed operational errors for unreadable artifacts, unsupported formats, and
+malformed serialized input</li>
+<li>explicit Mach-O framework and dylib provider-policy checks</li>
 </ul>
 <p>Those are release-positive tests when they stay:</p>
 <ul>
@@ -226,6 +230,7 @@ than vendored toy cases.</p>
 <li>vendored zlib</li>
 <li>vendored libpng</li>
 <li>combined daemon fixture</li>
+<li>confidence-floor inventory fixtures</li>
 <li>OpenSSL when available</li>
 <li>Linux event-loop analysis</li>
 </ul>
