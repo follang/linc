@@ -7,6 +7,21 @@ Use this checklist before cutting a release candidate.
 - run `make build`
 - run `make test`
 
+## Canonical Hardening Gates
+
+- confirm hermetic baselines still pass
+  - vendored zlib
+  - vendored libpng
+  - plugin ABI
+  - combined daemon fixture
+- confirm at least one host-dependent large-evidence ladder still passes where
+  available
+  - OpenSSL
+  - Linux event-loop stack
+- confirm failure suites still reject duplicate, unresolved, hidden, decorated,
+  and ABI-questionable cases conservatively
+- confirm determinism anchors still hold on the canonical large surfaces
+
 ## Contract Surfaces
 
 - confirm the documented JSON artifact shapes remain consumable by the current
