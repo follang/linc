@@ -1,103 +1,21 @@
 # Macro Semantics
 
-This chapter defines the intended stable semantics for captured macros.
-
-Macro inventory alone is not enough for a downstream binding generator.
-The useful contract is which macro information is safe to consume directly, which is advisory, and
-which should be treated as unsupported analysis evidence.
-
-## Current Macro Contract
-
-Each captured macro currently carries:
-
-- `name`
-- `body`
-- `function_like`
-- `form`
-- `kind`
-- `category`
-- optional parsed `value` for bindable integer/string constants
-
-These fields should be read with different confidence levels.
+`MacroBinding` is the normalized macro representation in the package.
 
 ## Intended Semantics By Category
 
-### `BindableConstant`
-
-These are the macros a downstream generator may most reasonably attempt to lower into a language
-constant surface.
-
-Current expectations:
-
-- object-like integer and string macros are the primary intended members of this category
-- when parsing succeeds, `value` gives the explicit lowered integer/string form
-- expression-like macros may still need consumer caution even when categorized as bindable
-- downstream code should still inspect the raw `body` if exact lowering matters
-
-### `ConfigurationFlag`
-
-These macros are not primarily binding targets.
-They are part of the effective compile-time environment.
-
-Downstream tools should use them to answer questions like:
-
-- which feature/profile was active during extraction
-- whether the observed ABI surface depends on compile-time configuration
-
-### `AbiAffecting`
-
-These macros matter because they may change type/layout/API shape rather than because they are good
-binding constants themselves.
-
-They should be treated as audit signals.
-
-### `Unsupported`
-
-These macros are intentionally preserved as evidence, not as directly bindable output.
-
-Downstream generators should not assume they can lower them safely without extra logic.
+- `BindableConstant`: safe candidates for generated constants
+- `ConfigurationFlag`: environment and availability signals
+- `AbiAffecting`: macros that may influence layout or calling behavior
+- `Unsupported`: capture and report, but do not assume a safe lowering path
 
 ## Function-Like vs Object-Like
 
-The first stable rule is:
-
-- object-like macros are the main candidates for binding constants
-- function-like macros should be treated conservatively unless future slices add stronger lowering
-  rules
-
-That means a macro being captured does not automatically make it a good codegen target.
-
-For unsupported macros specifically, consumers can now distinguish:
-
-- unsupported function-like macros
-- unsupported object-like macros
-
-That matters because those two cases often need different fallback handling in generators.
+`MacroForm` preserves whether the macro was object-like or function-like.
+That distinction matters because function-like macros are often not safe to
+lower automatically.
 
 ## Consumer Guidance
 
-For now, downstream consumers should:
-
-1. treat macro capture as structured evidence, not as guaranteed language-lowering input
-2. prefer `BindableConstant` object-like macros first
-3. treat `ConfigurationFlag` and `AbiAffecting` as environment/provenance data
-4. treat `Unsupported` macros as preserved but not directly bindable
-
-## Future Direction
-
-Later macro slices are expected to add:
-
-- explicit constant-value lowering for integer/string macros
-- clearer handling for unsupported function-like macros
-- provenance and source-location data
-- richer effective macro-environment reporting
-
-This chapter sets the semantic policy before those richer representations arrive.
-
-The regression suite now also carries a checked-in macro fixture with real-library-style constant,
-configuration, ABI-affecting, and function-like forms so classification changes stay pinned to
-representative native headers.
-
-For downstream auditing, `BindingPackage.effective_macro_environment` now exposes the filtered
-configuration/ABI-affecting subset directly, along with whatever provenance evidence was captured
-for those macros.
+Consumers should treat macro evidence as policy input, not as a promise that
+every captured macro should become a generated constant.

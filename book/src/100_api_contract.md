@@ -1,171 +1,50 @@
 # API Contract
 
-This chapter defines the current intended public library surface of LINC.
-
-It is not yet a semver policy document for every future release.
-It is the current explicit contract for how downstream consumers should approach the crate.
+This chapter defines the intended public library surface of LINC.
 
 ## First Principle
 
-LINC is a library crate.
-
-The intended downstream pattern is:
+LINC is a library crate. The intended downstream pattern is:
 
 1. call the crate from Rust
-2. obtain structured values such as `LinkAnalysisPackage`, `SymbolInventory`, and `ValidationReport`
+2. obtain structured values such as `LinkAnalysisPackage`,
+   `SymbolInventory`, and `ValidationReport`
 3. serialize those values only when another tool or process boundary needs them
 
-Consumers should prefer the crate root over deep module imports whenever possible.
+## Preferred Public Surface
 
-## Preferred public surface
-
-The current intended crate policy is:
-
-- the crate root is the preferred consumer boundary
-- public modules may still be used directly, but module depth correlates with how implementation-shaped an API is
-- additive, documented evolution is preferred over disruptive surface churn
-- typed data contracts are more important than incidental formatting or helper layout
-- diagnostics and validation reports are contractual structured output, not just debugging aids
-
-This policy should guide both downstream usage and future maintenance work.
+The crate root is the preferred consumer boundary. Additive, documented
+evolution is preferred over disruptive surface churn.
 
 ## Normative Rules For Consumers
 
-If you are building on top of LINC, the current intended rules are:
+If you are building on top of LINC:
 
 1. prefer crate-root re-exports over deep module imports
 2. use `analyze_source_package` as the normal contract-first entry point
-3. treat `LinkAnalysisPackage`, `SymbolInventory`, and `ValidationReport` as the primary transport-level contracts
-4. treat diagnostics and validation results as normal structured output, not as ad hoc log text
+3. treat `LinkAnalysisPackage`, `SymbolInventory`, and `ValidationReport` as
+   the primary transport-level contracts
+4. treat diagnostics and validation results as normal structured output, not as
+   ad hoc log text
 5. do not rely on exact `String` error text for durable control flow
-6. do not treat extracted declarations alone as sufficient ABI proof for layout-sensitive generation
+6. do not treat extracted declarations alone as sufficient ABI proof for
+   layout-sensitive generation
 
-These rules are the safest current downstream posture until later API and error-model slices land.
+## Public Surface Tiers
 
-## Public surface tiers
+- Tier 1: `analyze_source_package`, `inspect_symbols`, `probe_type_layouts`,
+  `validate`, `validate_many`, and `LinkAnalysisPackage`
+- Tier 2: modules such as `probe`, `symbols`, `validate`, and `raw_headers`
+- Tier 3: support-oriented modules such as `diagnostics`, `error`, `ir`, and
+  `line_markers`
 
-The public surface is best understood in three tiers.
+## Explicit Non-Goals
 
-## Tier 1: Preferred Root-Level API
+The current contract does not yet guarantee typed operational errors across the
+whole crate, full ABI completeness for all C constructs, or full cross-platform
+parity across ELF, Mach-O, and Windows-native artifact formats.
 
-These are the APIs downstream users should prefer first.
+## Artifact Boundary Reminder
 
-| API | Role | Current expectation |
-|---|---|---|
-| `analyze_source_package` | source-contract to link-analysis contract | preferred public entry point |
-| `LinkAnalysisPackage` | machine-readable link-analysis contract | preferred public contract |
-| `probe_type_layouts` | compiler-assisted ABI evidence | preferred advanced root API |
-| `inspect_symbols` | native artifact inventory | preferred advanced root API |
-| `validate` / `validate_many` | declaration-vs-artifact checks | preferred advanced root API |
-
-This tier is what later API-stability work should protect most aggressively.
-
-## Tier 2: Advanced Public Modules
-
-These modules are public and useful, but they are closer to the implementation.
-
-| Module | Why it is public | Why it is not the first choice |
-|---|---|---|
-| `extract` | useful for direct extraction flows | lower-level than crate-root workflows |
-| `probe` | useful for direct probe control | less curated than root API |
-| `raw_headers` | exposes repo-local scan orchestration details | bootstrap-oriented surface, not the normal downstream API |
-| `symbols` | useful for direct artifact work | implementation-shaped details still live here |
-| `validate` | useful for direct report logic | root re-exports are preferred |
-
-These modules are valid to use.
-They are simply not the most stable-looking consumer surface yet.
-
-## Tier 3: Support-Oriented Public Modules
-
-These modules are public today, but consumers should only depend on them deliberately.
-
-| Module | Notes |
-|---|---|
-| `diagnostics` | useful when inspecting detailed extraction output |
-| `error` | defines crate error types, still maturing |
-| `ir` | canonical raw IR definitions, but still evolving |
-| `line_markers` | low-level origin tracking support |
-| `preprocess` | preprocessed-input support details |
-
-If a downstream consumer imports heavily from this tier, it is probably depending on details that later cleanup work may want to simplify.
-
-## Downstream posture
-
-Prefer:
-
-- crate-root re-exports
-- `analyze_source_package` for contract-first intake
-- `LinkAnalysisPackage` as the durable downstream link contract
-- root-level validation and symbol APIs
-- final contracts over internal IR bridges
-
-For long-lived downstream integrations, also prefer:
-
-- documented behavior over inferred behavior
-- package-level metadata over reconstructing intent from raw declarations alone
-- package diagnostics and validation output as explicit decision inputs
-
-Avoid reaching for deep modules first unless:
-
-- you are building advanced integration code
-- you need lower-level control not exposed at the crate root
-- you are contributing to LINC itself
-
-## Internal and evolving surfaces
-
-This inventory is honest about the present state.
-The following are still true today:
-
-- some public APIs still return `Result<_, String>`
-- some module boundaries are still more historical than deliberate
-- the root exports a large raw IR surface because downstream tools genuinely need it
-- parts of the internal IR are still more public than the final architecture wants
-
-That is why the next plan phase starts with API cleanup and error-model hardening.
-
-## Explicit non-goals
-
-The current contract does not yet guarantee:
-
-- typed operational errors across the whole crate
-- full ABI completeness for all C constructs
-- full cross-platform parity across ELF, Mach-O, and Windows-native artifact formats
-- that every public module is equally stable as a consumer boundary
-- that repo-local bootstrap utilities are the public architecture
-
-These are roadmap items, not present-tense promises.
-
-## Immediate Consumer Guidance
-
-If you are integrating LINC into another crate, treat the following as your safest surface:
-
-1. root-level types and functions
-2. serialized `LinkAnalysisPackage` / `SymbolInventory` / `ValidationReport` values
-3. book-level documented behavior, not incidental implementation details
-
-If you need more than that, document exactly which lower-level modules you rely on.
-That will make later stabilization work much easier.
-
-## Type Invariants
-
-Public structs and enums now carry invariant-oriented docs in the source.
-
-Those notes are part of the library contract.
-They explain things like:
-
-- which fields are identity keys versus optional evidence
-- which vectors preserve declaration order
-- which normalized values are not full linker or ABI truth
-- which report types represent successful analysis with findings rather than hard failures
-
-For durable integrations, read those source-level invariant notes as part of the supported API.
-
-## Artifact boundary reminder
-
-`linc` owns evidence, not universal pipeline state.
-
-That means:
-
-- `linc/src/**` must not depend on `parc` or `gerc`
-- cross-package translation belongs only in tests/examples/harnesses
-- downstream consumers should treat explicit contracts as the boundary, not old all-in-one flows
+LINC owns evidence, not universal pipeline state. Cross-package translation
+belongs only in tests/examples/harnesses.

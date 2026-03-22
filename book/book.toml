@@ -1,7 +1,7 @@
 [book]
 authors = ["Trim Bresilla"]
 language = "en"
-title = "BIC Reference"
+title = "LINC Reference"
 
 [output.html]
 default-theme = "navy"

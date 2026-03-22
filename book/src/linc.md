@@ -1,95 +1,94 @@
 # LINC Reference
 
-LINC is the link-surface, symbol-inventory, validation, and ABI-evidence layer in the `PARC → LINC → GERC` pipeline.
+LINC is the link and binary evidence layer in the `parc -> linc -> gerc`
+toolchain.
 
-Its job is not to parse C source and not to generate Rust code.
-Its job is to take normalized source contracts and native artifacts, then produce link and binary evidence that downstream tooling can trust.
+It owns evidence, not parsing and not lowering.
 
-In practice LINC sits between:
+## What LINC Is For
 
-- `parc`, which handles preprocessing, parsing, and declaration extraction
-- native artifacts such as `.o`, `.a`, `.so`, and `.dylib`
-- downstream consumers such as `gerc` (Rust projection), `fol`, or validation/reporting tooling
+LINC turns normalized source intent into native evidence. It can:
+
+- normalize declared link requirements
+- inspect object, archive, and shared-library artifacts
+- probe ABI-relevant layouts
+- validate declarations against binary reality
+- serialize the resulting evidence for downstream consumers
 
 ## What LINC Produces
 
-The core output is a `LinkAnalysisPackage`.
+The main outputs are:
 
-That package is intentionally narrower than the historical all-in-one IR. It contains:
+- `LinkAnalysisPackage`
+- `SymbolInventory`
+- `ResolvedLinkPlan`
+- `ValidationReport`
+- `AbiProbeReport`
 
-- target/compiler metadata for the analysis
-- declared and normalized native link inputs
-- diagnostics produced during analysis
-- optional resolved link-plan data
-- optional probe and validation attachment points
+Those outputs are transportable artifacts. They are what downstream tooling
+should rely on, not private parser or extraction state.
 
-When native artifacts are involved, LINC can also produce:
-
-- `SymbolInventory` values from `inspect_symbols`
-- `ValidationReport` values from `validate`
-- `ResolvedLinkPlan` values from `resolve_link_plan`
-
-## Data flow
+## Data Flow
 
 ```text
-PARC (parc)
-    -> SourcePackage (frontend-neutral contract)
-    -> LINC (linc)
-    -> LinkAnalysisPackage / link and binary evidence
-    -> GERC (gerc)
-    -> Rust projection / emitted crate
+normalized source input
+  -> linc analysis
+  -> link/binary evidence artifacts
+  -> downstream consumer
 ```
 
-## What LINC Owns
+In practice the input is a `SourcePackage`, the analysis entrypoint is
+`analyze_source_package`, and any symbol/probe/validation pass is optional
+evidence layered on top.
 
-- intake of normalized frontend/source contracts
-- binary symbol inspection
-- object/shared-library/archive metadata extraction
-- provider matching
-- link-plan construction
-- ABI probe orchestration and retained measurement evidence
-- declaration-vs-artifact validation
-- link and binary evidence reporting
+## Ownership Boundary
 
-## What LINC Does Not Own
+LINC owns:
 
-- source parsing or preprocessing (upstream: `parc`)
-- source-level declaration extraction (upstream: `parc`)
-- Rust FFI code generation (downstream: `gerc`)
+- the evidence model
+- the link surface
+- the validation story
+- the ABI probe story
 
-## Module and API surface
+LINC does not own:
 
-Most users touch one or more of these library entry points:
+- parser internals
+- source preprocessing internals
+- Rust code generation
+- library-level composition with `parc` or `gerc`
 
-- `analyze_source_package` for ingesting a `SourcePackage` from any frontend
-- `probe_type_layouts` for compiler-assisted ABI layout probing
-- `inspect_symbols` for reading native artifact symbols
-- `validate` and `validate_many` for declaration-vs-artifact checks
-- `resolve_link_plan` for link-plan construction
-- `serde_json` over the final explicit contracts when transport is needed
+Composition across packages belongs in tests, examples, or external harnesses.
 
-## Artifact boundary
+## Modules And APIs
 
-`linc` owns evidence, not universal pipeline state.
+The root APIs are:
 
-The boundary rule is:
+- `analyze_source_package`
+- `inspect_symbols`
+- `probe_type_layouts`
+- `resolve_link_plan`
+- `validate`
 
-- `linc/src/**` must not depend on `parc` or `gerc`
-- cross-package translation belongs only in tests, examples, or external harnesses
-- repo-local bootstrap utilities are secondary, not the public architecture
+The important modules are:
 
-## Recommended Reading Order
+- `intake`
+- `analysis`
+- `link_plan`
+- `probe`
+- `symbols`
+- `validate`
+- `diagnostics`
+- `error`
 
-1. Getting Started and the core extraction chapters
-2. Native Evidence
-3. API Contract and the contract/policy chapters
-4. End-To-End Workflows
-5. Operations And Release
+`raw_headers` exists as a transitional bootstrap module and is not the long
+term public architecture.
 
-If you only want to integrate LINC into another tool, focus on:
+## Reading Order
 
-- [Header Processing](./020_headers.md)
-- [IR Model](./030_ir.md)
-- [Native Evidence](./095_native_evidence.md)
-- [API Contract](./100_api_contract.md)
-- [End-To-End Workflows](./110_workflows.md)
+1. [Getting Started](./010_getting_started.md)
+2. [Intake Layer](./015_intake.md)
+3. [Header Processing](./020_headers.md)
+4. [IR Model](./030_ir.md)
+5. [Native Evidence](./095_native_evidence.md)
+6. [API Contract](./100_api_contract.md)
+7. [End-To-End Workflows](./110_workflows.md)

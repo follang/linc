@@ -1,85 +1,68 @@
-# LINC (link and binary evidence)
+# LINC
 
-LINC is the link-analysis layer of the pipeline. It takes source-shaped input,
-normalizes declared native dependencies, inspects real artifacts, validates
-source claims against binary reality, and emits machine-readable evidence.
+LINC is the link and binary evidence layer in the `parc -> linc -> gerc`
+toolchain.
 
-In the intended architecture:
-
-- `parc` owns source meaning
-- `linc` owns link and binary meaning
-- `gerc` owns Rust lowering and emitted build metadata
-
-Those roles are intentionally separate. `linc` is not a parser, not a header
-driver, and not a Rust generator.
-
-## Architectural Rules
-
-`linc` owns its own internal model and its own evidence artifacts.
-
-- `linc/src/**` must not depend on `parc` or `gerc`
-- cross-package translation belongs only in tests, examples, or external harnesses
-- there is no shared ABI crate
-- there is no backward-compatibility burden for old pipeline shapes
-- repo-local bootstrap utilities are allowed to exist, but they are not the public architecture
+It does not own parsing, preprocessing, or Rust lowering. It owns evidence:
+what native inputs were declared, what native artifacts were found, how they
+match, and what ABI evidence was measured.
 
 ## Responsibilities
 
-- consuming source-shaped declarations and declared link intent
-- inspecting native artifacts for symbol evidence
-- probing ABI-relevant layout information
-- validating declarations against binary reality
-- resolving normalized native link requirements
-- emitting evidence artifacts for downstream tools
+- consume normalized source contracts through `SourcePackage`
+- inspect native artifacts for symbol evidence
+- normalize link requirements and provider choices
+- probe ABI-relevant layouts
+- validate source claims against compiled reality
+- serialize evidence for downstream tools
 
-## Non-responsibilities
+## Non-Responsibilities
 
-- parsing or preprocessing C as the public architecture
-- owning a universal pipeline envelope
-- Rust lowering or code generation
-- downstream runtime or loader policy
+- source parsing and preprocessing as a public architecture boundary
+- source extraction and declaration normalization upstream of `SourcePackage`
+- Rust code generation
+- downstream crate-specific build logic
+- any library-level dependency on `parc` or `gerc`
 
-The practical consequence is simple:
-
-1. some frontend emits a source artifact
-2. a test, example, or harness translates that artifact into `linc` input
-3. `linc` emits evidence artifacts
-4. a downstream generator consumes those artifacts on its own terms
+Cross-package composition belongs only in tests, examples, or external
+harnesses. Library code in `linc/src/**` stays self-contained.
 
 ## What LINC Produces
 
 The main output families are:
 
 - `LinkAnalysisPackage`
-  a normalized evidence bundle derived from source intent plus optional binary inspection
+  a normalized evidence bundle derived from source intent plus optional native
+  inspection
 - `SymbolInventory`
-  exported/imported symbol evidence from ELF, Mach-O, COFF, and PE artifacts
+  exported/imported symbol evidence from ELF, Mach-O, COFF, and similar
+  artifacts
 - `ValidationReport`
   declaration-vs-artifact evidence, including missing and mismatched cases
 - `ResolvedLinkPlan`
-  normalized library/framework/object requirements with provider matching
+  normalized library/framework/artifact requirements with provider matching
+- `AbiProbeReport`
+  compiler-measured layout evidence for requested types
 
-These are evidence products, not parser products.
+These are evidence products, not parser products and not code-generation
+products.
 
 ## Core Workflow
 
 ```rust
 use linc::{analyze_source_package, SourcePackage};
 
-let mut src = SourcePackage::default();
-// populate declarations, macros, and declared native link requirements
-
-let analysis = analyze_source_package(&src);
-let json = serde_json::to_string_pretty(&analysis).unwrap();
+let source = SourcePackage::default();
+let evidence = analyze_source_package(&source);
+let json = serde_json::to_string_pretty(&evidence).unwrap();
 ```
 
-For more serious native pipelines, the usual sequence is:
+The normal sequence is:
 
-1. analyze declared link surface with `analyze_source_package(...)`
-2. inspect artifacts with `inspect_symbols(...)`
-3. validate source intent with `validate(...)` or `validate_many(...)`
-4. resolve concrete provider choices with `resolve_link_plan(...)`
-5. pass source artifacts and evidence artifacts to the downstream tool
+1. an upstream frontend produces a normalized source artifact
+2. a test, example, or harness translates that artifact into `SourcePackage`
+3. LINC analyzes the package
+4. downstream tooling consumes the evidence on its own terms
 
 ## Artifact Boundary
 
@@ -88,10 +71,13 @@ across crates.
 
 - `parc` may serialize a source artifact
 - tests/examples/harnesses may translate that artifact into `linc` input
-- `linc` may serialize `LinkAnalysisPackage`, `SymbolInventory`, or `ValidationReport`
-- `gerc` or another consumer may load those artifacts through its own test/example code
+- `linc` may serialize `LinkAnalysisPackage`, `SymbolInventory`, or
+  `ValidationReport`
+- `gerc` or another consumer may load those artifacts through its own
+  test/example code
 
-Library code inside `linc` must not be the place where cross-package translation lives.
+Library code inside `linc` must not be the place where cross-package
+translation lives.
 
 ## Tested Scope
 
@@ -99,10 +85,11 @@ The suite currently exercises:
 
 - Linux and other ELF-oriented flows
 - macOS / Mach-O inventory and validation evidence
-- split-pipeline artifact tests using `parc` fixtures
-- difficult header surfaces including zlib, libpcap, libcurl, OpenSSL, SocketCAN, epoll, and libpng
+- split-pipeline artifact tests using upstream fixtures
+- difficult native surfaces including zlib, libpcap, libcurl, OpenSSL,
+  SocketCAN, epoll, and libpng
 
-The tests are the main statement of supported behavior.
+The tests are the statement of supported behavior.
 
 ## Build And Test
 
@@ -113,4 +100,5 @@ make test
 
 ## License
 
-Dual-licensed under Apache 2.0 or MIT (see `LICENSE-APACHE` and `LICENSE-MIT`).
+Dual-licensed under Apache 2.0 or MIT (see `LICENSE-APACHE` and
+`LICENSE-MIT`).

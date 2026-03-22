@@ -1,22 +1,18 @@
 # Code Generation
 
-Rust FFI code generation has been moved to **`gerc`** (the GERC crate).
+LINC does not own Rust code generation.
 
-LINC does not own code generation. Its responsibility ends at producing
-`BindingPackage` and link/binary evidence. The downstream `gerc` crate
-consumes that evidence to emit Rust projections.
+This chapter exists only to make the boundary explicit: LINC ends at evidence.
+Downstream tooling such as `gerc` owns lowering and emitted build metadata.
 
 ## Migration Note
 
-The `codegen` feature and `emit_rust_ffi` function that previously lived
-in this crate have been removed. If you were using them directly, switch
-to `gerc` for Rust FFI generation.
+Older bootstrap paths in the repository may still carry codegen-shaped names,
+but they are not the architectural center. The evidence contract is the
+stable boundary.
 
-## Pipeline
+## Practical Rule
 
-```text
-PARC -> LINC -> BindingPackage (JSON) -> GERC -> Rust FFI
-```
-
-See the [gerc documentation](https://github.com/follang/gerc) for code
-generation details.
+If you need Rust source, build metadata, or linker directives, consume the
+evidence packages from LINC and hand them to the downstream generator that
+owns that job.

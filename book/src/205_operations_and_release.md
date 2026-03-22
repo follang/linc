@@ -1,12 +1,13 @@
 # Operations And Release
 
-This section groups support-scope, integration-profile, and release-hardening material.
+This section covers the operational and release posture of LINC.
 
-Read this section when you need to answer questions such as:
+## Operations
 
-- what platform scope is currently strong
-- what `fol` should treat as required or gating evidence
-- what release posture the repository currently claims
-- what must be checked before changing contracts or cutting a release
+LINC is a library-first analysis tool. It is meant to be embedded, tested,
+and serialized, not launched as a separate end-user service.
 
-This is where the book moves from "how the library works" to "how to rely on it responsibly".
+## Release
+
+A release should be judged on build and test health, JSON contract stability,
+documentation alignment, fixture coverage, and platform support posture.

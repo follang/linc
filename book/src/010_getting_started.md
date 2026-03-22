@@ -1,23 +1,23 @@
 # Getting Started
 
-This chapter shows the shortest path from "I have source-shaped API metadata"
-to "I have machine-readable link and binary evidence".
+This chapter shows the shortest path from a normalized source contract to
+machine-readable evidence.
 
 Read `linc` as an analysis library. It produces evidence artifacts. It does
-not promise that every successful analysis is automatically safe for code
-generation or final build execution.
+not promise that every successful analysis is safe for final build execution
+or Rust generation.
 
 In the toolchain split:
 
 - `parc` owns source meaning
 - `linc` owns link and binary meaning
-- `gerc` owns Rust lowering and emitted build metadata
+- `gerc` owns lowering and emitted build metadata
 
-The boundary rule is strict: `linc/src/**` must not depend on `parc` or `gerc`,
-and cross-package translation belongs only in tests, examples, or external
-harnesses.
+The boundary rule is strict: `linc/src/**` must not depend on `parc` or
+`gerc`, and cross-package translation belongs only in tests, examples, or
+external harnesses.
 
-## Add the Crate
+## Add The Crate
 
 Use a local path dependency while developing in the workspace:
 
@@ -26,21 +26,20 @@ Use a local path dependency while developing in the workspace:
 linc = { path = "../linc" }
 ```
 
-If you need native artifact inspection and validation, enable the `symbols` feature.
+If you need symbol inspection or validation, enable the `symbols` feature.
 
-Example:
-
-```toml
-[dependencies]
-linc = { path = "../linc", features = ["codegen", "symbols"] }
-```
-
-## Preferred Contract-First Example
+## Minimal Example
 
 ```rust
-use linc::{analyze_source_package, SourceDeclaration, SourceFunction, SourcePackage, SourceType};
+use linc::{
+    analyze_source_package,
+    SourceDeclaration,
+    SourceFunction,
+    SourcePackage,
+    SourceType,
+};
 
-fn main() -> Result<(), String> {
+fn main() {
     let mut source = SourcePackage::default();
     source.declarations.push(SourceDeclaration::Function(SourceFunction {
         name: "mylib_init".into(),
@@ -51,7 +50,6 @@ fn main() -> Result<(), String> {
     }));
 
     let analysis = analyze_source_package(&source);
-
     println!(
         "declared link inputs: {}",
         analysis.declared_link_surface.ordered_inputs.len()
@@ -60,13 +58,10 @@ fn main() -> Result<(), String> {
         "has resolved plan: {}",
         analysis.resolved_link_plan.is_some()
     );
-
-    Ok(())
 }
 ```
 
 The preferred output contract is `LinkAnalysisPackage`.
-That is the main machine-readable artifact downstream tools should consume.
 
 ## JSON Round Trip
 
@@ -76,24 +71,21 @@ That is the main machine-readable artifact downstream tools should consume.
 use linc::{analyze_source_package, LinkAnalysisPackage, SourcePackage};
 
 let analysis = analyze_source_package(&SourcePackage::default());
-
 let json = serde_json::to_string_pretty(&analysis).unwrap();
 let restored: LinkAnalysisPackage = serde_json::from_str(&json).unwrap();
-
 assert_eq!(analysis, restored);
 ```
 
 ## Common Integration Pattern
 
-The most common downstream pattern is:
+The common pattern is:
 
-1. Produce a `SourcePackage` in `parc` or another frontend
-2. Call `analyze_source_package`
-3. Optionally inspect artifacts with `inspect_symbols`
-4. Optionally validate against those artifacts
-5. Feed `SourcePackage` plus `LinkAnalysisPackage` into your generator/build system
+1. produce a `SourcePackage` in `parc` or another frontend
+2. call `analyze_source_package`
+3. optionally inspect artifacts with `inspect_symbols`
+4. optionally validate against those artifacts
+5. pass `SourcePackage` plus `LinkAnalysisPackage` to downstream tooling
 
-Cross-package translation belongs outside `linc/src/**`.
 If `parc` emits a serialized source artifact, a test, example, or external
 harness should decode and translate it before calling `linc`.
 
@@ -108,13 +100,8 @@ When an analysis result does not look right, inspect these fields first:
 - `analysis.validation`
 - `analysis.symbol_inventories`
 
-Those surfaces usually tell you whether the problem is:
-
-- source intake adaptation
-- ABI probing
-- link metadata declaration
-- provider discovery
-- validation
+Those surfaces usually tell you whether the problem is source intake, ABI
+probing, link metadata declaration, provider discovery, or validation.
 
 ## Library-Only Design
 
@@ -123,7 +110,8 @@ binary evidence concerns.
 
 That means:
 
-1. call `analyze_source_package()` or other library APIs directly
+1. call `analyze_source_package()` or other public APIs directly
 2. serialize the resulting values if another tool needs artifacts
 3. keep cross-package translation in tests/examples/harnesses
-4. keep final generation and build policy in downstream tools rather than in `linc`
+4. keep final generation and build policy in downstream tools rather than in
+   `linc`

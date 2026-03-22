@@ -1,90 +1,20 @@
 # Reproducibility
 
-This chapter defines the intended reproducibility posture for the test and fixture environment.
-
-The goal is not "bit-for-bit identical on every machine" for every external toolchain interaction.
-The goal is that regressions are explainable, fixtures are stable, and platform-dependent tests are
-clearly classified.
-
-For `linc`, reproducibility is mainly about evidence artifacts and analysis
-results, not about preserving dead envelopes forever.
+This chapter describes what must be reproducible for LINC to be trustworthy.
 
 ## Reproducibility Requirements
 
-The current practical requirements are:
-
 - checked-in JSON contract fixtures must be deterministic
-- library-only unit tests should be deterministic without requiring internet access
-- platform/toolchain-dependent tests should be explicit about their assumptions
-- ignored or environment-dependent tests should not hide core contract regressions
+- library-only unit tests should be deterministic without requiring internet
+  access
+- toolchain-dependent tests should be explicit about their assumptions
 
 ## Fixture Rules
 
-For stable fixtures:
-
-- prefer checked-in headers, JSON payloads, and small native test artifacts where practical
-- avoid depending on ambient machine state when a fixture can encode the case directly
-- keep fixture names tied to the contract or bug they protect
-
-The checked-in fixture headers under `test/fixtures/` are part of that rule.
-They exist so tricky layout and macro cases remain regression-tested through the public library
-surface instead of only through inline one-off test strings.
+Prefer checked-in headers, JSON payloads, and small native test artifacts where
+practical.
 
 ## Contract Tests
 
-The main contract tests for `linc` should prove:
-
-- source intake produces the intended evidence artifacts
-- symbol and validation analysis remain explainable
-- link planning stays deterministic for the same evidence surface
-- serialized artifacts still match the currently documented and tested shape
-
-## Toolchain-Dependent Tests
-
-Some tests naturally depend on the local compiler, linker, or system libraries.
-
-For those tests:
-
-- the dependency should be visible in the test name or test setup
-- success criteria should avoid brittle formatting assumptions
-- failures should be diagnosable from the test itself, not from tribal knowledge
-
-## Ignored Tests
-
-Ignored tests are acceptable when they cover:
-
-- optional system-library flows
-- environment-sensitive artifact checks
-- expensive end-to-end paths that are not required on every local run
-
-They are not a substitute for protecting the main public contract.
-
-As environment assumptions become realistic for normal development, higher-value tests should move
-out of ignored status. That now includes several native-path checks such as archive-member
-provenance, dependency-edge capture, macro capture, layout attachment, and end-to-end validation.
-
-## Downstream Implication
-
-For `fol` and other consumers, the most reliable fixtures to depend on are:
-
-- versioned JSON contract fixtures
-- small deterministic input headers
-- explicit acceptance fixtures that live in source control
-
-That gives a stronger integration boundary than relying only on whatever happens to be installed on
-the developer machine.
-
-## What "supported" means
-
-For `linc`, support means:
-
-- the documented evidence artifacts are tested and reproducible
-- platform/toolchain assumptions are named explicitly where they matter
-- cross-package composition is proven through tests/examples/harnesses instead
-  of library coupling
-
-It does not mean:
-
-- every external machine will produce identical raw native observations
-- old artifact wrappers remain live forever
-- repo-local bootstrap flows are automatically the preferred downstream path
+The main contract tests should prove that source intake, validation, and link
+planning stay explainable and stable.

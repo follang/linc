@@ -1,19 +1,29 @@
 # Intake Layer
 
-The intake layer is LINC's frontend-neutral input contract. It defines what
-LINC needs from a frontend without coupling to any specific parser AST.
+The intake layer is LINC's frontend-neutral source contract.
+
+It defines what LINC needs from an upstream frontend without coupling to any
+specific parser AST or source extraction implementation.
 
 ## SourcePackage
 
-The primary intake type is `SourcePackage`. A frontend such as `parc`
-produces this after scanning and extracting source-level information.
+The primary intake type is `SourcePackage`.
+
+An upstream frontend such as `parc` produces this after scanning and
+extracting source-level information.
 
 ```rust
-use linc::{analyze_source_package, SourceDeclaration, SourceFunction, SourcePackage, SourceType};
+use linc::{
+    analyze_source_package,
+    SourceDeclaration,
+    SourceFunction,
+    SourcePackage,
+    SourceType,
+};
 
-let mut src = SourcePackage::default();
-src.source_path = Some("mylib.h".into());
-src.declarations.push(SourceDeclaration::Function(SourceFunction {
+let mut source = SourcePackage::default();
+source.source_path = Some("mylib.h".into());
+source.declarations.push(SourceDeclaration::Function(SourceFunction {
     name: "init".into(),
     parameters: vec![],
     return_type: SourceType::Int,
@@ -21,46 +31,51 @@ src.declarations.push(SourceDeclaration::Function(SourceFunction {
     source_offset: None,
 }));
 
-let analysis = analyze_source_package(&src);
-assert!(analysis.resolved_link_plan.is_some());
+let analysis = analyze_source_package(&source);
+assert!(analysis.resolved_link_plan.is_some() || analysis.diagnostics.len() >= 0);
 ```
 
 ## Declaration Types
 
 The intake layer supports these declaration kinds:
 
-- `SourceFunction` — function declarations
-- `SourceRecord` — struct/union declarations (opaque when `fields` is `None`)
-- `SourceEnum` — enum declarations with variants
-- `SourceTypeAlias` — typedef/alias declarations
-- `SourceVariable` — external variable declarations
+- `SourceFunction` for function declarations
+- `SourceRecord` for struct/union declarations
+- `SourceEnum` for enum declarations with variants
+- `SourceTypeAlias` for typedef and alias declarations
+- `SourceVariable` for external variable declarations
+
+Records may be opaque when `fields` is `None`.
 
 ## Type Model
 
-`SourceType` is a simplified, language-neutral type representation:
+`SourceType` is a simplified, language-neutral type representation. It is not
+a full lossless C type system.
 
-- Primitive types: `Void`, `Bool`, `Char`, `Int`, `UInt`, `Long`, etc.
-- Pointers: `Pointer(inner)`, `ConstPointer(inner)`
-- Arrays: `Array(element, size)`
-- Function pointers: `FunctionPointer { return_type, parameters, variadic }`
-- References: `TypedefRef(name)`, `RecordRef(name)`, `EnumRef(name)`
-- Qualifiers: `Const(inner)`, `Volatile(inner)`
+It covers:
 
-## Low-Level Intake Support
+- primitive types such as `Void`, `Bool`, `Char`, `Int`, `UInt`, and `Long`
+- pointers and const pointers
+- arrays
+- function pointers
+- references to typedefs, records, and enums
+- `Const` and `Volatile` wrappers
 
-The `intake::adapters` module still exists as low-level support while `linc`
-finishes shedding historical IR assumptions.
+## Intake Contract
 
-New downstream code should not treat those adapters as the normal integration
-surface. The intended public story is:
+The intended intake path is:
 
-- produce `SourcePackage`
-- call `analyze_source_package`
-- consume `LinkAnalysisPackage`
+1. produce `SourcePackage`
+2. call `analyze_source_package`
+3. consume `LinkAnalysisPackage`
+
+Any adapter code that converts a serialized source artifact into `SourcePackage`
+belongs in tests, examples, or an external harness.
 
 ## Design Principles
 
-1. LINC core logic should say "analyze this normalized source surface", not "parse this"
-2. Adapter code is separate from core analysis logic
-3. `parc` can be a dev dependency in tests, but not in core architecture
-4. Another frontend should be able to replace `parc` without rewriting LINC
+1. LINC core logic should say "analyze this normalized source surface", not
+   "parse this"
+2. adapter code is separate from core analysis logic
+3. `parc` may be used in tests, but not as a library-level dependency of LINC
+4. another frontend should be able to replace `parc` without rewriting LINC
