@@ -1,11 +1,11 @@
 # Header Processing
 
 `HeaderConfig` is a repo-local bootstrap utility for turning raw header sets
-into source-shaped input that LINC can analyze.
+into a `BindingPackage`.
 
 It exists because the repository still needs a way to start from real headers
 in difficult test and bootstrap scenarios. It is not the architectural center
-of LINC.
+of LINC, but it is still real public API and still covered by tests.
 
 The intended architecture is:
 
@@ -21,8 +21,8 @@ Use `HeaderConfig` when you need to:
 - bootstrap the repository from real system or vendored headers
 - drive difficult header fixtures without teaching another frontend every edge
   case first
-- gather preprocessing output, extracted declarations, and probe evidence in
-  one local pass
+- gather preprocessing output, extracted declarations, native link metadata,
+  and probe evidence in one local pass
 
 It is not the preferred downstream boundary.
 
@@ -75,8 +75,8 @@ The bootstrap helpers are for local repository work and test fixtures:
 6. optionally probe requested layouts
 7. optionally filter by origin
 
-The resulting package is a bootstrap artifact, not the normal downstream
-boundary.
+The resulting package is a bootstrap artifact built around `BindingPackage`,
+not the preferred downstream boundary.
 
 ## Policy
 
@@ -117,4 +117,3 @@ surface.
 
 You can request ABI layout facts directly in the bootstrap configuration. The
 resulting package will include layout evidence when probe requests succeed.
-

@@ -30,7 +30,9 @@ std::fs::write("symbols.json", json).unwrap();
 
 ## Workflow 4: Validate Source-Derived Bindings Against Artifacts
 
-Validation compares a binding package against one or more inventories.
+Validation currently compares a `BindingPackage` against one or more
+inventories. That lower-level path is still part of the crate surface, even if
+the preferred intake story starts from `SourcePackage`.
 
 ## Workflow 5: Extract Just The Link Surface
 
@@ -48,8 +50,8 @@ platform constraints, or ordering metadata.
 ## Workflow 7: Repo-Local Bootstrap
 
 The raw-header bootstrap path exists for difficult fixtures and repository
-self-hosting. It is not the package boundary that downstream tools should
-depend on.
+self-hosting. It is public, tested, and useful. It is just not the package
+boundary that new downstream tools should center first.
 
 ## Workflow 8: ABI-Sensitive Packages
 

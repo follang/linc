@@ -3,7 +3,9 @@
 LINC is the link and binary evidence layer in the `parc -> linc -> gerc`
 toolchain.
 
-It owns evidence, not parsing and not lowering.
+It owns evidence, not parsing and not lowering, but the crate surface today is
+broader than the preferred top-level story. Both the contract-first APIs and
+the older low-level IR/bootstrap APIs are still real.
 
 ## What LINC Is For
 
@@ -25,9 +27,10 @@ The main outputs are:
 - `ValidationReport`
 - `AbiProbeReport`
 
-Those outputs are transportable evidence artifacts. They are what downstream
-tooling should rely on, not private parser state and not downstream generator
-state.
+Those outputs are transportable evidence artifacts. The preferred modern
+consumer path is `SourcePackage -> LinkAnalysisPackage`, but LINC also still
+exposes `BindingPackage` and lower-level IR for direct inspection and staged
+work.
 
 ## Data Flow
 
@@ -38,9 +41,9 @@ normalized source input
   -> downstream consumer
 ```
 
-In practice the input is a `SourcePackage`, the analysis entrypoint is
-`analyze_source_package`, and any symbol/probe/validation pass is optional
-evidence layered on top.
+In practice the preferred input is `SourcePackage`, the preferred analysis
+entrypoint is `analyze_source_package`, and symbol/probe/validation are layered
+evidence on top.
 
 ## Ownership Boundary
 
@@ -70,6 +73,9 @@ The root APIs are:
 - `resolve_link_plan`
 - `validate`
 
+The root also still re-exports many low-level IR and report types, and tests
+exercise those paths directly.
+
 The important modules are:
 
 - `intake`
@@ -81,8 +87,9 @@ The important modules are:
 - `diagnostics`
 - `error`
 
-`raw_headers` still exists for repo-local bootstrap and fixture work, but it is
-not the public architecture boundary that downstream tooling should center.
+`raw_headers` still exists for repo-local bootstrap and fixture work. It is not
+the architectural center of the crate, but it is still a public low-level
+surface that the book needs to acknowledge honestly.
 
 ## Reading Order
 

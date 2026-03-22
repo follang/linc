@@ -1,6 +1,7 @@
 # API Contract
 
-This chapter defines the intended public library surface of LINC.
+This chapter defines the intended public library surface of LINC as it exists
+today, not as we might wish it already looked.
 
 ## First Principle
 
@@ -13,8 +14,11 @@ LINC is a library crate. The intended downstream pattern is:
 
 ## Preferred Public Surface
 
-The crate root is the preferred consumer boundary. Additive, documented
-evolution is preferred over disruptive surface churn.
+The crate root is still the preferred consumer boundary, but there are two
+real layers inside it:
+
+1. preferred contract-first APIs
+2. lower-level IR/bootstrap APIs that remain public
 
 ## Normative Rules For Consumers
 
@@ -34,12 +38,13 @@ If you are building on top of LINC:
 
 - Tier 1: `analyze_source_package`, `inspect_symbols`, `probe_type_layouts`,
   `validate`, `validate_many`, and `LinkAnalysisPackage`
-- Tier 2: modules such as `probe`, `symbols`, `validate`, and `raw_headers`
-- Tier 3: support-oriented modules such as `diagnostics`, `error`, `ir`, and
+- Tier 2: `BindingPackage`, root-level IR re-exports, and modules such as
+  `probe`, `symbols`, `validate`, and `raw_headers`
+- Tier 3: support-oriented modules such as `diagnostics`, `error`, and
   `line_markers`
 
-Tier 2 and Tier 3 are real, but they are not the first story the book wants
-downstream users to build around.
+Tier 2 and Tier 3 are real and tested. They are just not the first story the
+book wants new downstream users to build around.
 
 ## Explicit Non-Goals
 
@@ -47,8 +52,8 @@ The current contract does not yet guarantee typed operational errors across the
 whole crate, full ABI completeness for all C constructs, or full cross-platform
 parity across ELF, Mach-O, and Windows-native artifact formats.
 
-It also does not guarantee that repo-local bootstrap flows are the public
-architecture.
+It also does not guarantee that repo-local bootstrap flows are the preferred
+architecture, even though they are public.
 
 ## Artifact Boundary Reminder
 
