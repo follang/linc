@@ -86,3 +86,13 @@ fn combined_daemon_fixture_validates_against_daemon_core_inventory() {
         0
     );
 }
+
+#[test]
+fn combined_daemon_fixture_is_deterministic() {
+    let make = || {
+        let result = max_pain::analyze_max_pain().expect("daemon analysis");
+        serde_json::to_string(&result.package).expect("daemon package json")
+    };
+
+    assert_eq!(make(), make());
+}
