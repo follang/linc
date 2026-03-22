@@ -84,6 +84,54 @@ The current suite covers:
 - artifact-boundary tests using upstream fixtures
 - large hostile/library surfaces such as zlib, libpng, libcurl, OpenSSL, and epoll
 
+## Hardening Matrix
+
+The current hardening ladder is easiest to read in four buckets:
+
+- hermetic vendored baselines
+  - zlib
+  - libpng
+  - plugin ABI
+  - combined daemon fixture
+- host-dependent evidence ladders
+  - OpenSSL
+  - Linux event-loop stack
+  - epoll and socketcan system examples
+- failure and validation surfaces
+  - duplicate providers
+  - unresolved providers
+  - hidden or decorated symbol mismatches
+  - ABI-questionable fixtures and partial layout evidence
+- determinism anchors
+  - zlib
+  - libpng
+  - OpenSSL when available
+  - combined daemon fixture
+  - Linux event-loop analysis
+
+Those are the confidence anchors LINC should be judged against first.
+
+## Release Gates
+
+`linc` should only be treated as release-ready when all of these remain green:
+
+- `make build`
+- `make test`
+- unit and artifact-boundary suites
+- hermetic vendored examples
+- validation/link-plan edge suites
+- at least one OpenSSL-style host-dependent evidence target
+- at least one combined Linux/system evidence target
+
+The current canonical evidence surfaces are:
+
+- vendored zlib
+- vendored libpng
+- plugin ABI
+- combined daemon fixture
+- OpenSSL
+- Linux event-loop stack
+
 ## Build And Test
 
 ```sh
