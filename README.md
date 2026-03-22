@@ -104,6 +104,9 @@ The current hardening ladder is easiest to read in four buckets:
   - hidden or decorated symbol mismatches
   - ABI-questionable fixtures and partial layout evidence
   - explicit link, validation, and probe failure matrices
+  - explicit typed operational-error matrix
+  - explicit ELF/Mach-O/Windows confidence-floor matrix
+  - explicit Mach-O provider-policy matrix
 - determinism anchors
   - zlib
   - libpng
@@ -122,6 +125,9 @@ Those are the confidence anchors LINC should be judged against first.
 - unit and artifact-boundary suites
 - hermetic vendored examples
 - validation/link-plan edge suites
+- typed operational-error matrix
+- ELF/Mach-O/Windows confidence-floor matrix
+- Mach-O framework and dylib provider-policy matrix
 - at least one OpenSSL-style host-dependent evidence target
 - at least one combined Linux/system evidence target
 
@@ -148,6 +154,7 @@ The current LINC production corpus is intentionally named:
   - Linux event-loop stack
   - epoll and socketcan examples
 - conservative-failure anchors
+  - typed operational-error matrix
   - duplicate-provider fixtures
   - unresolved-provider fixtures
   - ABI-questionable validation fixtures

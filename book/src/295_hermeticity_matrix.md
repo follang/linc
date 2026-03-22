@@ -14,6 +14,7 @@ These are the first confidence anchors and should remain green everywhere:
 - vendored libpng
 - plugin ABI fixtures
 - combined daemon and max-pain fixtures
+- explicit ELF / Mach-O / Windows inventory confidence-floor fixtures
 
 These surfaces prove that LINC can:
 
@@ -44,6 +45,9 @@ These prove that LINC is refusing or degrading honestly:
 - hidden or decorated symbol mismatches
 - ABI-questionable fixtures
 - partial or missing layout evidence
+- typed operational errors for unreadable artifacts, unsupported formats, and
+  malformed serialized input
+- explicit Mach-O framework and dylib provider-policy checks
 
 Those are release-positive tests when they stay:
 
@@ -58,6 +62,7 @@ The most important repeat-run anchors right now are:
 - vendored zlib
 - vendored libpng
 - combined daemon fixture
+- confidence-floor inventory fixtures
 - OpenSSL when available
 - Linux event-loop analysis
 
