@@ -1,7 +1,7 @@
 # Native Evidence
 
-This section groups the parts of LINC that compare header-side declarations against native
-artifact-side evidence.
+This section groups the parts of LINC that compare source-side intent against
+native artifact-side evidence.
 
 Read this section when you care about:
 
@@ -15,5 +15,11 @@ The normal reading order inside this section is:
 2. Link Surface
 3. Validation
 
-Use this path when you are moving from "I parsed a header" to "I trust this native surface enough
-to generate and link against it".
+Use this path when you are moving from "I have a source contract" to "I trust
+this native surface enough to generate and link against it".
+
+The architectural rule stays the same here too:
+
+- LINC consumes source-shaped input
+- LINC emits evidence artifacts
+- downstream generation still happens elsewhere

@@ -11,3 +11,6 @@ The most important policy rule is architectural:
 - there is no backward-compatibility burden for old pipeline shapes
 - bootstrap utilities and repo-local shortcuts must never be mistaken for the
   public contract
+
+Read these chapters as the narrow contract surface.
+If another chapter sounds broader than this section, trust this section.

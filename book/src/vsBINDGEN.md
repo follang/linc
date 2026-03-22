@@ -1,6 +1,7 @@
 # LINC vs bindgen
 
-This document compares two different approaches to C interop.
+This document compares two different approaches to C interop from the point of
+view of the current toolchain split.
 
 ## The Short Version
 
@@ -44,3 +45,8 @@ metadata.
 Use bindgen when you want a direct header-to-Rust generator and are willing to
 pay the libclang cost. Use LINC when you want analysis, evidence, link
 metadata, validation, and downstream policy separation.
+
+That is the real split:
+
+- bindgen centers immediate Rust emission
+- LINC centers analysis and evidence that another tool can consume later

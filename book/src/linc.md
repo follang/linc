@@ -25,8 +25,9 @@ The main outputs are:
 - `ValidationReport`
 - `AbiProbeReport`
 
-Those outputs are transportable artifacts. They are what downstream tooling
-should rely on, not private parser or extraction state.
+Those outputs are transportable evidence artifacts. They are what downstream
+tooling should rely on, not private parser state and not downstream generator
+state.
 
 ## Data Flow
 
@@ -80,8 +81,8 @@ The important modules are:
 - `diagnostics`
 - `error`
 
-`raw_headers` exists as a transitional bootstrap module and is not the long
-term public architecture.
+`raw_headers` still exists for repo-local bootstrap and fixture work, but it is
+not the public architecture boundary that downstream tooling should center.
 
 ## Reading Order
 
@@ -92,3 +93,4 @@ term public architecture.
 5. [Native Evidence](./095_native_evidence.md)
 6. [API Contract](./100_api_contract.md)
 7. [End-To-End Workflows](./110_workflows.md)
+8. [Operations And Release](./205_operations_and_release.md)

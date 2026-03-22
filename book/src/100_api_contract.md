@@ -38,13 +38,22 @@ If you are building on top of LINC:
 - Tier 3: support-oriented modules such as `diagnostics`, `error`, `ir`, and
   `line_markers`
 
+Tier 2 and Tier 3 are real, but they are not the first story the book wants
+downstream users to build around.
+
 ## Explicit Non-Goals
 
 The current contract does not yet guarantee typed operational errors across the
 whole crate, full ABI completeness for all C constructs, or full cross-platform
 parity across ELF, Mach-O, and Windows-native artifact formats.
 
+It also does not guarantee that repo-local bootstrap flows are the public
+architecture.
+
 ## Artifact Boundary Reminder
 
 LINC owns evidence, not universal pipeline state. Cross-package translation
 belongs only in tests/examples/harnesses.
+
+If another chapter sounds broader than this one, treat this chapter as the
+normative boundary.

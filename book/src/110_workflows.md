@@ -55,3 +55,6 @@ depend on.
 
 For packages with important struct ABI, attach layout evidence, inspect
 symbols, and validate before generation.
+
+This is the right pattern when a downstream generator wants stronger evidence
+without turning LINC into the generator itself.
