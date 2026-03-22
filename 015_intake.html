@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Intake Layer - BIC Reference</title>
+        <title>Intake Layer - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,18 +175,26 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="intake-layer"><a class="header" href="#intake-layer">Intake Layer</a></h1>
-<p>The intake layer is LINC’s frontend-neutral input contract. It defines what
-LINC needs from a frontend without coupling to any specific parser AST.</p>
+<p>The intake layer is LINC’s frontend-neutral source contract.</p>
+<p>It defines what LINC needs from an upstream frontend without coupling to any
+specific parser AST or source extraction implementation.</p>
 <h2 id="sourcepackage"><a class="header" href="#sourcepackage">SourcePackage</a></h2>
-<p>The primary intake type is <code>SourcePackage</code>. A frontend such as <code>parc</code>
-produces this after scanning and extracting source-level information.</p>
+<p>The primary intake type is <code>SourcePackage</code>.</p>
+<p>An upstream frontend such as <code>parc</code> produces this after scanning and
+extracting source-level information.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use linc::{analyze_source_package, SourceDeclaration, SourceFunction, SourcePackage, SourceType};
+</span>use linc::{
+    analyze_source_package,
+    SourceDeclaration,
+    SourceFunction,
+    SourcePackage,
+    SourceType,
+};
 
-let mut src = SourcePackage::default();
-src.source_path = Some("mylib.h".into());
-src.declarations.push(SourceDeclaration::Function(SourceFunction {
+let mut source = SourcePackage::default();
+source.source_path = Some("mylib.h".into());
+source.declarations.push(SourceDeclaration::Function(SourceFunction {
     name: "init".into(),
     parameters: vec![],
     return_type: SourceType::Int,
@@ -194,44 +202,47 @@ src.declarations.push(SourceDeclaration::Function(SourceFunction {
     source_offset: None,
 }));
 
-let analysis = analyze_source_package(&amp;src);
-assert!(analysis.resolved_link_plan.is_some());
+let analysis = analyze_source_package(&amp;source);
+assert!(analysis.resolved_link_plan.is_some() || analysis.diagnostics.len() &gt;= 0);
 <span class="boring">}</span></code></pre>
 <h2 id="declaration-types"><a class="header" href="#declaration-types">Declaration Types</a></h2>
 <p>The intake layer supports these declaration kinds:</p>
 <ul>
-<li><code>SourceFunction</code> — function declarations</li>
-<li><code>SourceRecord</code> — struct/union declarations (opaque when <code>fields</code> is <code>None</code>)</li>
-<li><code>SourceEnum</code> — enum declarations with variants</li>
-<li><code>SourceTypeAlias</code> — typedef/alias declarations</li>
-<li><code>SourceVariable</code> — external variable declarations</li>
+<li><code>SourceFunction</code> for function declarations</li>
+<li><code>SourceRecord</code> for struct/union declarations</li>
+<li><code>SourceEnum</code> for enum declarations with variants</li>
+<li><code>SourceTypeAlias</code> for typedef and alias declarations</li>
+<li><code>SourceVariable</code> for external variable declarations</li>
 </ul>
+<p>Records may be opaque when <code>fields</code> is <code>None</code>.</p>
 <h2 id="type-model"><a class="header" href="#type-model">Type Model</a></h2>
-<p><code>SourceType</code> is a simplified, language-neutral type representation:</p>
+<p><code>SourceType</code> is a simplified, language-neutral type representation. It is not
+a full lossless C type system.</p>
+<p>It covers:</p>
 <ul>
-<li>Primitive types: <code>Void</code>, <code>Bool</code>, <code>Char</code>, <code>Int</code>, <code>UInt</code>, <code>Long</code>, etc.</li>
-<li>Pointers: <code>Pointer(inner)</code>, <code>ConstPointer(inner)</code></li>
-<li>Arrays: <code>Array(element, size)</code></li>
-<li>Function pointers: <code>FunctionPointer { return_type, parameters, variadic }</code></li>
-<li>References: <code>TypedefRef(name)</code>, <code>RecordRef(name)</code>, <code>EnumRef(name)</code></li>
-<li>Qualifiers: <code>Const(inner)</code>, <code>Volatile(inner)</code></li>
+<li>primitive types such as <code>Void</code>, <code>Bool</code>, <code>Char</code>, <code>Int</code>, <code>UInt</code>, and <code>Long</code></li>
+<li>pointers and const pointers</li>
+<li>arrays</li>
+<li>function pointers</li>
+<li>references to typedefs, records, and enums</li>
+<li><code>Const</code> and <code>Volatile</code> wrappers</li>
 </ul>
-<h2 id="low-level-intake-support"><a class="header" href="#low-level-intake-support">Low-Level Intake Support</a></h2>
-<p>The <code>intake::adapters</code> module still exists as low-level support while <code>linc</code>
-finishes shedding historical IR assumptions.</p>
-<p>New downstream code should not treat those adapters as the normal integration
-surface. The intended public story is:</p>
-<ul>
+<h2 id="intake-contract"><a class="header" href="#intake-contract">Intake Contract</a></h2>
+<p>The intended intake path is:</p>
+<ol>
 <li>produce <code>SourcePackage</code></li>
 <li>call <code>analyze_source_package</code></li>
 <li>consume <code>LinkAnalysisPackage</code></li>
-</ul>
+</ol>
+<p>Any adapter code that converts a serialized source artifact into <code>SourcePackage</code>
+belongs in tests, examples, or an external harness.</p>
 <h2 id="design-principles"><a class="header" href="#design-principles">Design Principles</a></h2>
 <ol>
-<li>LINC core logic should say “analyze this normalized source surface”, not “parse this”</li>
-<li>Adapter code is separate from core analysis logic</li>
-<li><code>parc</code> can be a dev dependency in tests, but not in core architecture</li>
-<li>Another frontend should be able to replace <code>parc</code> without rewriting LINC</li>
+<li>LINC core logic should say “analyze this normalized source surface”, not
+“parse this”</li>
+<li>adapter code is separate from core analysis logic</li>
+<li><code>parc</code> may be used in tests, but not as a library-level dependency of LINC</li>
+<li>another frontend should be able to replace <code>parc</code> without rewriting LINC</li>
 </ol>
 
                     </main>

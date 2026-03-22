@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Link Resolution Boundary - BIC Reference</title>
+        <title>Link Resolution Boundary - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,64 +175,18 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="link-resolution-boundary"><a class="header" href="#link-resolution-boundary">Link Resolution Boundary</a></h1>
-<p>This chapter defines the boundary between LINC link metadata and downstream build-system work.</p>
-<p>That boundary matters because LINC is intentionally a library for analysis and normalized link
-intent, not a replacement for a platform linker, package manager, or full build graph.</p>
+<p>This chapter defines the boundary between LINC link metadata and downstream
+build-system work.</p>
 <h2 id="what-linc-resolves-today"><a class="header" href="#what-linc-resolves-today">What LINC Resolves Today</a></h2>
-<p>LINC currently resolves and preserves:</p>
-<ul>
-<li>declared native link intent from headers/configuration</li>
-<li>normalized library/framework/artifact metadata</li>
-<li>ordered native inputs</li>
-<li>requirement provenance such as declared, inferred, or discovered</li>
-<li>platform applicability hints</li>
-<li>symbol inventories from supported native artifacts</li>
-<li>validation evidence about whether declarations appear to have native providers</li>
-</ul>
+<p>LINC preserves declared native link intent, normalized native link metadata,
+ordered inputs, requirement provenance, platform hints, symbol inventories, and
+validation evidence.</p>
 <h2 id="what-linc-does-not-resolve-today"><a class="header" href="#what-linc-does-not-resolve-today">What LINC Does Not Resolve Today</a></h2>
-<p>LINC does not currently promise:</p>
-<ul>
-<li>final filesystem search resolution for <code>-lfoo</code> style inputs</li>
-<li>system-specific linker search path expansion</li>
-<li>package-manager discovery of native dependencies</li>
-<li>full transitive native dependency closure</li>
-<li>platform linker flag synthesis for every toolchain</li>
-<li>final duplicate/conflict resolution across the full build graph</li>
-<li>runtime loader behavior</li>
-</ul>
+<p>LINC does not promise final linker invocation, full search-path expansion, or
+runtime loader behavior.</p>
 <h2 id="practical-rule-for-consumers"><a class="header" href="#practical-rule-for-consumers">Practical Rule For Consumers</a></h2>
-<p>The safe rule is:</p>
-<ul>
-<li>treat <code>BindingPackage.link</code> as normalized requirement metadata</li>
-<li>treat symbol inspection and validation as evidence</li>
-<li>treat final linker invocation and native dependency resolution as downstream responsibilities</li>
-</ul>
-<h2 id="why-this-split-is-intentional"><a class="header" href="#why-this-split-is-intentional">Why This Split Is Intentional</a></h2>
-<p>Keeping this boundary explicit makes the library more reusable.</p>
-<p>Different downstream consumers may:</p>
-<ul>
-<li>generate bindings only</li>
-<li>produce build metadata for another tool</li>
-<li>integrate with an existing package manager</li>
-<li>perform stricter resolution for one platform than another</li>
-</ul>
-<p>If LINC claimed to fully resolve all of that itself, it would either become much less general or
-would make promises it cannot yet uphold consistently.</p>
-<h2 id="what-a-downstream-tool-should-do"><a class="header" href="#what-a-downstream-tool-should-do">What A Downstream Tool Should Do</a></h2>
-<p>A serious downstream consumer should usually:</p>
-<ol>
-<li>read the normalized link surface from <code>BindingPackage.link</code></li>
-<li>apply its own target selection and policy gates</li>
-<li>resolve library names to actual native artifacts in its own environment</li>
-<li>optionally compare the resolved artifacts with LINC symbol inventories and validation reports</li>
-<li>assemble the final linker or build-system invocation itself</li>
-</ol>
-<h2 id="fol-as-an-example-consumer"><a class="header" href="#fol-as-an-example-consumer"><code>fol</code> As An Example Consumer</a></h2>
-<p><code>fol</code> is one example consumer of this boundary.</p>
-<p>It may rely on LINC for extraction, normalization, and evidence gathering, while still keeping
-its final code-generation and native-link orchestration policy on the consumer side.</p>
-<p>That example should not be read as a special-case contract.
-It is one integration profile built on top of the same generic library boundary.</p>
+<p>Treat <code>BindingPackage.link</code> as normalized requirement metadata and keep final
+linker invocation in downstream tooling.</p>
 
                     </main>
 

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Unsupported Cases - BIC Reference</title>
+        <title>Unsupported Cases - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,54 +175,21 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="unsupported-cases"><a class="header" href="#unsupported-cases">Unsupported Cases</a></h1>
-<p>This chapter records the important unsupported or incomplete cases explicitly.</p>
-<p>The purpose is to prevent downstream users from mistaking absence of detail for implicit support.</p>
+<p>This chapter keeps unsupported or incomplete areas explicit.</p>
 <h2 id="native-artifact-formats"><a class="header" href="#native-artifact-formats">Native Artifact Formats</a></h2>
-<p>Currently unsupported or incomplete at a production-ready level:</p>
-<ul>
-<li>Windows-native COFF/PE artifact inspection</li>
-<li>import-library parity with ELF archive/shared-library workflows</li>
-<li>fully modeled forwarded/re-exported symbol cases across all platforms</li>
-</ul>
+<p>Windows-native artifact support is still incomplete compared with ELF and
+Mach-O.</p>
 <h2 id="abi-modeling"><a class="header" href="#abi-modeling">ABI Modeling</a></h2>
-<p>Currently incomplete:</p>
-<ul>
-<li>bitfield representation as a first-class stable contract</li>
-<li>field-offset coverage directly attached to extracted record fields</li>
-<li>enum underlying representation as a complete, stable contract</li>
-<li>calling conventions beyond the current baseline <code>C</code> model</li>
-<li>per-declaration ABI-confidence metadata</li>
-</ul>
+<p>LINC does not yet model every ABI detail for every record shape. Layout
+evidence is conservative and partial where needed.</p>
 <h2 id="macro-semantics"><a class="header" href="#macro-semantics">Macro Semantics</a></h2>
-<p>Currently incomplete:</p>
-<ul>
-<li>stable lowering for arbitrary function-like macros</li>
-<li>source-location/provenance for all macro captures</li>
-<li>fully explicit effective macro-environment reporting</li>
-</ul>
+<p>Not every macro should be lowered automatically. Unsupported macros remain
+visible as evidence.</p>
 <h2 id="validation-depth"><a class="header" href="#validation-depth">Validation Depth</a></h2>
-<p>Currently incomplete:</p>
-<ul>
-<li>ABI-shape validation beyond symbol presence/provenance-oriented checks</li>
-<li>strong Windows-native linker/provider modeling</li>
-<li>fully modeled re-export and alias evidence across every artifact format</li>
-</ul>
-<h2 id="consumer-guidance"><a class="header" href="#consumer-guidance">Consumer Guidance</a></h2>
-<p>Downstream tools should treat these gaps as explicit non-guarantees.</p>
-<p>That means:</p>
-<ul>
-<li>do not build hard production assumptions on these areas yet</li>
-<li>isolate experimental handling behind clear policy gates</li>
-<li>prefer documented Tier 1 surfaces when designing the main integration path</li>
-</ul>
+<p>Validation is evidence, not a full platform linker oracle.</p>
 <h2 id="why-this-chapter-exists"><a class="header" href="#why-this-chapter-exists">Why This Chapter Exists</a></h2>
-<p>A production-oriented library needs explicit unsupported-case documentation.</p>
-<p>Otherwise users will accidentally rely on:</p>
-<ul>
-<li>behavior that merely happens to work on one platform</li>
-<li>incomplete representations that look more complete than they are</li>
-<li>future roadmap items that have not actually landed</li>
-</ul>
+<p>Unsupported cases should stay visible so downstream consumers can make policy
+choices explicitly.</p>
 
                     </main>
 

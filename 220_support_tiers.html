@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Support Tiers - BIC Reference</title>
+        <title>Support Tiers - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,62 +175,19 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="support-tiers"><a class="header" href="#support-tiers">Support Tiers</a></h1>
-<p>This chapter turns the platform matrix into explicit support tiers.</p>
-<p>The reason for doing this separately is that a matrix answers “what exists”, while a support tier
-answers “how hard should downstream code rely on it”.</p>
+<p>This chapter groups the platform and feature posture into rough tiers.</p>
 <h2 id="tier-definitions"><a class="header" href="#tier-definitions">Tier Definitions</a></h2>
-<h3 id="tier-1-preferred"><a class="header" href="#tier-1-preferred">Tier 1: Preferred</a></h3>
-<p>Meaning:</p>
 <ul>
-<li>directly exercised in this repository</li>
-<li>suitable for normal internal production use</li>
-<li>the first path that regressions should be fixed against</li>
-</ul>
-<h3 id="tier-2-supported-but-maturing"><a class="header" href="#tier-2-supported-but-maturing">Tier 2: Supported But Maturing</a></h3>
-<p>Meaning:</p>
-<ul>
-<li>functionality exists and is useful</li>
-<li>downstream use is reasonable with caution</li>
-<li>edge cases and parity gaps are still expected</li>
-</ul>
-<h3 id="tier-3-experimental--incomplete"><a class="header" href="#tier-3-experimental--incomplete">Tier 3: Experimental / Incomplete</a></h3>
-<p>Meaning:</p>
-<ul>
-<li>not ready for strong production claims</li>
-<li>contract surface may still change materially</li>
-<li>downstream users should isolate or avoid depending on it</li>
+<li>Tier 1: preferred and well-tested</li>
+<li>Tier 2: supported but still maturing</li>
+<li>Tier 3: experimental or incomplete</li>
 </ul>
 <h2 id="current-tier-assignment"><a class="header" href="#current-tier-assignment">Current Tier Assignment</a></h2>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Area</th><th>Current tier</th></tr>
-</thead>
-<tbody>
-<tr><td>Linux / ELF header scan + symbol inventory + validation path</td><td>Tier 1</td></tr>
-<tr><td>Apple / Mach-O scan and symbol path</td><td>Tier 2</td></tr>
-<tr><td>Windows / COFF/PE native artifact path</td><td>Tier 3</td></tr>
-<tr><td>JSON contract for <code>BindingPackage</code></td><td>Tier 1</td></tr>
-<tr><td><code>BindingPackage</code> + diagnostics as library handoff</td><td>Tier 1</td></tr>
-<tr><td>macro inventory as semantic binding input</td><td>Tier 2</td></tr>
-<tr><td>ABI probe expansion beyond size/align</td><td>Tier 2</td></tr>
-</tbody>
-</table>
-</div>
+<p>ELF-oriented flows are the strongest tier. Mach-O is useful but still
+maturing. Windows-native support is incomplete.</p>
 <h2 id="downstream-guidance"><a class="header" href="#downstream-guidance">Downstream Guidance</a></h2>
-<p>Downstream tools should:</p>
-<ul>
-<li>optimize their most critical paths around Tier 1 surfaces</li>
-<li>isolate Tier 2 usage behind smaller adapters or feature gates</li>
-<li>avoid depending on Tier 3 behavior as a core release blocker path</li>
-</ul>
-<h2 id="maintenance-implication"><a class="header" href="#maintenance-implication">Maintenance Implication</a></h2>
-<p>When a regression appears:</p>
-<ul>
-<li>Tier 1 regressions should block release</li>
-<li>Tier 2 regressions should be tracked explicitly and documented</li>
-<li>Tier 3 regressions should not be surprising, but should still be recorded honestly</li>
-</ul>
+<p>Consumers should encode these tiers explicitly in their own release policy
+instead of assuming uniform maturity across platforms.</p>
 
                     </main>
 

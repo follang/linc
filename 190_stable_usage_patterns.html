@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Stable Usage Patterns - BIC Reference</title>
+        <title>Stable Usage Patterns - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,91 +175,39 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="stable-usage-patterns"><a class="header" href="#stable-usage-patterns">Stable Usage Patterns</a></h1>
-<p>This chapter describes the usage patterns that are most likely to remain stable for downstream
-library consumers.</p>
-<p>The goal is to steer integrations toward durable habits rather than clever short-term shortcuts.</p>
-<p>These patterns are intentionally narrower than “everything that currently works”.
-They are the patterns most aligned with the regression suite and the documented contract.</p>
+<p>This chapter describes the usage patterns that are most likely to remain
+stable for downstream library consumers.</p>
 <h2 id="pattern-1-prefer-root-level-entry-points"><a class="header" href="#pattern-1-prefer-root-level-entry-points">Pattern 1: Prefer Root-Level Entry Points</a></h2>
-<p>The recommended entry points are:</p>
-<ul>
-<li><code>HeaderConfig</code></li>
-<li><code>PreprocessedInput</code></li>
-<li><code>probe_type_layouts</code></li>
-<li><code>inspect_symbols</code></li>
-<li><code>validate</code> / <code>validate_many</code></li>
-<li><code>analyze_source_package</code></li>
-</ul>
-<p>This is safer than building a workflow around deep module imports unless you are deliberately
-writing advanced integration code.</p>
+<p>Prefer <code>HeaderConfig</code>, <code>probe_type_layouts</code>, <code>inspect_symbols</code>, <code>validate</code>,
+<code>validate_many</code>, and <code>analyze_source_package</code>.</p>
 <h2 id="pattern-2-treat-bindingpackage-as-the-primary-product"><a class="header" href="#pattern-2-treat-bindingpackage-as-the-primary-product">Pattern 2: Treat <code>BindingPackage</code> As The Primary Product</a></h2>
-<p>For most consumers, the most stable intermediate artifact is the package itself.</p>
 <p>A typical flow is:</p>
 <ol>
-<li>scan headers or parse preprocessed input</li>
+<li>analyze or bootstrap source input</li>
 <li>inspect <code>package.diagnostics</code></li>
 <li>optionally attach or compare native evidence</li>
-<li>serialize the package with <code>serde_json</code> only when crossing a tool boundary</li>
+<li>serialize the package only when crossing a tool boundary</li>
 </ol>
-<p>This is more stable than reconstructing intent from raw AST-level details.</p>
 <h2 id="pattern-3-treat-diagnostics-as-contractual-data"><a class="header" href="#pattern-3-treat-diagnostics-as-contractual-data">Pattern 3: Treat Diagnostics As Contractual Data</a></h2>
-<p>Do not treat diagnostics as incidental log text.</p>
-<p>The stable pattern is:</p>
-<ul>
-<li>read <code>package.diagnostics</code></li>
-<li>classify which diagnostic kinds are blocking for your downstream generator</li>
-<li>make the decision explicit in your consumer</li>
-</ul>
-<p>That is more durable than guessing from whether an operation happened to return <code>Ok(...)</code>.</p>
+<p>Read <code>package.diagnostics</code>, classify which diagnostic kinds are blocking for
+your downstream generator, and make the decision explicit in your consumer.</p>
 <h2 id="pattern-4-gate-artifact-consumption-on-schema_version"><a class="header" href="#pattern-4-gate-artifact-consumption-on-schema_version">Pattern 4: Gate Artifact Consumption On <code>schema_version</code></a></h2>
-<p>If your tool stores or consumes package JSON:</p>
-<ul>
-<li>gate on <code>schema_version</code></li>
-<li>treat <code>linc_version</code> as provenance, not as the artifact gate</li>
-<li>keep fixture coverage for the payload shapes you rely on</li>
-</ul>
-<p>This is safer than keying behavior off the producing crate version string.</p>
+<p>Gate on <code>schema_version</code>, treat <code>linc_version</code> as provenance, and keep fixture
+coverage for the payload shapes you rely on.</p>
 <h2 id="pattern-5-preserve-native-metadata-instead-of-re-deriving-it"><a class="header" href="#pattern-5-preserve-native-metadata-instead-of-re-deriving-it">Pattern 5: Preserve Native Metadata Instead Of Re-Deriving It</a></h2>
-<p>When <code>package.link</code>, <code>package.layouts</code>, or symbol inventories are available, prefer using them.</p>
-<p>Do not assume your downstream generator should reconstruct:</p>
-<ul>
-<li>native search paths</li>
-<li>declared libraries</li>
-<li>declared frameworks</li>
-<li>layout evidence</li>
-<li>platform applicability</li>
-</ul>
-<p>That information is part of the intended machine contract.</p>
+<p>When <code>package.link</code>, <code>package.layouts</code>, or symbol inventories are available,
+prefer using them.</p>
 <h2 id="pattern-6-keep-validation-separate-from-transport-failure"><a class="header" href="#pattern-6-keep-validation-separate-from-transport-failure">Pattern 6: Keep Validation Separate From Transport Failure</a></h2>
-<p>The stable consumer pattern is:</p>
-<ul>
-<li>execution failure -&gt; handled as <code>Err(...)</code></li>
-<li>successful validation with mismatches -&gt; handled as structured evidence</li>
-</ul>
-<p>Do not collapse these into the same error channel.</p>
-<p>Even a clean transport path should not be interpreted as “ready to generate bindings”.
-Read validation as structured evidence and apply downstream policy explicitly.</p>
-<h2 id="pattern-7-isolate-lower-level-module-usage"><a class="header" href="#pattern-7-isolate-lower-level-module-usage">Pattern 7: Isolate Lower-Level Module Usage</a></h2>
-<p>If you need module-level APIs such as <code>extract</code>, <code>symbols</code>, or <code>raw_headers</code>, isolate that code in
-one small adapter layer inside your consumer.</p>
-<p>That way:</p>
-<ul>
-<li>most of your code depends only on root-level contracts</li>
-<li>any future API cleanup is localized</li>
-<li>the integration remains easier to review and stabilize</li>
-</ul>
+<p>Execution failure should be handled as <code>Err(...)</code>. Successful validation with
+mismatches should be handled as structured evidence.</p>
 <h2 id="anti-patterns"><a class="header" href="#anti-patterns">Anti-Patterns</a></h2>
-<p>These patterns are likely to age badly:</p>
 <ul>
 <li>matching on exact free-form error strings</li>
 <li>treating pretty JSON formatting as a semantic contract</li>
 <li>assuming every successful scan is generation-ready</li>
-<li>depending broadly on support-oriented modules for normal consumer flows</li>
-<li>inferring link intent only from declarations when <code>package.link</code> already exists</li>
+<li>inferring link intent only from declarations when package-level link evidence
+already exists</li>
 </ul>
-<p>The regression suite now mirrors several of the stable root-level usage patterns directly through
-integration tests, so these recommendations are guarded as contract behavior rather than only
-described in prose.</p>
 
                     </main>
 

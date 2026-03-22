@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>fol Extended Contract - BIC Reference</title>
+        <title>fol Extended Contract - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,58 +175,21 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="fol-extended-contract"><a class="header" href="#fol-extended-contract"><code>fol</code> Extended Contract</a></h1>
-<p>This chapter defines the richer optional contract that <code>fol</code> may consume when it wants stronger
-evidence than the minimal package surface alone.</p>
+<p>This chapter defines the optional evidence that makes <code>fol</code> more confident.</p>
 <h2 id="extended-optional-inputs"><a class="header" href="#extended-optional-inputs">Extended Optional Inputs</a></h2>
-<p>The extended contract may include:</p>
 <ul>
-<li><code>BindingPackage.layouts</code></li>
-<li><code>BindingPackage.link</code></li>
-<li>captured macros and macro categories</li>
+<li><code>layouts</code></li>
+<li><code>link</code></li>
 <li><code>SymbolInventory</code></li>
 <li><code>ValidationReport</code></li>
+<li>macros</li>
 </ul>
 <h2 id="why-this-contract-is-optional"><a class="header" href="#why-this-contract-is-optional">Why This Contract Is Optional</a></h2>
-<p>These inputs are valuable, but they are not equally mature across all platforms and workflows.</p>
-<p>That means <code>fol</code> should consume them opportunistically and explicitly, rather than assuming they
-are always present or equally authoritative.</p>
-<h2 id="recommended-uses"><a class="header" href="#recommended-uses">Recommended Uses</a></h2>
-<h3 id="layouts"><a class="header" href="#layouts"><code>layouts</code></a></h3>
-<p>Use when:</p>
-<ul>
-<li>generated bindings depend on ABI-sensitive size/alignment facts</li>
-<li>record or alias representation needs stronger evidence than extraction alone</li>
-</ul>
-<h3 id="link"><a class="header" href="#link"><code>link</code></a></h3>
-<p>Use when:</p>
-<ul>
-<li>the downstream flow needs declared native dependency intent</li>
-<li>library/framework/artifact ordering matters</li>
-<li>platform applicability needs to be preserved</li>
-</ul>
-<h3 id="symbolinventory-and-validationreport"><a class="header" href="#symbolinventory-and-validationreport"><code>SymbolInventory</code> and <code>ValidationReport</code></a></h3>
-<p>Use when:</p>
-<ul>
-<li>the downstream flow wants artifact-backed evidence that declarations have real providers</li>
-<li>duplicate, hidden, or unresolved-provider states must gate release</li>
-</ul>
-<h3 id="macros"><a class="header" href="#macros">macros</a></h3>
-<p>Use when:</p>
-<ul>
-<li>constant lowering is attempted</li>
-<li>compile-time environment or ABI-affecting flags must be audited</li>
-</ul>
+<p>Some generation tasks only need declarations. ABI-sensitive or publication
+quality workflows usually need more evidence.</p>
 <h2 id="consumer-rule"><a class="header" href="#consumer-rule">Consumer Rule</a></h2>
-<p>The safe rule for <code>fol</code> is:</p>
-<ul>
-<li>minimal contract is the baseline</li>
-<li>extended contract strengthens confidence, but should be treated field-by-field according to the
-documented maturity of each evidence layer</li>
-</ul>
-<h2 id="failure-posture"><a class="header" href="#failure-posture">Failure Posture</a></h2>
-<p>If extended evidence is required by policy and missing, <code>fol</code> should treat that as a consumer-side
-policy failure, not as proof that LINC is broken.</p>
-<p>That distinction keeps the producer/consumer contract honest.</p>
+<p>Use the extended contract when the downstream decision really depends on
+layout, link, or validation evidence.</p>
 
                     </main>
 

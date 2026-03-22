@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Cross-Repo Versioning - BIC Reference</title>
+        <title>Cross-Repo Versioning - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,53 +175,18 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="cross-repo-versioning"><a class="header" href="#cross-repo-versioning">Cross-Repo Versioning</a></h1>
-<p>This chapter defines the coordination policy between LINC and downstream consumers such as <code>fol</code>.</p>
-<p>The goal is to avoid accidental wire-contract drift across repositories.</p>
+<p>This chapter describes how producers and consumers should think about versioned
+artifacts across repository boundaries.</p>
 <h2 id="artifact-keys"><a class="header" href="#artifact-keys">Artifact Keys</a></h2>
-<p>The intended keys are:</p>
-<ul>
-<li><code>schema_version</code> for machine-contract consumption</li>
-<li>crate/repo versions for provenance and release coordination</li>
-</ul>
-<p><code>schema_version</code> is the primary technical artifact gate.</p>
+<p>Use <code>schema_version</code> as the artifact gate and <code>linc_version</code> as provenance.</p>
 <h2 id="coordination-rules"><a class="header" href="#coordination-rules">Coordination Rules</a></h2>
-<p>When LINC changes a relied-on contract:</p>
-<ol>
-<li>document the change</li>
-<li>update fixtures/snapshots</li>
-<li>decide whether the change is additive/defaultable or schema-breaking</li>
-<li>coordinate any <code>fol</code> reliance change explicitly</li>
-</ol>
+<p>Cross-repo consumers should pin the artifact shape they understand and reject
+future shapes instead of guessing.</p>
 <h2 id="additive-changes"><a class="header" href="#additive-changes">Additive Changes</a></h2>
-<p>For additive/defaultable changes:</p>
-<ul>
-<li><code>schema_version</code> may remain stable</li>
-<li><code>fol</code> may opt into the new field or evidence later</li>
-<li>snapshots and docs should still be updated</li>
-</ul>
+<p>Additive changes should be documented and fixture-tested.</p>
 <h2 id="breaking-contract-changes"><a class="header" href="#breaking-contract-changes">Breaking Contract Changes</a></h2>
-<p>For breaking changes:</p>
-<ul>
-<li><code>schema_version</code> should change deliberately</li>
-<li><code>fol</code> should not silently consume the new payload as if nothing changed</li>
-<li>fixture updates should land in a coordinated manner</li>
-</ul>
-<h2 id="consumer-rule"><a class="header" href="#consumer-rule">Consumer Rule</a></h2>
-<p><code>fol</code> should treat new LINC producer versions as:</p>
-<ul>
-<li>consumable if the relied-on <code>schema_version</code> contract is still supported</li>
-<li>potentially behaviorally different if new optional fields appear</li>
-<li>not consumable if the supported schema contract changes beyond what <code>fol</code>
-understands</li>
-</ul>
-<h2 id="recommended-workflow"><a class="header" href="#recommended-workflow">Recommended Workflow</a></h2>
-<p>The safest cross-repo workflow is:</p>
-<ol>
-<li>land LINC contract/documentation updates first</li>
-<li>update or add contract fixtures</li>
-<li>update <code>fol</code> to consume the new contract deliberately</li>
-<li>keep acceptance tests pinned to explicit fixture payloads where possible</li>
-</ol>
+<p>Breaking changes require explicit review and a schema bump when older
+consumers would misread the payload.</p>
 
                     </main>
 

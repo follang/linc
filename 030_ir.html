@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>IR Model - BIC Reference</title>
+        <title>IR Model - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,25 +175,24 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="ir-model"><a class="header" href="#ir-model">IR Model</a></h1>
-<p>The primary data model in LINC is <code>BindingPackage</code>.</p>
-<p>This is the durable artifact intended for:</p>
+<p>The primary internal data model in LINC is <code>BindingPackage</code>.</p>
+<p>This is the durable evidence artifact used for:</p>
 <ul>
 <li>JSON serialization</li>
-<li>downstream code generation (by <code>gerc</code>, not LINC)</li>
 <li>validation against native artifacts</li>
 <li>link-plan construction</li>
+<li>evidence hand-off to downstream tools</li>
 </ul>
 <h2 id="module-organization"><a class="header" href="#module-organization">Module Organization</a></h2>
 <p>The IR is split into focused submodules:</p>
 <ul>
-<li><code>ir::types</code> — declaration and type representation (<code>BindingItem</code>, <code>BindingType</code>, etc.)</li>
-<li><code>ir::link</code> — link surface types (<code>LinkLibrary</code>, <code>LinkArtifact</code>, <code>BindingLinkSurface</code>)</li>
-<li><code>ir::macros</code> — preprocessor macro types and classification</li>
+<li><code>ir::types</code> for declarations, functions, records, enums, typedefs, and variables</li>
+<li><code>ir::link</code> for native link surfaces and provider matching</li>
+<li><code>ir::macros</code> for preprocessor macro capture and classification</li>
 </ul>
-<p>IR types are re-exported from <code>linc::ir</code>.</p>
-<p>The crate root intentionally stays narrower and exposes workflow-facing entry points plus the
-small cross-crate contracts. Consumers that need the detailed binding IR should import it from
-<code>linc::ir</code> directly.</p>
+<p>The crate root intentionally stays narrower and exposes workflow-facing entry
+points plus the small cross-crate contracts. Consumers that need the detailed
+binding IR should import it from <code>linc::ir</code> directly.</p>
 <h2 id="top-level-shape"><a class="header" href="#top-level-shape">Top-Level Shape</a></h2>
 <p>At a high level, a <code>BindingPackage</code> contains:</p>
 <ul>
@@ -205,23 +204,24 @@ small cross-crate contracts. Consumers that need the detailed binding IR should 
 <li><code>layouts</code></li>
 <li><code>link</code></li>
 <li><code>provenance</code></li>
+<li><code>macro_provenance</code></li>
+<li><code>effective_macro_environment</code></li>
 <li><code>source_path</code></li>
 <li><code>items</code></li>
 <li><code>diagnostics</code></li>
 </ul>
-<p>This matters because the package is not just “the declarations”.
-It is the declaration surface plus the environment needed to interpret it.</p>
+<p>This matters because the package is not just “the declarations”. It is the
+declaration surface plus the environment needed to interpret it.</p>
 <h2 id="target"><a class="header" href="#target"><code>target</code></a></h2>
-<p><code>target</code> stores information about the scan environment.</p>
-<p>Current fields:</p>
+<p><code>target</code> stores information about the scan environment:</p>
 <ul>
-<li><code>target_triple</code></li>
-<li><code>compiler_command</code></li>
-<li><code>compiler_version</code></li>
-<li><code>flavor</code></li>
+<li>target triple</li>
+<li>compiler command</li>
+<li>compiler version</li>
+<li>flavor</li>
 </ul>
-<p>These fields are intentionally descriptive rather than prescriptive.
-They help downstream tooling understand what environment produced the package.</p>
+<p>These fields are descriptive rather than prescriptive. They help downstream
+tooling understand what environment produced the package.</p>
 <h2 id="inputs"><a class="header" href="#inputs"><code>inputs</code></a></h2>
 <p><code>inputs</code> records the source-side configuration of the scan:</p>
 <ul>
@@ -229,13 +229,20 @@ They help downstream tooling understand what environment produced the package.</
 <li><code>include_dirs</code></li>
 <li><code>defines</code></li>
 </ul>
-<p>This is useful for:</p>
+<p>That is useful for reproducibility, debugging, downstream rebuild decisions,
+and comparing packages produced from different header environments.</p>
+<h2 id="link"><a class="header" href="#link"><code>link</code></a></h2>
+<p><code>BindingLinkSurface</code> is the normalized native-link surface attached to the
+package. It preserves:</p>
 <ul>
-<li>reproducibility</li>
-<li>debugging</li>
-<li>downstream rebuild decisions</li>
-<li>comparing packages produced from different header environments</li>
+<li>preferred link mode</li>
+<li>native surface kind</li>
+<li>platform constraints</li>
+<li>include, framework, and library paths</li>
+<li>declared libraries, frameworks, and artifacts</li>
+<li>original ordered inputs</li>
 </ul>
+<p>This is evidence about the native surface, not a build system of its own.</p>
 <h2 id="items"><a class="header" href="#items"><code>items</code></a></h2>
 <p><code>items</code> is the core declaration surface.</p>
 <p>Supported variants:</p>
@@ -254,10 +261,12 @@ They help downstream tooling understand what environment produced the package.</
 </tbody>
 </table>
 </div>
-<p>Downstream tools should not ignore <code>Unsupported</code> blindly.
-Those entries are signals that the source surface contains shapes LINC saw but could not faithfully lower.</p>
+<p>Downstream tools should not ignore <code>Unsupported</code> blindly. Those entries are
+signals that the source surface contains shapes LINC saw but could not
+faithfully lower.</p>
 <h2 id="bindingtype"><a class="header" href="#bindingtype"><code>BindingType</code></a></h2>
-<p><code>BindingType</code> represents the type graph used throughout functions, fields, typedefs, and variables.</p>
+<p><code>BindingType</code> represents the type graph used throughout functions, fields,
+typedefs, and variables.</p>
 <p>Primitive types include:</p>
 <ul>
 <li><code>Void</code></li>
@@ -287,19 +296,9 @@ Those entries are signals that the source surface contains shapes LINC saw but c
 <li><code>EnumRef</code></li>
 <li><code>Opaque</code></li>
 </ul>
-<h3 id="pointer-constness"><a class="header" href="#pointer-constness">Pointer Constness</a></h3>
-<p>Pointer constness is modeled on the pointee:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::ir::BindingType;
-
-BindingType::Pointer {
-    pointee: Box::new(BindingType::Int),
-    const_pointee: true,
-}
-<span class="boring">}</span></code></pre>
-<p>This is intentionally simpler than a full C qualifier system.
-Consumers that need more qualifier fidelity should treat LINC as an analysis source, not a fully canonical C semantic model.</p>
+<p>Pointer constness is modeled on the pointee so the IR can distinguish
+<code>char *</code>, <code>const char *</code>, and <code>char * const</code> without pretending to be a full C
+semantic model.</p>
 <h2 id="functions"><a class="header" href="#functions">Functions</a></h2>
 <p><code>FunctionBinding</code> contains:</p>
 <ul>
@@ -310,11 +309,10 @@ Consumers that need more qualifier fidelity should treat LINC as an analysis sou
 <li><code>variadic</code></li>
 <li><code>source_offset</code></li>
 </ul>
-<p>Current calling convention coverage is conservative.
-Most users should assume plain C ABI unless the source or macro surface proves otherwise.</p>
-<p>When the extractor sees recognized declaration attributes such as <code>stdcall</code>, <code>cdecl</code>, <code>fastcall</code>,
-<code>vectorcall</code>, or <code>thiscall</code>, <code>FunctionBinding.calling_convention</code> now preserves that evidence
-instead of flattening everything to plain <code>C</code>.</p>
+<p>Current calling convention coverage is conservative. When the extractor sees
+recognized declaration attributes such as <code>stdcall</code>, <code>cdecl</code>, <code>fastcall</code>,
+<code>vectorcall</code>, or <code>thiscall</code>, <code>FunctionBinding.calling_convention</code> preserves
+that evidence instead of flattening everything to plain <code>C</code>.</p>
 <h2 id="records"><a class="header" href="#records">Records</a></h2>
 <p><code>RecordBinding</code> represents both <code>struct</code> and <code>union</code>.</p>
 <p>It carries:</p>
@@ -325,30 +323,18 @@ instead of flattening everything to plain <code>C</code>.</p>
 <li>optional representation evidence</li>
 <li><code>source_offset</code></li>
 </ul>
-<p>Opaque records are represented by <code>fields: None</code>.</p>
-<p>That distinction is important:</p>
-<ul>
-<li><code>Some(fields)</code> means the field surface was extracted</li>
-<li><code>None</code> means the type exists by name but layout/fields are intentionally unavailable</li>
-</ul>
-<p>Each <code>FieldBinding</code> may also carry <code>bit_width</code>.</p>
-<p>When <code>bit_width</code> is present, the field is a bitfield and LINC preserved that width as partial
-representation data even if full ABI placement is not yet available.</p>
-<p><code>FieldBinding.layout</code> is the companion ABI-evidence slot for compiler-probed field placement.
-Today it mainly carries <code>offset_bytes</code> when record field probing has been requested and succeeded.</p>
-<p>When available from compiler probing, <code>RecordBinding.representation</code> preserves:</p>
-<ul>
-<li><code>size</code></li>
-<li><code>align</code></li>
-<li><code>completeness</code></li>
-</ul>
-<p><code>RecordBinding.abi_confidence</code> is the higher-level summary of how much ABI evidence was attached:</p>
-<ul>
-<li><code>LayoutProbed</code> for size/alignment-only evidence</li>
-<li><code>RepresentationProbed</code> when record-shape evidence is attached</li>
-<li><code>FieldOffsetsProbed</code> when named field offsets were attached</li>
-<li><code>PartialBitfieldLayout</code> when bitfield widths are known but byte offsets remain partial</li>
-</ul>
+<p>Opaque records are represented by <code>fields: None</code>. That means the type exists
+by name but layout and fields are intentionally unavailable.</p>
+<p>Each <code>FieldBinding</code> may also carry <code>bit_width</code>. When <code>bit_width</code> is present,
+the field is a bitfield and LINC preserved that width as partial evidence even
+if full ABI placement is not yet available.</p>
+<p><code>FieldBinding.layout</code> is the companion ABI-evidence slot for compiler-probed
+field placement. It mainly carries <code>offset_bytes</code> when record field probing has
+been requested and succeeded.</p>
+<p>When available from compiler probing, <code>RecordBinding.representation</code> preserves
+size, align, and completeness.</p>
+<p><code>RecordBinding.abi_confidence</code> is the higher-level summary of how much ABI
+evidence was attached.</p>
 <h2 id="enums"><a class="header" href="#enums">Enums</a></h2>
 <p><code>EnumBinding</code> stores:</p>
 <ul>
@@ -357,18 +343,36 @@ Today it mainly carries <code>offset_bytes</code> when record field probing has 
 <li>optional representation evidence</li>
 <li>source offset</li>
 </ul>
-<p>Each variant carries:</p>
+<p>Each variant carries <code>name</code> and optional <code>value</code>. If a value is absent,
+downstream tooling should not invent one without understanding the original
+source and evaluation context.</p>
+<p>When available from compiler probing, <code>EnumBinding.representation</code> preserves
+underlying size and signedness.</p>
+<h2 id="macros-and-provenance"><a class="header" href="#macros-and-provenance">Macros And Provenance</a></h2>
+<p>The IR also carries supporting evidence:</p>
 <ul>
-<li><code>name</code></li>
-<li><code>value</code></li>
+<li>macro capture and classification</li>
+<li>compiler-probed type layouts</li>
+<li>provenance for declarations and macros</li>
+<li>effective macro environment snapshots</li>
 </ul>
-<p>If a value is absent, downstream tooling should not invent one without understanding the original source and evaluation context.</p>
-<p>When available from compiler probing, <code>EnumBinding.representation</code> preserves:</p>
+<p>Do not think of the IR as “just declarations”. It is the full analysis record.</p>
+<h2 id="serialization-rules"><a class="header" href="#serialization-rules">Serialization Rules</a></h2>
 <ul>
-<li><code>underlying_size</code></li>
-<li><code>is_signed</code></li>
+<li>keep container fields defaultable</li>
+<li>preserve declaration order where the contract depends on it</li>
+<li>treat additive fields as the normal evolution path</li>
+<li>serialize deterministic JSON in tests and fixtures</li>
 </ul>
-<p><code>EnumBinding.abi_confidence</code> distinguishes plain layout evidence from richer representation
+<h2 id="what-the-ir-is-not"><a class="header" href="#what-the-ir-is-not">What The IR Is Not</a></h2>
+<p>The IR is not:</p>
+<ul>
+<li>a parser AST</li>
+<li>a Rust codegen AST</li>
+<li>a shared ABI crate</li>
+<li>a build graph</li>
+</ul>
+<p>It is the LINC evidence model.
 evidence.</p>
 <p>For typedef-style named types, <code>TypeAliasBinding.abi_confidence</code> records whether the alias remains
 declaration-only or now has compiler-probed layout evidence attached.</p>
@@ -438,7 +442,7 @@ They are package-wide evidence, not per-item add-ons.</p>
 <p>This is intentionally additive evidence.
 It gives downstream tooling a stable way to talk about where a declaration came from without
 rewriting the declaration IR around source metadata.</p>
-<h2 id="serialization-rules"><a class="header" href="#serialization-rules">Serialization Rules</a></h2>
+<h2 id="serialization-rules-1"><a class="header" href="#serialization-rules-1">Serialization Rules</a></h2>
 <p>The entire package is <code>serde</code> serializable.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -454,7 +458,7 @@ let restored: BindingPackage = serde_json::from_str(&amp;json)?;
 <li>older JSON missing newer optional fields generally deserializes with defaults</li>
 </ul>
 <p>That makes the package suitable for machine-to-machine contracts.</p>
-<h2 id="what-the-ir-is-not"><a class="header" href="#what-the-ir-is-not">What The IR Is Not</a></h2>
+<h2 id="what-the-ir-is-not-1"><a class="header" href="#what-the-ir-is-not-1">What The IR Is Not</a></h2>
 <p>The IR is useful, but it is intentionally not:</p>
 <ul>
 <li>a full semantic C type system</li>

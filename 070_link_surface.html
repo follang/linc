@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Link Surface - BIC Reference</title>
+        <title>Link Surface - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,9 +175,11 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="link-surface"><a class="header" href="#link-surface">Link Surface</a></h1>
-<p><code>BindingPackage.link</code> is the normalized native-link surface attached to a scan.</p>
-<p>This is one of the most important additions in the current LINC architecture because binding generation alone is not enough.
-Downstream tools also need to know what native inputs are expected at link time.</p>
+<p><code>BindingPackage.link</code> is the normalized native-link surface attached to a
+scan.</p>
+<p>This is one of the most important pieces of LINC because evidence generation
+alone is not enough. Downstream tools also need to know what native inputs are
+expected at link time.</p>
 <h2 id="what-the-link-surface-contains"><a class="header" href="#what-the-link-surface-contains">What The Link Surface Contains</a></h2>
 <p><code>BindingLinkSurface</code> currently carries:</p>
 <ul>
@@ -192,93 +194,38 @@ Downstream tools also need to know what native inputs are expected at link time.
 <li><code>artifacts</code></li>
 <li><code>ordered_inputs</code></li>
 </ul>
-<p>This deliberately preserves both:</p>
-<ul>
-<li>normalized buckets, such as <code>libraries</code></li>
-<li>original ordering information, via <code>ordered_inputs</code></li>
-</ul>
+<p>This deliberately preserves both normalized buckets, such as <code>libraries</code>, and
+original ordering information, via <code>ordered_inputs</code>.</p>
 <h2 id="why-ordered-inputs-matter"><a class="header" href="#why-ordered-inputs-matter">Why Ordered Inputs Matter</a></h2>
-<p>Link order can be semantically significant, especially with:</p>
-<ul>
-<li>static archives</li>
-<li>mixed object/archive inputs</li>
-<li>linkers that resolve left-to-right</li>
-</ul>
-<p>If LINC only preserved deduplicated buckets, a downstream tool could lose the original intended order and silently produce a different result.</p>
+<p>Link order can be semantically significant, especially with static archives,
+mixed object/archive inputs, and linkers that resolve left-to-right.</p>
+<p>If LINC only preserved deduplicated buckets, a downstream tool could lose the
+original intended order and silently produce a different result.</p>
 <h2 id="declared-libraries"><a class="header" href="#declared-libraries">Declared Libraries</a></h2>
-<p>Library-name inputs are recorded with:</p>
-<ul>
-<li>name</li>
-<li>kind</li>
-<li>source</li>
-</ul>
+<p>Library-name inputs are recorded with a name, a kind, and a source.</p>
 <p>Kinds:</p>
 <ul>
 <li><code>Default</code></li>
 <li><code>Static</code></li>
 <li><code>Dynamic</code></li>
 </ul>
-<p>Provider matching for declared library names is intentionally tolerant of ordinary platform naming
-shapes. Today that includes:</p>
-<ul>
-<li><code>lib{name}.a</code></li>
-<li><code>lib{name}.so</code></li>
-<li><code>lib{name}.so.*</code></li>
-<li><code>lib{name}.dylib</code></li>
-<li><code>lib{name}.*.dylib</code></li>
-<li><code>lib{name}.tbd</code></li>
-<li><code>lib{name}.*.tbd</code></li>
-</ul>
-<p>Examples:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let cfg = HeaderConfig::new()
-    .header("api.h")
-    .link_lib("z")
-    .link_static_lib("foo")
-    .link_shared_lib("dl");
-<span class="boring">}</span></code></pre>
+<p>Provider matching for declared library names is intentionally tolerant of
+ordinary platform naming shapes.</p>
 <h2 id="concrete-artifacts"><a class="header" href="#concrete-artifacts">Concrete Artifacts</a></h2>
-<p>When the binding surface depends on explicit files instead of library names, use artifact inputs:</p>
-<ul>
-<li><code>link_object_file(...)</code></li>
-<li><code>link_static_artifact(...)</code></li>
-<li><code>link_shared_artifact(...)</code></li>
-</ul>
-<p>Each artifact preserves:</p>
-<ul>
-<li><code>path</code></li>
-<li><code>kind</code></li>
-<li><code>source</code></li>
-</ul>
-<p>This is important for vendored or generated native inputs that are not discoverable through a generic <code>-lfoo</code> model.</p>
+<p>When the binding surface depends on explicit files instead of library names,
+use artifact inputs.</p>
+<p>Each artifact preserves path, kind, and source. That is important for vendored
+or generated native inputs that are not discoverable through a generic
+<code>-lfoo</code> model.</p>
 <h2 id="framework-inputs"><a class="header" href="#framework-inputs">Framework Inputs</a></h2>
-<p>For Apple-style native dependencies:</p>
-<ul>
-<li><code>framework_dir(...)</code></li>
-<li><code>link_framework(...)</code></li>
-</ul>
-<p>These are preserved separately from ordinary library names because they are resolved differently by downstream toolchains.</p>
+<p>For Apple-style native dependencies, frameworks are preserved separately from
+ordinary library names because they are resolved differently by downstream
+toolchains.</p>
 <h2 id="preferred-link-mode"><a class="header" href="#preferred-link-mode">Preferred Link Mode</a></h2>
-<p><code>preferred_mode</code> captures the scan-time preference between:</p>
-<ul>
-<li><code>Default</code></li>
-<li><code>PreferStatic</code></li>
-<li><code>PreferDynamic</code></li>
-</ul>
-<p>This is not the same as hard pinning every input.
-It is a policy hint attached to the package.</p>
-<p>Use:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>.prefer_static_linking()
-<span class="boring">}</span></code></pre>
-<p>or:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>.prefer_dynamic_linking()
-<span class="boring">}</span></code></pre>
-<p>when the package should carry that preference explicitly.</p>
+<p><code>preferred_mode</code> captures the scan-time preference between default, preferred
+static, and preferred dynamic.</p>
+<p>This is not the same as hard pinning every input. It is a policy hint attached
+to the package.</p>
 <h2 id="native-surface-kind"><a class="header" href="#native-surface-kind">Native Surface Kind</a></h2>
 <p><code>native_surface_kind</code> classifies the package at a higher level:</p>
 <ul>
@@ -288,79 +235,31 @@ It is a policy hint attached to the package.</p>
 <li><code>Mixed</code></li>
 </ul>
 <p>This gives downstream consumers a quick decision point.</p>
-<p>Examples:</p>
-<ul>
-<li>pure header extraction with no native requirements -&gt; <code>HeaderOnly</code></li>
-<li>only <code>link_lib("sqlite3")</code> -&gt; <code>LibraryNames</code></li>
-<li>only explicit <code>.a</code> / <code>.so</code> / <code>.o</code> inputs -&gt; <code>ConcreteArtifacts</code></li>
-<li>any mix of library names and explicit files/frameworks -&gt; <code>Mixed</code></li>
-</ul>
 <h2 id="requirement-provenance"><a class="header" href="#requirement-provenance">Requirement Provenance</a></h2>
-<p>Link requirements preserve a <code>source</code>:</p>
+<p>Link requirements preserve a source:</p>
 <ul>
 <li><code>Declared</code></li>
 <li><code>Inferred</code></li>
 <li><code>Discovered</code></li>
 </ul>
-<p>That distinction matters because downstream tooling often wants to trust user declarations more than inferred guesses, while still preserving discovered evidence for reporting and future planning.</p>
+<p>That distinction matters because downstream tooling often wants to trust user
+declarations more than inferred guesses while still preserving discovered
+evidence for reporting and future planning.</p>
 <h2 id="platform-constraints"><a class="header" href="#platform-constraints">Platform Constraints</a></h2>
 <p><code>platform_constraints</code> are package-level target applicability hints.</p>
-<p>Today they are strings rather than a rich constraint language.
-That still makes them useful for:</p>
-<ul>
-<li>simple target gating</li>
-<li>downstream filtering</li>
-<li>build-graph selection</li>
-</ul>
+<p>Today they are strings rather than a rich constraint language. That still makes
+them useful for simple target gating, downstream filtering, and build-graph
+selection.</p>
 <h2 id="reading-the-link-surface-programmatically"><a class="header" href="#reading-the-link-surface-programmatically">Reading The Link Surface Programmatically</a></h2>
-<p>The link surface is already part of <code>BindingPackage</code>, so most consumers should read it directly:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let package = HeaderConfig::new()
-    .header("api.h")
-    .link_lib("demo")
-    .process()?
-    .package;
-
-let link = &amp;package.link;
-println!("ordered inputs: {}", link.ordered_inputs.len());
-<span class="boring">}</span></code></pre>
-<p>This keeps link-planning policy in the downstream library or tool that consumes LINC.</p>
+<p>Most consumers should read the link surface directly from <code>BindingPackage</code>.
+That keeps link-planning policy in the downstream library or tool that consumes
+LINC.</p>
 <h2 id="normalized-plan-artifact"><a class="header" href="#normalized-plan-artifact">Normalized Plan Artifact</a></h2>
-<p>When a consumer wants a library-facing planning artifact instead of reading raw link buckets
-directly, it can call:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let plan = linc::resolve_link_plan(&amp;package);
-assert_eq!(plan.inputs.len(), package.link.ordered_inputs.len());
-<span class="boring">}</span></code></pre>
-<p><code>ResolvedLinkPlan</code> is intentionally still a normalized metadata artifact.
-It is not yet a full filesystem-resolved linker invocation.</p>
-<p>When inventories are available, consumers can also separate declared requirements from candidate
-providers:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let plan = linc::resolve_link_plan_with_inventories(&amp;package, &amp;inventories);
-for requirement in &amp;plan.requirements {
-    println!("{:?}: {}", requirement.resolution, requirement.providers.len());
-}
-<span class="boring">}</span></code></pre>
-<p>That keeps “what the package asked for” distinct from “what the current artifact set appears to
-provide”.</p>
-<p>If a consumer is planning for one concrete target, it can also filter the plan by target triple:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let linux_plan = linc::resolve_link_plan_for_target(
-    &amp;package,
-    &amp;inventories,
-    Some("x86_64-unknown-linux-gnu"),
-);
-<span class="boring">}</span></code></pre>
-<p>Today this uses simple substring matching over <code>platform_constraints</code>.
-That should be read as target-applicability filtering, not as a full constraint language.</p>
-<p>The requirement resolution state is explicit:</p>
+<p><code>ResolvedLinkPlan</code> is the normalized planning artifact. It is intentionally not
+a full filesystem-resolved linker invocation.</p>
+<p>When inventories are available, consumers can separate declared requirements
+from candidate providers.</p>
 <ul>
-<li><code>Unresolved</code></li>
 <li><code>Resolved</code></li>
 <li><code>Ambiguous</code></li>
 </ul>

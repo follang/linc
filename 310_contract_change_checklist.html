@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Contract Change Checklist - BIC Reference</title>
+        <title>Contract Change Checklist - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,52 +175,38 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="contract-change-checklist"><a class="header" href="#contract-change-checklist">Contract Change Checklist</a></h1>
-<p>Use this checklist whenever a release includes changes to schema, public API, or checked-in
-contract fixtures.</p>
-<p>The goal is to make contract-impacting changes deliberate rather than accidental.</p>
+<p>Use this checklist whenever a release includes changes to schema, public API,
+or checked-in contract fixtures.</p>
 <h2 id="schema-changes"><a class="header" href="#schema-changes">Schema Changes</a></h2>
-<p>Before releasing a schema-affecting change:</p>
 <ul>
 <li>confirm whether the change is additive, behavioral, or breaking</li>
 <li>keep <code>schema_version</code> unchanged for additive/defaulted changes</li>
-<li>bump <code>schema_version</code> only when older consumers can no longer deserialize or safely interpret the
-payload</li>
-<li>add or update contract fixtures that demonstrate the intended behavior</li>
-<li>only keep older fixture shapes when the current documented artifact still claims to accept them</li>
+<li>bump <code>schema_version</code> only when older consumers can no longer deserialize or
+safely interpret the payload</li>
 </ul>
 <h2 id="public-api-changes"><a class="header" href="#public-api-changes">Public API Changes</a></h2>
-<p>Before releasing a public API change:</p>
 <ul>
-<li>confirm whether the root-level API contract changed or only lower-level modules changed</li>
+<li>confirm whether the root-level API contract changed or only lower-level
+modules changed</li>
 <li>update crate-level docs and book chapters when recommended usage changes</li>
-<li>keep stable entry-point guidance current</li>
-<li>add or update public API coverage if a new root-level behavior is now part of the contract</li>
 </ul>
 <h2 id="fixture-changes"><a class="header" href="#fixture-changes">Fixture Changes</a></h2>
-<p>Before releasing fixture changes:</p>
 <ul>
-<li>confirm the fixture still represents a real supported or intentionally unsupported scenario</li>
+<li>confirm the fixture still represents a real supported or intentionally
+unsupported scenario</li>
 <li>confirm the corresponding regression test explains why the fixture exists</li>
-<li>remove stale fixtures only when the underlying contract surface is intentionally removed or
-replaced</li>
 </ul>
 <h2 id="consumer-guidance-changes"><a class="header" href="#consumer-guidance-changes">Consumer Guidance Changes</a></h2>
-<p>Before releasing consumer-guidance changes:</p>
 <ul>
-<li>confirm generic library guidance stays separate from consumer-specific guidance</li>
-<li>confirm <code>fol</code> guidance remains an example consumer profile rather than the universal crate policy</li>
-<li>confirm readiness/limitation wording still matches the actual regression boundary</li>
+<li>confirm generic library guidance stays separate from consumer-specific
+guidance</li>
+<li>confirm consumer guidance remains an example profile rather than universal
+crate policy</li>
 </ul>
 <h2 id="final-questions"><a class="header" href="#final-questions">Final Questions</a></h2>
-<p>Ask these before tagging a release:</p>
-<ul>
-<li>did this change alter what downstream code can safely rely on?</li>
-<li>did fixture coverage change to prove that new reliance boundary?</li>
-<li>did the docs change to describe the same boundary?</li>
-<li>would a consumer that still claims to understand this schema line misread the new payload or semantics?</li>
-</ul>
-<p>If the answer to any of those questions is “yes” and the release notes do not explain it yet,
-the release is not ready.</p>
+<p>Ask whether the change altered what downstream code can safely rely on, whether
+fixture coverage changed to prove the new boundary, and whether the docs now
+describe the same boundary.</p>
 
                     </main>
 

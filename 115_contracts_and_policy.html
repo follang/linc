@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Contracts And Policy - BIC Reference</title>
+        <title>Contracts And Policy - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -176,16 +176,6 @@
                     <main>
                         <h1 id="contracts-and-policy"><a class="header" href="#contracts-and-policy">Contracts And Policy</a></h1>
 <p>This section groups the durable contract and policy chapters.</p>
-<p>Read this section when you need to answer questions such as:</p>
-<ul>
-<li>what parts of the public API are intended to stay stable</li>
-<li>what current JSON artifact policy means in practice</li>
-<li>which failures are operational errors versus report data</li>
-<li>which fields are identity, stable transport, or evolving evidence</li>
-</ul>
-<p>These chapters are the narrowest statement of what downstream consumers should rely on.</p>
-<p>If you are integrating LINC into another tool, this section matters more than the implementation
-details of lower-level modules.</p>
 <p>The most important policy rule is architectural:</p>
 <ul>
 <li><code>linc/src/**</code> must not depend on <code>parc</code> or <code>gerc</code></li>
@@ -193,8 +183,11 @@ details of lower-level modules.</p>
 <li><code>linc</code> owns its own internal model and its own evidence artifacts</li>
 <li>there is no shared ABI crate</li>
 <li>there is no backward-compatibility burden for old pipeline shapes</li>
-<li>bootstrap utilities and repo-local shortcuts must never be mistaken for the public contract</li>
+<li>bootstrap utilities and repo-local shortcuts must never be mistaken for the
+public contract</li>
 </ul>
+<p>Read these chapters as the narrow contract surface.
+If another chapter sounds broader than this section, trust this section.</p>
 
                     </main>
 

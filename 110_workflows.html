@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>End-To-End Workflows - BIC Reference</title>
+        <title>End-To-End Workflows - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -176,36 +176,19 @@
                     <main>
                         <h1 id="end-to-end-workflows"><a class="header" href="#end-to-end-workflows">End-To-End Workflows</a></h1>
 <p>This chapter ties the separate surfaces together into practical workflows.</p>
-<p>Read the workflows in this order:</p>
-<ol>
-<li>start from <code>SourcePackage</code> when a frontend already exists</li>
-<li>attach artifact evidence only when you actually need it</li>
-<li>keep repo-local bootstrap flows secondary</li>
-</ol>
 <h2 id="workflow-1-analyze-a-source-contract-and-save-json"><a class="header" href="#workflow-1-analyze-a-source-contract-and-save-json">Workflow 1: Analyze A Source Contract And Save JSON</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>use linc::{analyze_source_package, LinkAnalysisPackage, SourcePackage};
+</span>use linc::{analyze_source_package, SourcePackage};
 
 let analysis = analyze_source_package(&amp;SourcePackage::default());
 let json = serde_json::to_string_pretty(&amp;analysis).unwrap();
 std::fs::write("link-analysis.json", json).unwrap();
 <span class="boring">}</span></code></pre>
-<p>This is the baseline path once a frontend already exists.</p>
-<p>The resulting file now contains:</p>
-<ul>
-<li>declared link metadata</li>
-<li>resolved link-plan shape</li>
-<li>diagnostics</li>
-<li>optional probe/validation attachment points</li>
-<li>target and input provenance</li>
-</ul>
-<h2 id="workflow-2-test-or-harness-translation-from-parc"><a class="header" href="#workflow-2-test-or-harness-translation-from-parc">Workflow 2: Test Or Harness Translation From PARC</a></h2>
-<p>The intended cross-package architecture is artifact-based, not shared-type based.</p>
-<p>That means <code>linc</code> library code should not import <code>parc</code>.
-Instead, a test, example, or external harness can translate a PARC-owned source
-artifact into <code>linc</code> input and then run <code>analyze_source_package(...)</code>.</p>
-<p>That translator should live outside <code>linc/src/**</code>.</p>
+<h2 id="workflow-2-translate-parc-artifacts-in-tests-or-harnesses"><a class="header" href="#workflow-2-translate-parc-artifacts-in-tests-or-harnesses">Workflow 2: Translate PARC Artifacts In Tests Or Harnesses</a></h2>
+<p>The intended cross-package architecture is artifact-based, not shared-type
+based. Library code should not import <code>parc</code>; translation belongs in tests,
+examples, or external harnesses.</p>
 <h2 id="workflow-3-inspect-a-native-artifact"><a class="header" href="#workflow-3-inspect-a-native-artifact">Workflow 3: Inspect A Native Artifact</a></h2>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -215,113 +198,30 @@ let inventory = inspect_symbols("build/libdemo.so")?;
 let json = serde_json::to_string_pretty(&amp;inventory).unwrap();
 std::fs::write("symbols.json", json).unwrap();
 <span class="boring">}</span></code></pre>
-<p>Use this when you need artifact evidence first.</p>
-<p>Typical reasons:</p>
-<ul>
-<li>debugging whether a build exported the symbol you expected</li>
-<li>checking archive member provenance</li>
-<li>checking shared-library dependency edges</li>
-</ul>
 <h2 id="workflow-4-validate-source-derived-bindings-against-artifacts"><a class="header" href="#workflow-4-validate-source-derived-bindings-against-artifacts">Workflow 4: Validate Source-Derived Bindings Against Artifacts</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::{inspect_symbols, validate, SourcePackage};
-
-let source = SourcePackage::default();
-let binding = linc::intake::adapters::to_binding_package(&amp;source);
-let inventory = inspect_symbols("build/libdemo.so")?;
-let report = validate(&amp;binding, &amp;inventory);
-<span class="boring">}</span></code></pre>
-<p>This is the first serious consistency check between source intent and native reality.</p>
-<p>For a split native surface:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::{inspect_symbols, validate_many, SourcePackage};
-
-let source = SourcePackage::default();
-let binding = linc::intake::adapters::to_binding_package(&amp;source);
-let core = inspect_symbols("build/libcore.so")?;
-let support = inspect_symbols("build/libsupport.a")?;
-let report = validate_many(&amp;binding, &amp;[core, support]);
-<span class="boring">}</span></code></pre>
+<p>Validation currently compares a <code>BindingPackage</code> against one or more
+inventories. That lower-level path is still part of the crate surface, even if
+the preferred intake story starts from <code>SourcePackage</code>.</p>
 <h2 id="workflow-5-extract-just-the-link-surface"><a class="header" href="#workflow-5-extract-just-the-link-surface">Workflow 5: Extract Just The Link Surface</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let declared = &amp;analysis.declared_link_surface;
-let resolved = &amp;analysis.resolved_link_plan;
-<span class="boring">}</span></code></pre>
-<p>This is the useful boundary if a downstream tool only wants:</p>
-<ul>
-<li>library names</li>
-<li>concrete artifact inputs</li>
-<li>framework inputs</li>
-<li>platform constraints</li>
-<li>ordering and link preference metadata</li>
-</ul>
+<p>Use <code>analysis.declared_link_surface</code> and <code>analysis.resolved_link_plan</code> when a
+downstream tool only wants link names, artifact inputs, framework inputs,
+platform constraints, or ordering metadata.</p>
 <h2 id="workflow-6-downstream-fol--gerc-consumption"><a class="header" href="#workflow-6-downstream-fol--gerc-consumption">Workflow 6: Downstream <code>fol</code> / <code>gerc</code> Consumption</a></h2>
-<p>The intended downstream pattern is:</p>
 <ol>
-<li><code>parc</code> produces a PARC-owned source artifact</li>
+<li><code>parc</code> produces a source artifact</li>
 <li>tests/examples/harnesses translate that artifact into <code>linc</code> input</li>
 <li><code>linc</code> produces <code>LinkAnalysisPackage</code></li>
 <li>downstream generation reads source and link analysis in parallel</li>
-<li>downstream generation reads <code>analysis.resolved_link_plan</code> to construct native link inputs</li>
-<li>downstream generation may use validation output as a gate or diagnostic surface</li>
 </ol>
-<p>That division keeps <code>linc</code> focused on analysis and evidence rather than parser
-ownership or final build execution.</p>
-<h2 id="workflow-7-repo-local-raw-header-bootstrap"><a class="header" href="#workflow-7-repo-local-raw-header-bootstrap">Workflow 7: Repo-Local Raw-Header Bootstrap</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::analyze_source_package;
-use linc::raw_headers::HeaderConfig;
-
-let result = HeaderConfig::new()
-    .header("include/demo.h")
-    .include_dir("include")
-    .process()?;
-
-let source = linc::intake::adapters::from_binding_package(&amp;result.package);
-let analysis = analyze_source_package(&amp;source);
-<span class="boring">}</span></code></pre>
-<p>This exists as a repo-local bootstrap path for difficult fixtures and
-repository self-hosting. It is not the package boundary that downstream tools
-should depend on.</p>
-<h2 id="workflow-7-abi-sensitive-packages"><a class="header" href="#workflow-7-abi-sensitive-packages">Workflow 7: ABI-Sensitive Packages</a></h2>
-<p>For packages with important struct ABI:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::{inspect_symbols, validate};
-use linc::raw_headers::HeaderConfig;
-
-let result = HeaderConfig::new()
-    .header("include/api.h")
-    .probe_type_layout("struct api_context")
-    .probe_type_layout("struct api_options")
-    .process()?;
-
-let source = linc::intake::adapters::from_binding_package(&amp;result.package);
-let binding = linc::intake::adapters::to_binding_package(&amp;source);
-let inventory = inspect_symbols("build/libapi.so")?;
-let report = validate(&amp;binding, &amp;inventory);
-<span class="boring">}</span></code></pre>
-<p>This gives you:</p>
-<ul>
-<li>layout evidence</li>
-<li>symbol-provider evidence</li>
-<li>a source-level contract that can be re-analyzed</li>
-<li>a separate validation decision surface</li>
-</ul>
-<h2 id="recommended-validation-gate"><a class="header" href="#recommended-validation-gate">Recommended Validation Gate</a></h2>
-<p>For serious native binding pipelines, a practical gate is:</p>
-<ul>
-<li>fail on <code>Missing</code></li>
-<li>fail on <code>UnresolvedDeclaredLinkInputs</code></li>
-<li>fail on <code>DuplicateProviders</code></li>
-<li>inspect <code>DecorationMismatch</code></li>
-<li>treat <code>WeakMatch</code> as policy-dependent</li>
-</ul>
-<p>That is a pragmatic middle ground between “trust the source blindly” and “pretend current validation proves full ABI compatibility”.</p>
+<h2 id="workflow-7-repo-local-bootstrap"><a class="header" href="#workflow-7-repo-local-bootstrap">Workflow 7: Repo-Local Bootstrap</a></h2>
+<p>The raw-header bootstrap path exists for difficult fixtures and repository
+self-hosting. It is public, tested, and useful. It is just not the package
+boundary that new downstream tools should center first.</p>
+<h2 id="workflow-8-abi-sensitive-packages"><a class="header" href="#workflow-8-abi-sensitive-packages">Workflow 8: ABI-Sensitive Packages</a></h2>
+<p>For packages with important struct ABI, attach layout evidence, inspect
+symbols, and validate before generation.</p>
+<p>This is the right pattern when a downstream generator wants stronger evidence
+without turning LINC into the generator itself.</p>
 
                     </main>
 

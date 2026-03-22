@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Header Processing - BIC Reference</title>
+        <title>Header Processing - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,31 +175,31 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="header-processing"><a class="header" href="#header-processing">Header Processing</a></h1>
-<p><code>HeaderConfig</code> exists as a repo-local bootstrap utility for turning raw header
-sets into source-ish input that <code>linc</code> can analyze.</p>
-<p>It is documented here because the code still exists and the test corpus still
-uses it in places. It is not the architectural center of <code>linc</code>.</p>
+<p><code>HeaderConfig</code> is a repo-local bootstrap utility for turning raw header sets
+into a <code>BindingPackage</code>.</p>
+<p>It exists because the repository still needs a way to start from real headers
+in difficult test and bootstrap scenarios. It is not the architectural center
+of LINC, but it is still real public API and still covered by tests.</p>
 <p>The intended architecture is:</p>
 <ul>
-<li>a frontend such as <code>parc</code> owns preprocessing, parsing, and declaration extraction</li>
-<li><code>linc</code> consumes source-shaped input and produces evidence</li>
+<li>an upstream frontend such as <code>parc</code> owns preprocessing, parsing, and
+declaration extraction</li>
+<li>LINC consumes normalized source input and produces evidence</li>
 <li>cross-package translation belongs outside <code>linc/src/**</code></li>
 </ul>
-<p>Read this chapter as operational guidance for a bootstrap utility, not as the
-main contract that downstream tools should build around.</p>
 <h2 id="what-headerconfig-is-good-for"><a class="header" href="#what-headerconfig-is-good-for">What <code>HeaderConfig</code> Is Good For</a></h2>
-<p><code>HeaderConfig</code> is useful when you need to:</p>
+<p>Use <code>HeaderConfig</code> when you need to:</p>
 <ul>
 <li>bootstrap the repository from real system or vendored headers</li>
-<li>drive difficult header fixtures without first teaching another frontend every edge case</li>
-<li>gather preprocessing output, extracted declarations, and probe evidence in one local pass</li>
+<li>drive difficult header fixtures without teaching another frontend every edge
+case first</li>
+<li>gather preprocessing output, extracted declarations, native link metadata,
+and probe evidence in one local pass</li>
 </ul>
-<p>It is not the preferred downstream boundary.
-The preferred downstream boundary is still:</p>
-<pre><code class="language-text">source-shaped input -&gt; analyze_source_package(...) -&gt; LinkAnalysisPackage
-</code></pre>
+<p>It is not the preferred downstream boundary.</p>
 <h2 id="conceptual-domains"><a class="header" href="#conceptual-domains">Conceptual Domains</a></h2>
-<p>Even though <code>HeaderConfig</code> is one builder, it carries several distinct domains:</p>
+<p>Even though <code>HeaderConfig</code> is one builder, it carries several distinct
+domains:</p>
 <ol>
 <li>preprocessing environment</li>
 <li>entry-header selection</li>
@@ -207,8 +207,6 @@ The preferred downstream boundary is still:</p>
 <li>ABI probe requests</li>
 <li>origin-filtering policy</li>
 </ol>
-<p>Those domains are useful when auditing scans because header failures often come
-from one domain while the others are correct.</p>
 <h2 id="configuration-surface"><a class="header" href="#configuration-surface">Configuration Surface</a></h2>
 <p>The most important builder methods are:</p>
 <div class="table-wrapper">
@@ -233,13 +231,11 @@ from one domain while the others are correct.</p>
 <p>Repeated path, define, link, constraint, and probe calls append in order.
 The builder does not deduplicate for you.</p>
 <h2 id="validation-before-execution"><a class="header" href="#validation-before-execution">Validation Before Execution</a></h2>
-<p><code>HeaderConfig::validate()</code> is a public preflight API.
-<code>HeaderConfig::process()</code> validates before it attempts preprocessing,
-extraction, or probing.</p>
-<p>Treat invalid configuration as an operational error, not as one diagnostic
-inside an otherwise usable result.</p>
-<h2 id="what-process-does"><a class="header" href="#what-process-does">What <code>process()</code> Does</a></h2>
-<p>Calling <code>.process()</code> performs a local bootstrap scan:</p>
+<p>The bootstrap path validates its inputs before it executes. Treat invalid
+configuration as an operational error, not as a diagnostic hidden inside a
+usable result.</p>
+<h2 id="what-the-bootstrap-path-does"><a class="header" href="#what-the-bootstrap-path-does">What The Bootstrap Path Does</a></h2>
+<p>The bootstrap helpers are for local repository work and test fixtures:</p>
 <ol>
 <li>synthesize a temporary translation unit from the configured entry headers</li>
 <li>preprocess it with the configured compiler and dialect settings</li>
@@ -249,76 +245,20 @@ inside an otherwise usable result.</p>
 <li>optionally probe requested layouts</li>
 <li>optionally filter by origin</li>
 </ol>
-<p>The returned <code>RawHeaderResult</code> contains:</p>
-<ul>
-<li><code>package</code></li>
-<li><code>report.command</code></li>
-<li><code>report.args</code></li>
-<li><code>report.preprocessed_source</code></li>
-</ul>
-<h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
-<h3 id="entry-headers"><a class="header" href="#entry-headers">Entry Headers</a></h3>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("include/api.h")
-    .header("include/extra.h")
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>The configured entry headers are treated as one scan unit, so order still
-matters when headers depend on prior macros or type setup.</p>
-<h3 id="include-directories-and-defines"><a class="header" href="#include-directories-and-defines">Include Directories And Defines</a></h3>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("api.h")
-    .include_dir("vendor/include")
-    .include_dir("generated/include")
-    .define("API_VERSION", Some("3".into()))
-    .define("USE_EXPERIMENTAL", None)
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>Notes:</p>
-<ul>
-<li><code>define("NAME", None)</code> corresponds to <code>-DNAME</code></li>
-<li><code>define("NAME", Some("VALUE".into()))</code> corresponds to <code>-DNAME=VALUE</code></li>
-</ul>
-<h3 id="native-link-intent"><a class="header" href="#native-link-intent">Native Link Intent</a></h3>
-<p><code>HeaderConfig</code> can also attach declared native-link requirements while scanning:</p>
-<ul>
-<li>library search paths</li>
-<li>framework search paths</li>
-<li>library declarations</li>
-<li>object or artifact declarations</li>
-<li>preferred static/dynamic bias</li>
-<li>target constraints</li>
-</ul>
-<p>That does not perform real linking. It preserves declared native dependency
-intent so later analysis can reason about it.</p>
+<p>The resulting package is a bootstrap artifact built around <code>BindingPackage</code>,
+not the preferred downstream boundary.</p>
 <h2 id="policy"><a class="header" href="#policy">Policy</a></h2>
 <p>If you are writing new downstream code:</p>
 <ul>
 <li>do not treat <code>HeaderConfig</code> as the pipeline contract</li>
 <li>do not move cross-package translation into <code>linc/src/**</code></li>
-<li>do not build new docs or examples around this path unless the point is specifically repository bootstrap</li>
+<li>do not build new docs or examples around this path unless the point is
+specifically repository bootstrap</li>
 </ul>
 <p>Use it when it helps the repository analyze difficult headers.
 Do not mistake it for the long-term boundary between packages.</p>
-<ul>
-<li>the configured values are preserved in <code>package.inputs.defines</code></li>
-</ul>
 <h2 id="compiler-and-flavor"><a class="header" href="#compiler-and-flavor">Compiler And Flavor</a></h2>
 <p>LINC uses the compiler as a preprocessor and ABI probe driver.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::raw_headers::Flavor;
-
-let result = HeaderConfig::new()
-    .header("api.h")
-    .compiler("clang")
-    .flavor(Flavor::ClangC11)
-    .process()?;
-<span class="boring">}</span></code></pre>
 <p>Flavor affects parsing expectations and extension handling:</p>
 <ul>
 <li><code>GnuC11</code></li>
@@ -331,107 +271,14 @@ let result = HeaderConfig::new()
 <li>use <code>GnuC11</code> when the project assumes GCC-style C extensions</li>
 <li>use <code>StdC11</code> only when you want a stricter source profile</li>
 </ul>
-<p>If <code>compiler(...)</code> is not set explicitly, LINC currently infers the driver from the effective
-flavor:</p>
-<ul>
-<li><code>ClangC11</code> -&gt; <code>clang</code></li>
-<li><code>GnuC11</code> / <code>StdC11</code> -&gt; <code>gcc</code></li>
-</ul>
 <h2 id="native-link-inputs-during-scan"><a class="header" href="#native-link-inputs-during-scan">Native Link Inputs During Scan</a></h2>
-<p>The scan phase can also record the native inputs that the extracted API expects.</p>
-<p>Examples:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("sqlite3.h")
-    .library_dir("/opt/sqlite/lib")
-    .link_lib("sqlite3")
-    .prefer_dynamic_linking()
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>Or with concrete artifacts:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("engine.h")
-    .link_object_file("build/engine_shim.o")
-    .link_static_artifact("build/libengine_support.a")
-    .link_shared_artifact("build/libengine.so")
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>These declarations are preserved in <code>package.link</code>.
-The scan does not link anything by itself.
-It records the intent and the normalized link surface.</p>
-<p>Link declarations are append-only and declaration-ordered.
-If you mix library names, frameworks, and concrete artifacts, that original declared order is
-preserved in <code>package.link.ordered_inputs</code>.</p>
-<h2 id="frameworks-and-platform-constraints"><a class="header" href="#frameworks-and-platform-constraints">Frameworks And Platform Constraints</a></h2>
-<p>For Apple-style native surfaces:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("mykit.h")
-    .framework_dir("/Library/Frameworks")
-    .link_framework("CoreFoundation")
-    .target_constraint("x86_64-apple-darwin")
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>Platform constraints are simple strings today.
-They are preserved so downstream consumers can decide whether a package applies to the current target.</p>
+<p>The bootstrap path can record the native inputs that the extracted API expects.
+These declarations are preserved in the resulting package. The bootstrap path
+does not link anything by itself; it records intent and normalized link
+surface.</p>
 <h2 id="layout-probing-during-scan"><a class="header" href="#layout-probing-during-scan">Layout Probing During Scan</a></h2>
-<p>You can request ABI layout facts directly in the scan:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let result = HeaderConfig::new()
-    .header("api.h")
-    .probe_type_layout("struct api_context")
-    .probe_type_layout("struct api_config")
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>The resulting package will include <code>package.layouts</code>.</p>
-<p>This is the preferred path when the binding package needs to carry extracted declarations and layout evidence together.</p>
-<p>Repeated probe requests append in order.
-No implicit deduplication is performed today.</p>
-<h2 id="diagnostics-and-partial-success"><a class="header" href="#diagnostics-and-partial-success">Diagnostics And Partial Success</a></h2>
-<p>LINC is intentionally diagnostic-heavy.
-A scan can succeed structurally while still recording unsupported constructs.</p>
-<p>Always inspect:</p>
-<ul>
-<li><code>package.diagnostics</code></li>
-<li><code>report.preprocessed_source</code></li>
-</ul>
-<p>Treat a “successful” scan with important diagnostics as an incomplete binding package, not a final truth.</p>
-<h2 id="raw-header-result-example"><a class="header" href="#raw-header-result-example">Raw Header Result Example</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::HeaderConfig;
-
-let result = HeaderConfig::new()
-    .header("api.h")
-    .include_dir("include")
-    .process()?;
-
-println!("compiler: {}", result.report.command);
-println!("argv: {:?}", result.report.args);
-println!("items: {}", result.package.items.len());
-println!("diagnostics: {}", result.package.diagnostics.len());
-<span class="boring">}</span></code></pre>
-<h2 id="failure-modes-to-expect"><a class="header" href="#failure-modes-to-expect">Failure Modes To Expect</a></h2>
-<p>The most common failure categories are:</p>
-<ul>
-<li>header not found</li>
-<li>compiler/preprocessor invocation mismatch</li>
-<li>missing defines or include paths</li>
-<li>unsupported source constructs reduced to diagnostics</li>
-<li>layout probe requests for names the compiler cannot resolve</li>
-</ul>
-<p>When debugging, reduce the problem in this order:</p>
-<ol>
-<li>confirm the compiler command and args</li>
-<li>inspect the preprocessed source</li>
-<li>disable origin filtering if declarations appear missing</li>
-<li>compare the extracted item set against the original header intent</li>
-</ol>
+<p>You can request ABI layout facts directly in the bootstrap configuration. The
+resulting package will include layout evidence when probe requests succeed.</p>
 
                     </main>
 

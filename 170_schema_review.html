@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Schema Version Review - BIC Reference</title>
+        <title>Schema Version Review - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -180,33 +180,15 @@
 <p>The schema version remains:</p>
 <pre><code class="language-text">SCHEMA_VERSION = 1
 </code></pre>
-<p>That is intentional for the current phase.</p>
 <h2 id="why-it-has-not-been-bumped-yet"><a class="header" href="#why-it-has-not-been-bumped-yet">Why It Has Not Been Bumped Yet</a></h2>
-<p>The IR has grown substantially, but the recent changes have mostly been of this form:</p>
-<ul>
-<li>additive fields</li>
-<li>additive nested metadata</li>
-<li>serde-defaultable structures</li>
-<li>richer evidence attached to existing top-level containers</li>
-</ul>
-<p>Those changes are important, but they do not automatically justify a schema
-bump unless they change the meaning of previously valid artifacts in a
-non-defaultable way.</p>
+<p>The recent changes have mostly been additive fields, additive nested metadata,
+serde-defaultable structures, and richer evidence attached to existing
+top-level containers.</p>
 <h2 id="current-review-standard"><a class="header" href="#current-review-standard">Current Review Standard</a></h2>
-<p>A future bump to <code>2</code> should happen when one or more of these become true:</p>
-<ul>
-<li>an existing field changes meaning in a way old consumers would misread</li>
-<li>a representation changes in a non-defaultable way</li>
-<li>downstream consumers need a new explicit artifact boundary</li>
-<li>the project decides the current documented shape can no longer evolve safely within <code>v1</code></li>
-</ul>
-<h2 id="practical-consequence"><a class="header" href="#practical-consequence">Practical Consequence</a></h2>
-<p>Today, downstream consumers should read the current status as:</p>
-<ul>
-<li><code>v1</code> is still the active artifact line</li>
-<li>the current <code>v1</code> shape is hardened by fixtures and tests</li>
-<li>a future <code>v2</code> should be deliberate, documented, and paired with updated fixtures and consumer expectations</li>
-</ul>
+<p>A future bump to <code>2</code> should happen when an existing field changes meaning in a
+way old consumers would misread, a representation changes in a non-defaultable
+way, or the project decides the current shape can no longer evolve safely
+within <code>v1</code>.</p>
 
                     </main>
 

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>JSON Artifacts - BIC Reference</title>
+        <title>JSON Artifacts - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -184,21 +184,10 @@
 </ul>
 <p><code>linc</code> does not carry a backward-compatibility burden for discarded designs.</p>
 <h2 id="first-principle"><a class="header" href="#first-principle">First Principle</a></h2>
-<p>The artifact contract is about semantic meaning, not pretty-print formatting.</p>
-<p>Consumers may depend on:</p>
-<ul>
-<li>documented field names</li>
-<li>documented field meanings</li>
-<li><code>schema_version</code></li>
-<li>documented defaulting behavior when tests rely on it</li>
-</ul>
-<p>Consumers must not depend on:</p>
-<ul>
-<li>whitespace</li>
-<li>pretty-print layout</li>
-<li>incidental field ordering</li>
-<li>undocumented fields that happen to be present today</li>
-</ul>
+<p>Consumers may depend on documented field names, documented field meanings,
+<code>schema_version</code>, and documented defaulting behavior when tests rely on it.</p>
+<p>Consumers must not depend on whitespace, pretty-print layout, incidental field
+ordering, or undocumented fields that happen to be present today.</p>
 <h2 id="main-serialized-artifacts"><a class="header" href="#main-serialized-artifacts">Main Serialized Artifacts</a></h2>
 <p>The main JSON-bearing values are:</p>
 <ul>
@@ -207,81 +196,25 @@
 <li><code>ValidationReport</code></li>
 <li><code>ResolvedLinkPlan</code></li>
 </ul>
-<p>Older package names or historical envelopes are not the contract.</p>
 <h2 id="version-fields"><a class="header" href="#version-fields">Version Fields</a></h2>
-<p>Two version-like fields matter:</p>
-<ul>
-<li><code>schema_version</code></li>
-<li><code>linc_version</code></li>
-</ul>
-<p>They do different jobs.</p>
-<h3 id="schema_version"><a class="header" href="#schema_version"><code>schema_version</code></a></h3>
-<p><code>schema_version</code> is the artifact gate.</p>
-<p>Consumers should use it to decide whether they understand the artifact shape
-they are about to ingest.</p>
-<p>Rules:</p>
-<ul>
-<li>if <code>schema_version</code> is newer than the consumer understands, reject it</li>
-<li>if the shape changes in a meaning-changing way, review it explicitly and update tests</li>
-<li>if a field is only additive and has a safe default, document that choice and test it</li>
-</ul>
-<h3 id="linc_version"><a class="header" href="#linc_version"><code>linc_version</code></a></h3>
-<p><code>linc_version</code> identifies the producing build.</p>
-<p>It is useful for:</p>
-<ul>
-<li>diagnostics</li>
-<li>audits</li>
-<li>bug reproduction</li>
-<li>provenance</li>
-</ul>
-<p>It is not the primary shape gate.</p>
+<p><code>schema_version</code> is the artifact gate. <code>linc_version</code> identifies the producing
+build and is useful for provenance.</p>
 <h2 id="change-policy"><a class="header" href="#change-policy">Change Policy</a></h2>
-<p>Because these crates are still new, the policy is intentionally strict and
-simple:</p>
 <ul>
 <li>do not preserve obsolete artifact envelopes just because they existed earlier</li>
 <li>do not keep old field layouts alive unless current tests still need them</li>
 <li>do make semantic changes explicit in docs and fixtures</li>
-<li>do update <code>schema_version</code> when consumers would otherwise misread the artifact</li>
-</ul>
-<h2 id="producer-guidance"><a class="header" href="#producer-guidance">Producer Guidance</a></h2>
-<p>If a tool emits <code>linc</code> JSON:</p>
-<ol>
-<li>preserve <code>schema_version</code> exactly</li>
-<li>serialize the documented artifact, not an old transitional wrapper</li>
-<li>keep fixture coverage in sync with newly relied-on fields</li>
-<li>treat <code>linc_version</code> as provenance, not as the shape contract</li>
-</ol>
-<h2 id="consumer-guidance"><a class="header" href="#consumer-guidance">Consumer Guidance</a></h2>
-<p>If a tool consumes <code>linc</code> JSON:</p>
-<ol>
-<li>check <code>schema_version</code></li>
-<li>deserialize into the currently documented structure</li>
-<li>rely on documented semantics only</li>
-<li>reject future shapes instead of guessing</li>
-</ol>
-<h2 id="what-counts-as-a-real-shape-change"><a class="header" href="#what-counts-as-a-real-shape-change">What Counts As A Real Shape Change</a></h2>
-<p>These usually require explicit review and likely a schema bump:</p>
-<ul>
-<li>changing the meaning of an existing field</li>
-<li>removing a relied-on field</li>
-<li>changing representation so an older consumer would misread the artifact</li>
-<li>promoting previously incidental data into required semantics</li>
-</ul>
-<p>These may stay within the same schema line if documented and tested:</p>
-<ul>
-<li>adding a new field with a safe default</li>
-<li>adding new metadata that older consumers can ignore without semantic confusion</li>
-<li>clarifying documentation without changing meaning</li>
+<li>do update <code>schema_version</code> when consumers would otherwise misread the
+artifact</li>
 </ul>
 <h2 id="maintenance-rule"><a class="header" href="#maintenance-rule">Maintenance Rule</a></h2>
-<p>The tests are the practical statement of the JSON contract.</p>
 <p>When artifact shapes change:</p>
 <ol>
 <li>update the docs</li>
 <li>update or replace the relevant fixtures</li>
 <li>update consumers in tests/examples/harnesses</li>
-<li>do not carry a dead compatibility layer just to keep an obsolete shape deserializable</li>
+<li>do not carry a dead compatibility layer just to keep an obsolete shape
+deserializable</li>
 </ol>
 
                     </main>

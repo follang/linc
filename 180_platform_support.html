@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Platform Support - BIC Reference</title>
+        <title>Platform Support - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -176,8 +176,6 @@
                     <main>
                         <h1 id="platform-support"><a class="header" href="#platform-support">Platform Support</a></h1>
 <p>This chapter records the current practical platform-support posture of LINC.</p>
-<p>The important point is that “parses some C” and “production-ready across native platforms” are
-not the same claim.</p>
 <h2 id="current-matrix"><a class="header" href="#current-matrix">Current Matrix</a></h2>
 <div class="table-wrapper">
 <table>
@@ -186,7 +184,7 @@ not the same claim.</p>
 </thead>
 <tbody>
 <tr><td>header scanning</td><td>usable</td><td>usable with Apple-specific link metadata support</td><td>limited by missing Windows-native completion work</td></tr>
-<tr><td>macro capture</td><td>usable</td><td>usable</td><td>mostly compiler-dependent, not yet fully characterized</td></tr>
+<tr><td>macro capture</td><td>usable</td><td>usable</td><td>compiler-dependent and not yet fully characterized</td></tr>
 <tr><td>layout probing</td><td>usable with GCC/Clang-style toolchains</td><td>usable with Clang-style toolchains</td><td>not yet a completed support target</td></tr>
 <tr><td>symbol inventory</td><td>usable</td><td>partial but present</td><td>present for COFF objects, import libraries, and PE binaries, but still not production-ready</td></tr>
 <tr><td>validation</td><td>usable where symbol inventory is usable</td><td>partial</td><td>limited; supported inventory classes are tested but the Windows linker model is still incomplete</td></tr>
@@ -195,80 +193,14 @@ not the same claim.</p>
 </table>
 </div>
 <h2 id="what-usable-means-here"><a class="header" href="#what-usable-means-here">What “Usable” Means Here</a></h2>
-<p>In this chapter, usable means:</p>
-<ul>
-<li>the feature exists</li>
-<li>it has direct test coverage in this repository</li>
-<li>it is reasonable for controlled internal use</li>
-</ul>
-<p>It does not automatically mean:</p>
-<ul>
-<li>ABI completeness for arbitrary third-party libraries</li>
-<li>long-term semver confidence for every edge case</li>
-<li>parity with every compiler and linker variant on that platform</li>
-</ul>
-<h2 id="linux--elf"><a class="header" href="#linux--elf">Linux / ELF</a></h2>
-<p>Linux/ELF is currently the strongest native-artifact path in the library.</p>
-<p>That includes:</p>
-<ul>
-<li>object/archive/shared-library inspection</li>
-<li>dependency-edge capture from shared libraries</li>
-<li>validation against discovered symbols</li>
-<li>direct matrix tests for ELF object, static-library, and shared-library format/capability expectations</li>
-</ul>
-<p>For current production-oriented internal use, ELF should be treated as the primary supported
-native-artifact environment.</p>
-<p>The fixture suite also now carries explicit decorated-name regression coverage so cross-platform
-symbol matching behavior stays pinned even when the full Windows artifact path is still incomplete.</p>
-<h2 id="apple--mach-o"><a class="header" href="#apple--mach-o">Apple / Mach-O</a></h2>
-<p>Mach-O support exists and is useful, but it is still behind ELF in overall maturity.</p>
-<p>Current strengths:</p>
-<ul>
-<li>Mach-O symbol parsing exists</li>
-<li>framework metadata is modeled in the link surface</li>
-<li>Apple-specific scan metadata can be preserved</li>
-<li>direct matrix tests cover Mach-O object, static-library, and dylib format/capability expectations</li>
-</ul>
-<p>Across the currently supported ELF and Mach-O surfaces, the test suite also asserts a shared
-artifact-kind/platform capability matrix so support claims stay aligned with the actual inventory
-model.</p>
-<p>Current caveats:</p>
-<ul>
-<li>validation depth is not yet as battle-tested as ELF</li>
-<li>platform-specific linking behavior is still less fully modeled than it needs to be for a strong
-“full binder/linker” claim</li>
-</ul>
-<h2 id="windows--coff"><a class="header" href="#windows--coff">Windows / COFF</a></h2>
-<p>Windows-native artifact support should currently be read as incomplete.</p>
-<p>That means downstream consumers should not yet assume:</p>
-<ul>
-<li>full import-library inspection parity</li>
-<li>robust decoration handling across Windows-native conventions</li>
-<li>production-ready validation against the Windows linker model</li>
-</ul>
-<p>This is a roadmap gap, not just a documentation gap.</p>
-<p>What is now explicitly covered:</p>
-<ul>
-<li>COFF object inventory classification</li>
-<li>Windows import-library classification</li>
-<li>PE executable / PE dynamic-library inventory classification</li>
-<li>checked-in Windows artifact fixture coverage</li>
-</ul>
-<p>What is still not done:</p>
-<ul>
-<li>deep ABI-aware Windows validation</li>
-<li>loader/forwarder completeness</li>
-<li>production-grade decoration and provider-resolution behavior across the whole Windows toolchain surface</li>
-</ul>
+<p>Usable means the feature exists, it has direct test coverage in this
+repository, and it is reasonable for controlled internal use.</p>
 <h2 id="recommended-production-posture"><a class="header" href="#recommended-production-posture">Recommended Production Posture</a></h2>
-<p>For now:</p>
 <ul>
 <li>prefer Linux/ELF for the most mature end-to-end native validation path</li>
 <li>treat Apple support as useful but still maturing</li>
 <li>treat Windows-native linker/artifact support as incomplete</li>
 </ul>
-<p>If another tool depends on LINC in a multi-platform release flow, that tool should encode these
-platform expectations explicitly rather than assuming uniform maturity.</p>
 
                     </main>
 

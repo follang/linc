@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Error Taxonomy - BIC Reference</title>
+        <title>Error Taxonomy - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,102 +175,31 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="error-taxonomy"><a class="header" href="#error-taxonomy">Error Taxonomy</a></h1>
-<p>This chapter defines the intended typed error taxonomy that later implementation slices should converge on.</p>
-<p>It is a design slice first.
-It does not yet mean every operational API has been migrated.</p>
+<p>This chapter defines the intended typed error taxonomy that later
+implementation slices should converge on.</p>
 <h2 id="goal"><a class="header" href="#goal">Goal</a></h2>
-<p><code>LincError</code> should become the crate-wide typed failure surface for operational failures.</p>
-<p>The design target is to separate these concerns cleanly:</p>
-<ul>
-<li>configuration and scan execution failures</li>
-<li>preprocessing and parse failures</li>
-<li>ABI probe failures</li>
-<li>artifact inspection failures</li>
-<li>serialization and schema failures</li>
-</ul>
-<p>Validation findings are deliberately different.
-They should remain structured report output, not thrown as operational errors.</p>
-<h2 id="current-lincerror-coverage"><a class="header" href="#current-lincerror-coverage">Current <code>LincError</code> Coverage</a></h2>
-<p>The current enum already contains variants for:</p>
-<ul>
-<li>missing headers</li>
-<li>preprocessor failure</li>
-<li>parse failure</li>
-<li>I/O failure</li>
-<li>serialization failure</li>
-<li>symbol-read failure</li>
-<li>unsupported artifact format</li>
-<li>schema-version mismatch</li>
-</ul>
-<p>That is a decent starting point, but it is not yet the final operational taxonomy.</p>
+<p><code>LincError</code> should be the crate-wide typed failure surface for operational
+failures.</p>
+<p>The design target is to separate configuration and scan execution failures,
+preprocessing and parse failures, ABI probe failures, artifact inspection
+failures, and serialization or schema failures.</p>
+<p>Validation findings are deliberately different. They should remain structured
+report output, not thrown as operational errors.</p>
+<h2 id="current-coverage"><a class="header" href="#current-coverage">Current Coverage</a></h2>
+<p>The current enum already contains variants for missing headers, preprocessor
+failure, parse failure, I/O failure, serialization failure, symbol-read
+failure, unsupported artifact format, and schema-version mismatch.</p>
 <h2 id="intended-category-boundaries"><a class="header" href="#intended-category-boundaries">Intended Category Boundaries</a></h2>
-<h2 id="1-scan-and-configuration-failures"><a class="header" href="#1-scan-and-configuration-failures">1. Scan And Configuration Failures</a></h2>
-<p>These are failures such as:</p>
-<ul>
-<li>missing entry headers</li>
-<li>invalid or contradictory scan configuration</li>
-<li>scan setup that cannot be normalized safely</li>
-</ul>
-<p>The important design rule is:</p>
 <ul>
 <li>configuration failure should be distinguishable from compiler failure</li>
-</ul>
-<h2 id="2-preprocessing-and-parse-failures"><a class="header" href="#2-preprocessing-and-parse-failures">2. Preprocessing And Parse Failures</a></h2>
-<p>These cover:</p>
-<ul>
-<li>compiler/preprocessor invocation failures</li>
-<li>parse failures after preprocessing</li>
-</ul>
-<p>The important design rule is:</p>
-<ul>
-<li>consumers should be able to distinguish “the toolchain invocation failed” from “the source did not parse”</li>
-</ul>
-<h2 id="3-probe-failures"><a class="header" href="#3-probe-failures">3. Probe Failures</a></h2>
-<p>These cover ABI/layout probe execution problems such as:</p>
-<ul>
-<li>compiler invocation failure</li>
-<li>probe program compilation failure</li>
-<li>probe output parse failure</li>
-</ul>
-<p>The important design rule is:</p>
-<ul>
+<li>consumers should be able to distinguish toolchain invocation failure from
+source parse failure</li>
 <li>probe failures should not be collapsed into generic scan or I/O text</li>
+<li>path and context should be preserved in typed artifact errors</li>
 </ul>
-<h2 id="4-artifact-inspection-failures"><a class="header" href="#4-artifact-inspection-failures">4. Artifact Inspection Failures</a></h2>
-<p>These cover:</p>
-<ul>
-<li>unreadable native artifacts</li>
-<li>unsupported native formats</li>
-<li>malformed or unparseable artifact contents</li>
-</ul>
-<p>The important design rule is:</p>
-<ul>
-<li>path/context should be preserved in the typed error</li>
-</ul>
-<h2 id="5-serialization-and-schema-failures"><a class="header" href="#5-serialization-and-schema-failures">5. Serialization And Schema Failures</a></h2>
-<p>These cover:</p>
-<ul>
-<li>JSON serialization/deserialization failures</li>
-<li>schema-version mismatch</li>
-</ul>
-<p>This is currently the most mature typed-error area in the crate.</p>
 <h2 id="validation-is-not-an-error-channel"><a class="header" href="#validation-is-not-an-error-channel">Validation Is Not An Error Channel</a></h2>
-<p>This point matters enough to say twice:</p>
-<ul>
-<li>validation mismatches should not be encoded as <code>LincError</code></li>
-<li>validation should keep returning <code>ValidationReport</code></li>
-</ul>
-<p>That keeps operational failure separate from analytical result data.</p>
-<h2 id="migration-direction"><a class="header" href="#migration-direction">Migration Direction</a></h2>
-<p>The intended migration order is:</p>
-<ol>
-<li>define the taxonomy</li>
-<li>migrate raw-header scanning</li>
-<li>migrate probing</li>
-<li>migrate symbol inspection</li>
-<li>add stable tests for error categories and messages</li>
-</ol>
-<p>That sequence avoids changing several operational surfaces without a clear target model.</p>
+<p>Validation mismatches should not be encoded as <code>LincError</code>.
+Validation should keep returning <code>ValidationReport</code>.</p>
 
                     </main>
 

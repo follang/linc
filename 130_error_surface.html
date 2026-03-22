@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Error Surface - BIC Reference</title>
+        <title>Error Surface - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -176,66 +176,29 @@
                     <main>
                         <h1 id="error-surface"><a class="header" href="#error-surface">Error Surface</a></h1>
 <p>This chapter inventories the current public error surface of LINC.</p>
-<p>It is intentionally explicit because one of the main goals of the new roadmap is to replace the remaining unstructured operational errors with typed crate errors.</p>
 <h2 id="current-state"><a class="header" href="#current-state">Current State</a></h2>
-<p>LINC currently has two different public error styles:</p>
-<ul>
-<li>typed errors via <code>LincError</code> (also available as the <code>LincError</code> alias)</li>
-<li>unstructured <code>Result&lt;_, String&gt;</code> returns on several operational APIs</li>
-</ul>
-<p>That split is functional, but it is not yet the final intended API shape.</p>
+<p>LINC exposes typed errors via <code>LincError</code> and structured diagnostics inside
+returned data.</p>
 <h2 id="typed-error-surface-today"><a class="header" href="#typed-error-surface-today">Typed Error Surface Today</a></h2>
-<p>The clearest typed error boundary today is around the explicit workflow APIs:</p>
-<ul>
-<li><code>probe_type_layouts(...) -&gt; Result&lt;AbiProbeReport, LincError&gt;</code></li>
-<li><code>inspect_symbols(...) -&gt; Result&lt;SymbolInventory, LincError&gt;</code></li>
-<li><code>HeaderConfig::validate() -&gt; Result&lt;(), LincError&gt;</code></li>
-</ul>
-<p>By contrast, JSON transport now goes through <code>serde_json</code> directly instead of LINC-owned helper
-functions, so serialization failures are normal serde transport errors unless a consumer wraps
-them at its own boundary.</p>
-<h2 id="remaining-string-returning-apis"><a class="header" href="#remaining-string-returning-apis">Remaining <code>String</code>-Returning APIs</a></h2>
-<p>The current APIs still returning <code>Result&lt;_, String&gt;</code> are:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>API</th><th>Area</th><th>Why it currently uses <code>String</code></th></tr>
-</thead>
-<tbody>
-<tr><td><code>HeaderConfig::process</code></td><td>raw-header scan</td><td>preprocessing, parsing, probe, and scan orchestration errors are not yet normalized</td></tr>
-</tbody>
-</table>
-</div>
-<p>Note: <code>extract_from_source</code> has been narrowed to <code>pub(crate)</code> and is no longer part of the public
-API surface. New consumers should use <code>SourcePackage</code> intake instead.</p>
-<p>These are precisely the APIs targeted by the next error-model workstream.</p>
+<p>The clearest typed error boundary today is around the explicit workflow APIs
+such as <code>probe_type_layouts(...)</code> and <code>inspect_symbols(...)</code>.</p>
 <h2 id="what-consumers-should-do-right-now"><a class="header" href="#what-consumers-should-do-right-now">What Consumers Should Do Right Now</a></h2>
-<p>Until typed operational errors land, downstream users should:</p>
+<p>Downstream users should:</p>
 <ul>
 <li>treat successful return values as stable enough to consume</li>
 <li>treat diagnostics in returned data structures as first-class signals</li>
 <li>avoid matching exact error strings for durable control flow</li>
-<li>wrap <code>String</code> errors at their own boundary if they need structured handling immediately</li>
+<li>wrap stringly errors at their own boundary if they need structured handling
+immediately</li>
 </ul>
 <h2 id="what-counts-as-an-error-vs-a-diagnostic"><a class="header" href="#what-counts-as-an-error-vs-a-diagnostic">What Counts As An Error vs A Diagnostic</a></h2>
-<p>This distinction is not fully standardized yet, but the current pattern is:</p>
 <ul>
 <li>hard operational failures generally return an error</li>
-<li>partially understood source constructs often become diagnostics attached to a returned package</li>
-<li>validation findings are reported as structured match results, not thrown as errors</li>
+<li>partially understood source constructs often become diagnostics attached to a
+returned package</li>
+<li>validation findings are reported as structured match results, not thrown as
+errors</li>
 </ul>
-<p>That is already a useful separation.
-The remaining work is to make the hard-failure side typed and explicit.</p>
-<h2 id="why-this-inventory-matters"><a class="header" href="#why-this-inventory-matters">Why This Inventory Matters</a></h2>
-<p>Without an explicit inventory, it is easy for stringly APIs to linger indefinitely.</p>
-<p>This chapter exists to make the current debt auditable.
-The next steps are not “discover the problem later.”
-They are:</p>
-<ol>
-<li>define the typed taxonomy</li>
-<li>migrate these APIs one by one</li>
-<li>add tests that treat error categories as stable contract</li>
-</ol>
 
                     </main>
 

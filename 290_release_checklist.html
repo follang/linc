@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Release Checklist - BIC Reference</title>
+        <title>Release Checklist - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,57 +175,54 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="release-checklist"><a class="header" href="#release-checklist">Release Checklist</a></h1>
-<p>This chapter is the final release-readiness checklist for LINC.</p>
-<p>It is intentionally operational.
-Use it before cutting a release candidate or publishing a version that downstream consumers are
-expected to pin.</p>
+<p>Use this checklist before cutting a release candidate.</p>
 <h2 id="build-and-test"><a class="header" href="#build-and-test">Build And Test</a></h2>
 <ul>
 <li>run <code>make build</code></li>
 <li>run <code>make test</code></li>
-<li>confirm the normal library test suite passes without newly introduced ignores</li>
-<li>confirm producer-side acceptance tests still pass</li>
-<li>confirm regression fixtures still deserialize and round-trip where expected</li>
+</ul>
+<h2 id="canonical-hardening-gates"><a class="header" href="#canonical-hardening-gates">Canonical Hardening Gates</a></h2>
+<ul>
+<li>confirm hermetic baselines still pass
+<ul>
+<li>vendored zlib</li>
+<li>vendored libpng</li>
+<li>plugin ABI</li>
+<li>combined daemon fixture</li>
+</ul>
+</li>
+<li>confirm at least one host-dependent large-evidence ladder still passes where
+available
+<ul>
+<li>OpenSSL</li>
+<li>Linux event-loop stack</li>
+</ul>
+</li>
+<li>confirm failure suites still reject duplicate, unresolved, hidden, decorated,
+and ABI-questionable cases conservatively</li>
+<li>confirm determinism anchors still hold on the canonical large surfaces</li>
 </ul>
 <h2 id="contract-surfaces"><a class="header" href="#contract-surfaces">Contract Surfaces</a></h2>
 <ul>
-<li>confirm the current documented JSON artifact shapes remain consumable by the
-documented schema version</li>
-<li>confirm <code>ValidationReport</code> fixture coverage still matches current structured fields</li>
-<li>confirm <code>ResolvedLinkPlan</code> remains consumable through the documented downstream subset</li>
-<li>confirm new additive fields use <code>#[serde(default)]</code> only when the documented artifact shape needs it</li>
+<li>confirm the documented JSON artifact shapes remain consumable by the current
+schema version</li>
+<li>confirm <code>ValidationReport</code> fixture coverage still matches current structured
+fields</li>
 </ul>
 <h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
 <ul>
-<li>confirm README wording matches tested behavior and does not overclaim</li>
-<li>confirm the book reflects current API entry points and current platform scope</li>
-<li>confirm documented guarantees are backed by tests or explicit fixtures</li>
-<li>confirm limitations are still described where behavior is conservative rather than complete</li>
-</ul>
-<h2 id="abi-and-native-evidence"><a class="header" href="#abi-and-native-evidence">ABI And Native Evidence</a></h2>
-<ul>
-<li>confirm ABI-sensitive validation changes are covered by regression fixtures</li>
-<li>confirm layout-backed flows remain tested through producer-side acceptance coverage</li>
-<li>confirm ELF and Mach-O inventories still match the intended conservative provider policy</li>
-<li>confirm symbol-provider ambiguity and unresolved-provider paths are still surfaced explicitly</li>
+<li>confirm README wording matches tested behavior</li>
+<li>confirm the book reflects current API entry points and platform scope</li>
 </ul>
 <h2 id="consumer-boundary"><a class="header" href="#consumer-boundary">Consumer Boundary</a></h2>
 <ul>
 <li>confirm the generic library contract stays primary</li>
-<li>confirm <code>fol</code> guidance is still documented as consumer guidance, not universal crate policy</li>
-<li>confirm the producer-side <code>fol</code> acceptance tests still model the intended narrow consumer subset</li>
-<li>confirm cross-package composition is still described as tests/examples/harness work, not crate-to-crate library coupling</li>
+<li>confirm cross-package composition is still described as tests/examples/
+harness work, not crate-to-crate library coupling</li>
 </ul>
 <h2 id="release-decision"><a class="header" href="#release-decision">Release Decision</a></h2>
-<p>Do not treat “builds successfully” as sufficient.</p>
-<p>LINC is ready to release only when:</p>
-<ul>
-<li>the code builds</li>
-<li>the tests pass</li>
-<li>the documented contract still matches the code</li>
-<li>the contract fixtures still match the intended consumer boundary</li>
-<li>the current platform/support claims are still true</li>
-</ul>
+<p>Do not treat “builds successfully” as sufficient. The code, docs, and fixtures
+all need to match the same boundary.</p>
 
                     </main>
 
@@ -235,7 +232,7 @@ documented schema version</li>
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="300_readiness_scorecard.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="295_hermeticity_matrix.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -249,7 +246,7 @@ documented schema version</li>
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="300_readiness_scorecard.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="295_hermeticity_matrix.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

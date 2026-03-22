@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Failure Model - BIC Reference</title>
+        <title>Failure Model - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,119 +175,24 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="failure-model"><a class="header" href="#failure-model">Failure Model</a></h1>
-<p>This chapter defines the intended behavior boundary between hard failures, diagnostics, and validation findings.</p>
-<p>This is important because typed errors alone do not solve API clarity if consumers still do not know what should fail versus what should be reported as structured analysis output.</p>
+<p>This chapter defines the intended boundary between hard failures, diagnostics,
+and validation findings.</p>
 <h2 id="the-three-outcome-classes"><a class="header" href="#the-three-outcome-classes">The Three Outcome Classes</a></h2>
-<p>LINC currently has three practical outcome classes:</p>
 <ol>
 <li>hard operational failure</li>
 <li>successful analysis with diagnostics</li>
 <li>successful validation with findings</li>
 </ol>
-<h2 id="1-hard-operational-failure"><a class="header" href="#1-hard-operational-failure">1. Hard Operational Failure</a></h2>
-<p>These are failures where the requested operation could not produce a meaningful result.</p>
-<p>Examples:</p>
-<ul>
-<li>unreadable input files</li>
-<li>schema-version mismatch during JSON import</li>
-<li>preprocessing or parse failure severe enough that no usable analysis result can be produced</li>
-<li>probe execution failure</li>
-<li>artifact inspection failure</li>
-</ul>
-<p>These should be represented as returned errors.</p>
-<h2 id="2-successful-analysis-with-diagnostics"><a class="header" href="#2-successful-analysis-with-diagnostics">2. Successful Analysis With Diagnostics</a></h2>
-<p>These are cases where LINC can still return a meaningful package, but the result is incomplete, lossy, or carries analysis warnings.</p>
-<p>Examples:</p>
-<ul>
-<li>unsupported source constructs that are recognized but not fully modeled</li>
-<li>best-effort extraction where fidelity is partial</li>
-<li>source features that are reduced to diagnostics instead of hard failure</li>
-</ul>
-<p>These should appear in:</p>
-<ul>
-<li><code>BindingPackage.diagnostics</code></li>
-</ul>
-<p>The important consumer rule is:</p>
-<ul>
-<li>a successful return does not automatically mean “safe to generate without review”</li>
-</ul>
-<h2 id="3-successful-validation-with-findings"><a class="header" href="#3-successful-validation-with-findings">3. Successful Validation With Findings</a></h2>
-<p>Validation is not a hard-error channel for normal mismatches.</p>
-<p>Examples:</p>
-<ul>
-<li>missing symbols</li>
-<li>hidden symbols</li>
-<li>decoration mismatches</li>
-<li>duplicate providers</li>
-<li>unresolved declared link inputs</li>
-</ul>
-<p>These should appear in:</p>
-<ul>
-<li><code>ValidationReport</code></li>
-</ul>
-<p>The important consumer rule is:</p>
-<ul>
-<li>validation findings are analytical results, not transport failure</li>
-</ul>
-<h2 id="current-practical-guidance"><a class="header" href="#current-practical-guidance">Current Practical Guidance</a></h2>
-<p>Downstream code should currently interpret the library like this:</p>
+<h2 id="consumer-rule"><a class="header" href="#consumer-rule">Consumer Rule</a></h2>
 <ul>
 <li><code>Err(...)</code> means the requested operation itself failed</li>
-<li>diagnostics mean the operation succeeded, but the returned analysis may be partial or lossy</li>
-<li>validation findings mean the operation succeeded and produced evidence that the native surface does not match expectations cleanly</li>
+<li>diagnostics mean the operation succeeded, but the returned analysis may be
+partial or lossy</li>
+<li>validation findings mean the operation succeeded and produced evidence that
+the native surface does not match expectations cleanly</li>
 </ul>
-<h2 id="partial-success-semantics"><a class="header" href="#partial-success-semantics">Partial-Success Semantics</a></h2>
-<p>The important production rule is that successful return and acceptable return are different questions.</p>
-<p>A practical consumer decision flow is:</p>
-<ol>
-<li>if the operation returned <code>Err(...)</code>, treat it as an execution failure</li>
-<li>if the operation succeeded, inspect <code>BindingPackage.diagnostics</code></li>
-<li>if layouts were expected, verify that the expected <code>package.layouts</code> evidence is present</li>
-<li>if native artifacts matter, run validation and inspect the resulting <code>ValidationReport</code></li>
-<li>only then decide whether generation should continue</li>
-</ol>
-<p>This means a robust downstream integration should not collapse everything into a single boolean
-“success” value.</p>
-<h3 id="when-diagnostics-should-block-generation"><a class="header" href="#when-diagnostics-should-block-generation">When Diagnostics Should Block Generation</a></h3>
-<p>In most real pipelines, diagnostics should be treated as blocking when they indicate:</p>
-<ul>
-<li>unsupported declarations that are required by the generated binding surface</li>
-<li>partial extraction of ABI-relevant constructs</li>
-<li>preprocessing or parse recovery that leaves the package materially incomplete</li>
-</ul>
-<p>Diagnostics may be non-blocking when they affect declarations that the downstream generator does
-not intend to expose.</p>
-<h3 id="when-validation-findings-should-block-linking-or-publication"><a class="header" href="#when-validation-findings-should-block-linking-or-publication">When Validation Findings Should Block Linking Or Publication</a></h3>
-<p>Validation findings should usually block the next stage when they show:</p>
-<ul>
-<li>missing required symbols</li>
-<li>duplicate visible providers for the same declaration</li>
-<li>unresolved declared native inputs</li>
-<li>visibility or decoration mismatches that make the selected provider ambiguous</li>
-</ul>
-<p>Validation findings are still structured output rather than execution failure, but they are often
-release-blocking evidence.</p>
-<h2 id="consumer-decision-table"><a class="header" href="#consumer-decision-table">Consumer Decision Table</a></h2>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Outcome</th><th>Meaning</th><th>Typical downstream response</th></tr>
-</thead>
-<tbody>
-<tr><td><code>Err(...)</code></td><td>operation could not produce a usable result</td><td>stop immediately</td></tr>
-<tr><td>success + no important diagnostics</td><td>analysis succeeded cleanly enough</td><td>continue</td></tr>
-<tr><td>success + diagnostics</td><td>analysis completed, but may be partial or lossy</td><td>review or gate</td></tr>
-<tr><td>success + validation findings</td><td>artifact comparison completed and found mismatches</td><td>block publish/link until resolved</td></tr>
-</tbody>
-</table>
-</div>
-<h2 id="why-this-distinction-matters"><a class="header" href="#why-this-distinction-matters">Why This Distinction Matters</a></h2>
-<p>Without this distinction, downstream consumers tend to make one of two mistakes:</p>
-<ul>
-<li>treating diagnostics as harmless warnings when they may indicate unusable bindings</li>
-<li>treating validation mismatches as exceptional control flow rather than structured evidence</li>
-</ul>
-<p>This chapter makes the intended split explicit before later slices migrate more APIs to typed errors.</p>
+<p>That means a robust downstream integration should not collapse everything into
+a single boolean “success” value.</p>
 
                     </main>
 

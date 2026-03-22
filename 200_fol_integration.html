@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>fol Integration Guide - BIC Reference</title>
+        <title>fol Integration Guide - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,167 +175,50 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="fol-integration-guide"><a class="header" href="#fol-integration-guide"><code>fol</code> Integration Guide</a></h1>
-<p>This chapter describes the intended producer/consumer contract between LINC and <code>fol</code>.</p>
-<p>LINC should be read as the C-analysis producer.
-<code>fol</code> should be read as the downstream consumer that decides what to generate, what to reject, and
-how to assemble its final binding/link workflow.</p>
+<p>This chapter describes the intended producer/consumer contract between LINC
+and <code>fol</code>.</p>
 <h2 id="division-of-responsibility"><a class="header" href="#division-of-responsibility">Division Of Responsibility</a></h2>
-<p>The intended split is:</p>
 <ul>
-<li>LINC extracts declarations, metadata, diagnostics, layouts, and native-surface evidence</li>
-<li><code>fol</code> consumes that evidence to generate bindings, choose generation policy, and drive any final
-language/runtime-specific integration</li>
+<li>LINC extracts declarations, metadata, diagnostics, layouts, and native
+evidence</li>
+<li><code>fol</code> consumes that evidence to generate bindings and apply policy</li>
 </ul>
-<p>LINC is not expected to replace <code>fol</code>.
-It is expected to provide a stable machine contract that <code>fol</code> can trust.</p>
-<h2 id="what-linc-should-produce-for-fol"><a class="header" href="#what-linc-should-produce-for-fol">What LINC Should Produce For <code>fol</code></a></h2>
-<p>For a healthy integration, <code>fol</code> should expect LINC to provide:</p>
+<h2 id="what-fol-should-expect"><a class="header" href="#what-fol-should-expect">What <code>fol</code> Should Expect</a></h2>
 <ul>
 <li><code>BindingPackage</code> as the primary declaration and metadata contract</li>
-<li><code>BindingPackage.diagnostics</code> as explicit extraction warnings and partial-fidelity signals</li>
-<li><code>BindingPackage.layouts</code> when ABI-sensitive types need compiler-probed evidence</li>
+<li><code>BindingPackage.diagnostics</code> as explicit extraction warnings and
+partial-fidelity signals</li>
+<li><code>BindingPackage.layouts</code> when ABI-sensitive types need compiler-probed
+evidence</li>
 <li><code>BindingPackage.link</code> as the normalized native dependency surface</li>
 <li><code>SymbolInventory</code> and <code>ValidationReport</code> when native artifact matching matters</li>
 </ul>
-<h2 id="what-fol-should-treat-as-required-inputs"><a class="header" href="#what-fol-should-treat-as-required-inputs">What <code>fol</code> Should Treat As Required Inputs</a></h2>
-<p>For simple declaration-only generation, <code>fol</code> can often start with:</p>
-<ul>
-<li><code>BindingPackage.items</code></li>
-<li><code>BindingPackage.diagnostics</code></li>
-</ul>
-<p>For ABI-sensitive or publication-quality generation, <code>fol</code> should generally also require:</p>
-<ul>
-<li>expected layout evidence in <code>BindingPackage.layouts</code></li>
-<li>link metadata in <code>BindingPackage.link</code></li>
-<li>validation evidence against real native artifacts where applicable</li>
-</ul>
 <h2 id="recommended-end-to-end-flow"><a class="header" href="#recommended-end-to-end-flow">Recommended End-To-End Flow</a></h2>
-<p>The intended high-confidence flow is:</p>
 <ol>
-<li>run LINC header scanning or preprocessed parsing</li>
+<li>run LINC header scanning or source analysis</li>
 <li>inspect <code>BindingPackage.diagnostics</code></li>
 <li>require layout probes for ABI-sensitive types</li>
 <li>inspect native artifacts and run validation when linkable symbols matter</li>
-<li>serialize or pass the resulting structured values to <code>fol</code></li>
+<li>pass the resulting structured values to <code>fol</code></li>
 <li>let <code>fol</code> decide what to generate, reject, or gate behind policy</li>
 </ol>
-<p>When <code>fol</code> applies probe-aware gating, it should read retained probe diagnostics intentionally:</p>
-<ul>
-<li><code>ProbeUnavailable</code> means the requested type did not produce honest layout evidence and should
-usually be treated as “do not lower by value unless you have another trusted reason”</li>
-<li><code>ProbeFailed</code> means the probe mechanism itself was not trustworthy for that request and should
-normally block generation until fixed</li>
-</ul>
-<p>That distinction matters because an opaque-handle API and a broken probe request are not the same
-problem, even though both can leave <code>BindingPackage.layouts</code> without the requested subject.</p>
 <h2 id="contract-boundaries"><a class="header" href="#contract-boundaries">Contract Boundaries</a></h2>
-<p>The key contract boundaries are:</p>
 <ul>
 <li><code>schema_version</code> is the wire-compatibility gate</li>
 <li><code>linc_version</code> is producer provenance</li>
-<li><code>BindingPackage</code> is the declaration/metadata contract</li>
+<li><code>BindingPackage</code> is the declaration and metadata contract</li>
 <li><code>ValidationReport</code> is evidence, not an exception channel</li>
 <li>diagnostics are part of the data contract, not incidental logs</li>
 </ul>
-<h2 id="fixture-driven-consumer-testing"><a class="header" href="#fixture-driven-consumer-testing">Fixture-Driven Consumer Testing</a></h2>
-<p>This repository also carries serialized fixture packages for downstream-consumer tests.</p>
-<p>Those fixtures are example consumer fixtures, not the universal crate contract.
-They exist so a downstream tool such as <code>fol</code> can pin a narrow, intentional subset of the generic
-library contract and regression-test it without depending on live repository state.</p>
-<p>The current fixture tiers are:</p>
-<ul>
-<li>a minimal package fixture that exercises the smallest durable generation contract</li>
-<li>an extended package fixture that exercises additive evidence such as macros, layouts, and link
-metadata</li>
-</ul>
-<p>The repository now also carries producer-side <code>fol</code> acceptance tests that exercise:</p>
-<ul>
-<li>a live binding-scan flow serialized into a narrow consumer subset</li>
-<li>a native validation plus link-plan flow serialized into a narrow consumer subset</li>
-</ul>
-<p>That keeps the generic library contract primary while still regression-testing the concrete <code>fol</code>
-integration profile.</p>
-<h2 id="what-fol-should-not-assume"><a class="header" href="#what-fol-should-not-assume">What <code>fol</code> Should Not Assume</a></h2>
-<p><code>fol</code> should not assume:</p>
-<ul>
-<li>every successful scan is generation-ready</li>
-<li>declarations alone are enough for ABI-sensitive output</li>
-<li>every platform has equal artifact-inspection maturity</li>
-<li>exact free-form error strings are stable control-flow keys</li>
-<li>missing validation means “safe”, rather than “not yet checked”</li>
-</ul>
-<h2 id="recommended-consumer-gates-in-fol"><a class="header" href="#recommended-consumer-gates-in-fol">Recommended Consumer Gates In <code>fol</code></a></h2>
-<p><code>fol</code> should make these gates explicit in its own pipeline:</p>
-<ul>
-<li>block on operational errors</li>
-<li>block on diagnostics that affect required declarations</li>
-<li>block on missing required layouts</li>
-<li>block on validation findings for required native symbols</li>
-<li>block on unsupported <code>schema_version</code></li>
-</ul>
-<p>These gates should be policy decisions in <code>fol</code>, but the evidence should come from LINC.</p>
-<h2 id="recommended-gating-policy"><a class="header" href="#recommended-gating-policy">Recommended Gating Policy</a></h2>
-<p>If <code>fol</code> wants one concrete, conservative policy that matches the current producer-side
-acceptance tests, the recommended order is:</p>
-<ol>
-<li>reject unsupported <code>schema_version</code></li>
-<li>reject operational failures from scanning, probing, or artifact inspection</li>
-<li>inspect diagnostics and stop when required declarations or ABI-sensitive surfaces are marked as
-partial, unsupported, or otherwise unsafe for generation</li>
-<li>require probed layouts for ABI-sensitive records, enums, typedef-backed variables, and other
-by-value surfaces that <code>fol</code> intends to generate as layout-sensitive bindings</li>
-<li>reject validation reports with:
-<ul>
-<li><code>AbiShapeMismatch</code></li>
-<li><code>Missing</code></li>
-<li><code>UnresolvedDeclaredLinkInputs</code></li>
-<li><code>DuplicateProviders</code></li>
-</ul>
-</li>
-<li>require the resolved link plan to have concrete provider paths for every required native input</li>
-</ol>
-<p>That policy is intentionally narrower than the full generic LINC contract.
-It is a recommended <code>fol</code> profile, not a universal rule for every downstream consumer.</p>
-<h2 id="minimal-vs-extended-fol-trust-surface"><a class="header" href="#minimal-vs-extended-fol-trust-surface">Minimal vs Extended <code>fol</code> Trust Surface</a></h2>
-<p>The current recommendation is to separate two <code>fol</code> modes clearly.</p>
-<p>Minimal declaration-oriented flow:</p>
-<ul>
-<li>trust <code>BindingPackage.items</code></li>
-<li>trust <code>schema_version</code></li>
-<li>require inspection of <code>diagnostics</code></li>
-<li>do not assume ABI-sensitive generation is ready from declarations alone</li>
-</ul>
-<p>Extended ABI/link-aware flow:</p>
-<ul>
-<li>require <code>BindingPackage.layouts</code> for ABI-sensitive types</li>
-<li>require <code>ValidationReport</code> when native symbol presence and ABI shape matter</li>
-<li>require <code>ResolvedLinkPlan</code> when final native dependency assembly matters</li>
-<li>treat any unresolved or ambiguous provider state as a generation gate until <code>fol</code> has explicit
-higher-level policy for that case</li>
-</ul>
-<h2 id="what-fol-should-consider-ready"><a class="header" href="#what-fol-should-consider-ready">What <code>fol</code> Should Consider Ready</a></h2>
-<p>For the current integration profile, <code>fol</code> can treat a package as ready for high-confidence
-generation only when all of the following are true:</p>
-<ul>
-<li>the scanned package deserializes under the expected schema version</li>
-<li>required declarations are present</li>
-<li>required layouts are present for ABI-sensitive generated surfaces</li>
-<li>diagnostics do not contain generation-blocking findings under <code>fol</code> policy</li>
-<li>validation does not report ABI-shape mismatch, missing providers, unresolved declared link
-inputs, or duplicate providers for required native declarations</li>
-<li>the link plan resolves every required native input to at least one concrete provider artifact</li>
-</ul>
-<p>That keeps the <code>fol</code> contract narrow, explicit, and regression-testable while still leaving the
-core LINC library contract general enough for other consumers.</p>
 <h2 id="minimal-durable-contract"><a class="header" href="#minimal-durable-contract">Minimal Durable Contract</a></h2>
-<p>If the integration needs a smallest stable contract first, it should standardize on:</p>
-<ul>
-<li><code>BindingPackage</code></li>
-<li><code>schema_version</code></li>
-<li>diagnostic handling rules</li>
-<li>optional <code>ValidationReport</code> for artifact-backed flows</li>
-</ul>
-<p>That is the narrowest practical boundary that still scales toward fuller binder/linker behavior.</p>
+<p>The shortest durable <code>fol</code> contract is:</p>
+<ol>
+<li>a serialized <code>BindingPackage</code></li>
+<li>optional <code>SymbolInventory</code> values</li>
+<li>optional <code>ValidationReport</code></li>
+<li>explicit consumer policy over diagnostics, layout evidence, and link
+evidence</li>
+</ol>
 
                     </main>
 

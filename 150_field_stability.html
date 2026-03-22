@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Field Stability - BIC Reference</title>
+        <title>Field Stability - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -177,9 +177,6 @@
                         <h1 id="field-stability"><a class="header" href="#field-stability">Field Stability</a></h1>
 <p>This chapter classifies the current <code>BindingPackage</code> artifact by stability
 expectations.</p>
-<p>It does not mean every field is frozen forever.
-It means downstream consumers have an explicit guide for what is safer to rely
-on in the currently documented and tested shape.</p>
 <h2 id="top-level-bindingpackage"><a class="header" href="#top-level-bindingpackage">Top-Level <code>BindingPackage</code></a></h2>
 <p>The top-level package fields fall into three practical groups:</p>
 <ul>
@@ -188,7 +185,6 @@ on in the currently documented and tested shape.</p>
 <li>evolving evidence fields</li>
 </ul>
 <h2 id="contract-identity-fields"><a class="header" href="#contract-identity-fields">Contract Identity Fields</a></h2>
-<p>These are the primary package identity and artifact-shape fields:</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -202,101 +198,13 @@ on in the currently documented and tested shape.</p>
 </table>
 </div>
 <h2 id="stable-container-fields"><a class="header" href="#stable-container-fields">Stable Container Fields</a></h2>
-<p>These are the major package sections downstream tools can reasonably depend on existing:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Field</th><th>Current classification</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>target</code></td><td>stable container</td><td>nested contents may grow</td></tr>
-<tr><td><code>inputs</code></td><td>stable container</td><td>nested contents may grow</td></tr>
-<tr><td><code>macros</code></td><td>stable container</td><td>macro modeling still evolving</td></tr>
-<tr><td><code>layouts</code></td><td>stable container</td><td>probe richness still evolving</td></tr>
-<tr><td><code>link</code></td><td>stable container</td><td>resolution semantics still evolving</td></tr>
-<tr><td><code>items</code></td><td>stable container</td><td>declaration modeling still evolving</td></tr>
-<tr><td><code>diagnostics</code></td><td>stable container</td><td>taxonomy may still deepen</td></tr>
-</tbody>
-</table>
-</div>
-<p>The important distinction is:</p>
-<ul>
-<li>the container concepts are stable enough to build around</li>
-<li>not every nested field should be assumed permanently frozen yet</li>
-</ul>
-<h2 id="nested-stability-guidance"><a class="header" href="#nested-stability-guidance">Nested Stability Guidance</a></h2>
-<h2 id="target"><a class="header" href="#target"><code>target</code></a></h2>
-<p>Current nested fields such as target triple, compiler command, compiler version, and flavor should be treated as:</p>
-<ul>
-<li>stable descriptive metadata</li>
-<li>additive/defaultable</li>
-</ul>
-<p>Consumers may rely on the presence of the <code>target</code> object.
-They should not assume no new target metadata will ever be added.</p>
-<h2 id="inputs"><a class="header" href="#inputs"><code>inputs</code></a></h2>
-<p>The <code>inputs</code> object should be treated as:</p>
-<ul>
-<li>stable input provenance container</li>
-<li>additive/defaultable</li>
-</ul>
-<p>Entry headers, include dirs, and defines are safe concepts to consume.
-The exact set of input metadata may still grow.</p>
-<h2 id="macros"><a class="header" href="#macros"><code>macros</code></a></h2>
-<p>Macro inventory is a stable concept.
-Its precise semantic richness is still evolving.</p>
-<p>Consumers may safely rely on:</p>
-<ul>
-<li>the existence of macro inventory</li>
-<li>macro names and bodies being preserved when captured</li>
-</ul>
-<p>Consumers should be cautious about treating the current kind/category set as the final maximum taxonomy.</p>
-<h2 id="layouts"><a class="header" href="#layouts"><code>layouts</code></a></h2>
-<p>Layout evidence is a stable concept.
-The current <code>TypeLayout</code> shape is still minimal.</p>
-<p>Consumers may rely on:</p>
-<ul>
-<li>package-level layout evidence existing</li>
-<li>current size/align data when present</li>
-</ul>
-<p>Consumers should not assume this is the full eventual ABI layout model.</p>
-<h2 id="link"><a class="header" href="#link"><code>link</code></a></h2>
-<p>The normalized link surface is a stable concept and a core downstream contract area.</p>
-<p>Consumers may rely on:</p>
-<ul>
-<li>package-level link metadata existing</li>
-<li>libraries/frameworks/artifacts/ordered inputs being preserved as concepts</li>
-</ul>
-<p>Consumers should expect:</p>
-<ul>
-<li>additional metadata</li>
-<li>richer resolution semantics</li>
-<li>future resolved-planning data in addition to the current descriptive surface</li>
-</ul>
-<h2 id="items"><a class="header" href="#items"><code>items</code></a></h2>
-<p>Binding items are the core declaration payload and are stable as a container concept.</p>
-<p>Consumers may rely on:</p>
-<ul>
-<li>function, record, enum, typedef, variable, and unsupported item variants existing as current categories</li>
-</ul>
-<p>Consumers should still assume nested type/declaration fidelity will deepen over time.</p>
-<h2 id="diagnostics"><a class="header" href="#diagnostics"><code>diagnostics</code></a></h2>
-<p>Diagnostics are a stable concept.
-Their taxonomy and richness may still expand.</p>
-<p>Consumers may rely on:</p>
-<ul>
-<li>diagnostics being part of the returned package</li>
-<li>diagnostics representing analysis findings rather than transport failure</li>
-</ul>
-<p>Consumers should avoid assuming the current set of diagnostic kinds is final.</p>
+<p>The major package sections downstream tools can reasonably depend on existing
+are <code>target</code>, <code>inputs</code>, <code>macros</code>, <code>layouts</code>, <code>link</code>, <code>items</code>, and
+<code>diagnostics</code>.</p>
 <h2 id="practical-rule-for-downstream-consumers"><a class="header" href="#practical-rule-for-downstream-consumers">Practical Rule For Downstream Consumers</a></h2>
-<p>Today, the safest posture is:</p>
-<ol>
-<li>rely on top-level package sections and documented meanings</li>
-<li>treat nested metadata as additive/defaultable unless explicitly documented as a shape gate</li>
-<li>use <code>schema_version</code> as the hard artifact boundary</li>
-<li>avoid assuming current minimal models are final models</li>
-</ol>
-<p>This is the right balance between “the contract is meaningless” and “every nested field is frozen forever.”</p>
+<p>Rely on top-level package sections and documented meanings, treat nested
+metadata as additive/defaultable unless explicitly documented otherwise, and
+use <code>schema_version</code> as the hard artifact boundary.</p>
 
                     </main>
 

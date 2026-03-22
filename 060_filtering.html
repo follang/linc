@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Origin Filtering - BIC Reference</title>
+        <title>Origin Filtering - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,9 +175,11 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="origin-filtering"><a class="header" href="#origin-filtering">Origin Filtering</a></h1>
-<p>By default, LINC does not blindly keep every declaration found after preprocessing.
-It uses source-origin information to keep the extracted surface focused on the headers you asked for.</p>
-<p>This behavior is one of the reasons scans stay usable on real systems with deep transitive header trees.</p>
+<p>By default, LINC does not blindly keep every declaration found after
+preprocessing. It uses source-origin information to keep the extracted surface
+focused on the headers you asked for.</p>
+<p>This behavior is one of the reasons scans stay usable on real systems with
+deep transitive header trees.</p>
 <h2 id="the-problem-filtering-solves"><a class="header" href="#the-problem-filtering-solves">The Problem Filtering Solves</a></h2>
 <p>A normal header often pulls in:</p>
 <ul>
@@ -186,13 +188,14 @@ It uses source-origin information to keep the extracted surface focused on the h
 <li>project-local support headers</li>
 <li>unrelated transitive declarations</li>
 </ul>
-<p>If all of that were kept by default, a scan of one library header could explode into a large, noisy package dominated by system declarations.</p>
+<p>If all of that were kept by default, a scan of one library header could
+explode into a large, noisy package dominated by system declarations.</p>
 <h2 id="how-origin-tracking-works"><a class="header" href="#how-origin-tracking-works">How Origin Tracking Works</a></h2>
 <p>The C preprocessor emits line markers such as:</p>
 <pre><code class="language-text"># 42 "/usr/include/stdio.h" 3
 </code></pre>
-<p>LINC parses those markers into a <code>FileOriginMap</code>.
-That map is then used to classify declaration offsets.</p>
+<p>LINC parses those markers into a <code>FileOriginMap</code>. That map is then used to
+classify declaration offsets.</p>
 <p>Current origin classes are:</p>
 <div class="table-wrapper">
 <table>
@@ -208,66 +211,36 @@ That map is then used to classify declaration offsets.</p>
 </table>
 </div>
 <h2 id="default-behavior"><a class="header" href="#default-behavior">Default Behavior</a></h2>
-<p>The default <code>OriginFilter</code> keeps:</p>
-<ul>
-<li>entry-header declarations</li>
-<li>user-include declarations</li>
-</ul>
-<p>and excludes:</p>
-<ul>
-<li>system-header declarations</li>
-</ul>
-<p>This is usually the right tradeoff for binding generation because it preserves your API surface while avoiding C runtime clutter.</p>
+<p>The default <code>OriginFilter</code> keeps entry-header declarations and user-include
+declarations, and excludes system-header declarations.</p>
+<p>This is usually the right tradeoff for evidence generation because it
+preserves the API surface while avoiding C runtime clutter.</p>
 <h2 id="disable-filtering-entirely"><a class="header" href="#disable-filtering-entirely">Disable Filtering Entirely</a></h2>
-<p>If you want the complete preprocessed declaration world:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::HeaderConfig;
-
-let result = HeaderConfig::new()
-    .header("mylib.h")
-    .no_origin_filter()
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>This is useful for:</p>
-<ul>
-<li>debugging missing declarations</li>
-<li>validating whether a declaration really exists after preprocessing</li>
-<li>exploring the full translation unit</li>
-</ul>
+<p>Disable filtering when you want the complete preprocessed declaration world.
+That is useful for debugging missing declarations or validating whether a
+declaration really exists after preprocessing.</p>
 <h2 id="custom-filters"><a class="header" href="#custom-filters">Custom Filters</a></h2>
-<p>You can provide an explicit <code>OriginFilter</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::{HeaderConfig, OriginFilter};
-
-let result = HeaderConfig::new()
-    .header("mylib.h")
-    .origin_filter(OriginFilter {
-        include_entry: true,
-        include_user: true,
-        include_system: true,
-    })
-    .process()?;
-<span class="boring">}</span></code></pre>
-<p>That is useful when system declarations are intentionally part of the bindable contract.</p>
+<p>Custom filters are useful when system declarations are intentionally part of
+the bindable contract.</p>
 <h2 id="practical-advice"><a class="header" href="#practical-advice">Practical Advice</a></h2>
 <p>If a declaration seems to be missing:</p>
 <ol>
 <li>rerun with <code>.no_origin_filter()</code></li>
-<li>inspect <code>report.preprocessed_source</code></li>
+<li>inspect the preprocessing report</li>
 <li>confirm the declaration was not removed by macro conditions</li>
 <li>confirm the declaration still maps cleanly to a known origin</li>
 </ol>
-<p>Most “missing item” surprises come from one of those four causes.</p>
+<p>Most missing-item surprises come from one of those four causes.</p>
 <h2 id="why-filtering-happens-after-extraction"><a class="header" href="#why-filtering-happens-after-extraction">Why Filtering Happens After Extraction</a></h2>
-<p>LINC first extracts from the parsed translation unit and then filters by origin.</p>
+<p>LINC first extracts from the parsed translation unit and then filters by
+origin.</p>
 <p>That design has two benefits:</p>
 <ul>
 <li>extraction logic sees the same full parse tree the compiler saw</li>
 <li>filtering policy stays configurable and separate from parsing</li>
 </ul>
-<p>It also means you can inspect the same source through multiple origin policies without changing preprocessing itself.</p>
+<p>It also means you can inspect the same source through multiple origin policies
+without changing preprocessing itself.</p>
 
                     </main>
 

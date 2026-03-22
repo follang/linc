@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Native Evidence - BIC Reference</title>
+        <title>Native Evidence - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,8 +175,8 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="native-evidence"><a class="header" href="#native-evidence">Native Evidence</a></h1>
-<p>This section groups the parts of LINC that compare header-side declarations against native
-artifact-side evidence.</p>
+<p>This section groups the parts of LINC that compare source-side intent against
+native artifact-side evidence.</p>
 <p>Read this section when you care about:</p>
 <ul>
 <li>what symbols an artifact exports or imports</li>
@@ -189,8 +189,14 @@ artifact-side evidence.</p>
 <li>Link Surface</li>
 <li>Validation</li>
 </ol>
-<p>Use this path when you are moving from “I parsed a header” to “I trust this native surface enough
-to generate and link against it”.</p>
+<p>Use this path when you are moving from “I have a source contract” to “I trust
+this native surface enough to generate and link against it”.</p>
+<p>The architectural rule stays the same here too:</p>
+<ul>
+<li>LINC consumes source-shaped input</li>
+<li>LINC emits evidence artifacts</li>
+<li>downstream generation still happens elsewhere</li>
+</ul>
 
                     </main>
 

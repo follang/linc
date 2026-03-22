@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>LINC vs bindgen - BIC Reference</title>
+        <title>LINC vs bindgen - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -174,626 +174,44 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="bic-vs-bindgen--an-architectural-deep-dive"><a class="header" href="#bic-vs-bindgen--an-architectural-deep-dive">BIC vs bindgen — An Architectural Deep Dive</a></h1>
-<p>This document explains how BIC and bindgen approach the same fundamental problem — making C
-libraries usable from Rust — through radically different architectures. It walks through
-parsing, type extraction, ABI discovery, symbol inspection, validation, linking, and code
-generation step by step, showing exactly where each tool does its work and what it produces.</p>
-<hr>
-<h2 id="the-core-difference-in-one-sentence"><a class="header" href="#the-core-difference-in-one-sentence">The Core Difference in One Sentence</a></h2>
-<p><strong>bindgen is a transpiler</strong>: it reads a C header and writes Rust code.
-<strong>BIC is an analysis engine</strong>: it reads a C header <em>and</em> the compiled artifact, cross-references
-them, and produces a structured evidence report that downstream tools can act on.</p>
-<p>bindgen answers: “what does this header say?”
-BIC answers: “what does this header say, does the compiled library agree, and how confident
-should you be?”</p>
-<hr>
-<h2 id="1-parsing"><a class="header" href="#1-parsing">1. Parsing</a></h2>
-<h3 id="how-bindgen-parses-c"><a class="header" href="#how-bindgen-parses-c">How bindgen parses C</a></h3>
-<p>bindgen does not have its own parser. It shells out to <strong>libclang</strong> — the C/C++ compiler
-frontend from the LLVM project — and walks the resulting AST through the <code>clang-sys</code> crate.
-This means:</p>
+                        <h1 id="linc-vs-bindgen"><a class="header" href="#linc-vs-bindgen">LINC vs bindgen</a></h1>
+<p>This document compares two different approaches to C interop from the point of
+view of the current toolchain split.</p>
+<h2 id="the-short-version"><a class="header" href="#the-short-version">The Short Version</a></h2>
 <ul>
-<li>Every machine that builds with bindgen needs a working libclang installation (headers + shared
-library or static archive). On some distros this is <code>libclang-dev</code>, on macOS it comes with
-Xcode, on Windows you install LLVM.</li>
-<li>bindgen inherits libclang’s full C11/C17 and partial C++17 parsing capability. It correctly
-handles platform-specific extensions, GNU attributes, MSVC declspec, Objective-C syntax.</li>
-<li>The downside: libclang is a massive dependency. It drags in the entire Clang frontend at
-either build time (static linking) or runtime (dynamic loading via <code>dlopen</code>). This makes
-cross-compilation painful and CI setup non-trivial.</li>
-<li>For <code>#define</code> macros, libclang provides almost no useful information (it operates on the
-post-preprocessed token stream). bindgen works around this with the <code>cexpr</code> crate — a
-standalone C expression evaluator — to parse integer and string constant macros. Complex
-macros (casts, nested expressions, function-like macros) either fail silently or require
-an opt-in <code>clang_macro_fallback</code> that compiles each macro in isolation.</li>
+<li>bindgen is a header-to-Rust transpiler</li>
+<li>LINC is an evidence engine</li>
 </ul>
-<h3 id="how-bic-parses-c"><a class="header" href="#how-bic-parses-c">How BIC parses C</a></h3>
-<p>BIC uses <strong>PAC</strong> (<code>follang/pac</code>), a custom C parser written entirely in Rust. The pipeline is:</p>
-<ol>
-<li>BIC invokes the system’s C compiler (gcc or clang) <strong>only as a preprocessor</strong> (<code>-E</code> flag)
-to expand includes, evaluate <code>#ifdef</code> blocks, and produce a single preprocessed translation
-unit.</li>
-<li>PAC parses that preprocessed source into a full C AST (<code>TranslationUnit</code>).</li>
-<li>BIC’s <code>Extractor</code> walks the AST and converts C declarations into its own IR.</li>
-</ol>
-<p>The implications are significant:</p>
+<p>bindgen answers “what does this header say?”
+LINC answers “what does the source say, what does the artifact say, and do
+they agree?”</p>
+<h2 id="parsing"><a class="header" href="#parsing">Parsing</a></h2>
+<p>bindgen depends on libclang and the Clang frontend. LINC keeps parsing and
+source extraction upstream of its own evidence layer and does not depend on
+libclang.</p>
+<h2 id="internal-representation"><a class="header" href="#internal-representation">Internal Representation</a></h2>
+<p>bindgen’s IR is transient and internal to one code generation run. LINC’s
+<code>BindingPackage</code> is a durable, serialized evidence contract.</p>
+<h2 id="abi-discovery"><a class="header" href="#abi-discovery">ABI Discovery</a></h2>
+<p>bindgen reads ABI information from libclang. LINC can attach compiler-probed
+layout evidence and keep that evidence alongside the rest of the analysis
+package.</p>
+<h2 id="symbol-inspection-and-validation"><a class="header" href="#symbol-inspection-and-validation">Symbol Inspection And Validation</a></h2>
+<p>bindgen does not own native artifact inspection or validation.
+LINC does.</p>
+<h2 id="code-generation"><a class="header" href="#code-generation">Code Generation</a></h2>
+<p>bindgen’s job ends in generated Rust. LINC’s job ends in evidence. A downstream
+tool such as <code>gerc</code> can consume LINC’s evidence and emit Rust or build
+metadata.</p>
+<h2 id="when-to-use-which"><a class="header" href="#when-to-use-which">When To Use Which</a></h2>
+<p>Use bindgen when you want a direct header-to-Rust generator and are willing to
+pay the libclang cost. Use LINC when you want analysis, evidence, link
+metadata, validation, and downstream policy separation.</p>
+<p>That is the real split:</p>
 <ul>
-<li><strong>No libclang dependency</strong>. Any machine with gcc or clang (which every C development
-environment already has) can run BIC. No special dev packages, no LLVM install, no
-<code>LIBCLANG_PATH</code> environment variable. The parser is just a Rust crate.</li>
-<li><strong>Preprocessing is separated from parsing</strong>. BIC explicitly runs the preprocessor as a
-subprocess, captures the preprocessed source (preserving it in <code>PreprocessingReport</code>), and
-then parses it. This means you can inspect exactly what the preprocessor produced, you can
-feed already-preprocessed <code>.i</code> files directly via <code>PreprocessedInput</code>, and you can reproduce
-issues without the original system headers.</li>
-<li><strong>Macro capture is first-class</strong>. During preprocessing, BIC captures <code>#define</code> macros with
-their bodies, classifies them (<code>BindableConstant</code>, <code>ConfigurationFlag</code>, <code>AbiAffecting</code>,
-<code>Unsupported</code>), and when safe, parses their values into typed representations (<code>MacroValue::Integer(42)</code>,
-<code>MacroValue::String("hello")</code>). Function-like macros are identified and marked.</li>
-<li>The tradeoff: PAC only handles C (not C++, not Objective-C). BIC is deliberately C-only.</li>
+<li>bindgen centers immediate Rust emission</li>
+<li>LINC centers analysis and evidence that another tool can consume later</li>
 </ul>
-<h3 id="what-this-means-practically"><a class="header" href="#what-this-means-practically">What this means practically</a></h3>
-<p>If you’re binding a C++ library, you must use bindgen (or cbindgen, or cxx). If you’re binding
-a C library — which is the vast majority of system libraries, embedded SDKs, kernel interfaces,
-and database engines — BIC gives you a lighter-weight, more inspectable pipeline with no system
-dependency beyond a C compiler you already have.</p>
-<hr>
-<h2 id="2-internal-representation"><a class="header" href="#2-internal-representation">2. Internal Representation</a></h2>
-<h3 id="bindgens-ir"><a class="header" href="#bindgens-ir">bindgen’s IR</a></h3>
-<p>After parsing with libclang, bindgen builds an internal <strong>item graph</strong>. Each node is an <code>Item</code>
-identified by a unique <code>ItemId</code>. Items have an <code>ItemKind</code>:</p>
-<ul>
-<li><code>Module</code> — C++ namespaces mapped to Rust modules</li>
-<li><code>Type</code> — with many <code>TypeKind</code> sub-variants (integers, floats, pointers, function pointers,
-aliases, arrays, compound types, template instantiations)</li>
-<li><code>Function</code> — ABI info, mangled name, link to its function-pointer type</li>
-<li><code>Var</code> — constants and static variables</li>
-</ul>
-<p>Items reference each other by <code>ItemId</code>, forming a graph. A <code>Trace</code> trait enumerates outgoing
-edges (base members, field types, parameter types) for graph traversal. This graph is the
-input to bindgen’s analysis passes and code generation.</p>
-<p>The IR is <strong>internal and ephemeral</strong>. It exists only in memory during a single bindgen
-invocation. There is no serialization format, no schema version, no way to inspect it after
-the run completes (beyond debug flags like <code>--emit-ir</code>).</p>
-<h3 id="bics-ir"><a class="header" href="#bics-ir">BIC’s IR</a></h3>
-<p>BIC’s IR is defined in <code>ir.rs</code> and centers on <code>BindingPackage</code> — a top-level container that
-is fully serializable to JSON via serde:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct BindingPackage {
-    pub schema_version: u32,
-    pub linc_version: String,
-    pub source_path: Option&lt;String&gt;,
-    pub target: BindingTarget,         // compiler identity
-    pub inputs: BindingInputs,         // headers, include dirs, defines
-    pub items: Vec&lt;BindingItem&gt;,       // extracted declarations
-    pub diagnostics: Vec&lt;Diagnostic&gt;,  // warnings/errors from extraction
-    pub macros: Vec&lt;MacroBinding&gt;,     // captured preprocessor macros
-    pub layouts: Vec&lt;TypeLayout&gt;,      // compiler-probed type layouts
-    pub link: BindingLinkSurface,      // native link requirements
-    pub provenance: Vec&lt;DeclarationProvenance&gt;,  // per-item source origin
-}
-<span class="boring">}</span></code></pre>
-<p><code>BindingItem</code> is an enum:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum BindingItem {
-    Function(FunctionBinding),    // name, params, return type, calling convention, variadic
-    Record(RecordBinding),        // struct/union with fields, layout evidence
-    Enum(EnumBinding),            // variants with values, representation evidence
-    TypeAlias(TypeAliasBinding),  // typedef with canonical resolution chain
-    Variable(VariableBinding),    // extern globals
-    Unsupported(UnsupportedItem), // recognized but unmodelable constructs
-}
-<span class="boring">}</span></code></pre>
-<p>The type system (<code>BindingType</code>) maps C types faithfully:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum BindingType {
-    Void, Bool, Char, SChar, UChar, Short, UShort, Int, UInt,
-    Long, ULong, LongLong, ULongLong, Float, Double, LongDouble,
-    Pointer { pointee, const_pointee, qualifiers },
-    Array(inner, Option&lt;size&gt;),
-    FunctionPointer { return_type, parameters, variadic },
-    Qualified { ty, qualifiers },
-    TypedefRef(name), RecordRef(name), EnumRef(name), Opaque(name),
-}
-<span class="boring">}</span></code></pre>
-<p>The critical difference: <strong>BIC’s IR is a durable, versioned data contract</strong>. You serialize it
-with <code>to_json()</code>, store it, transmit it, diff it, feed it to other tools. A <code>BindingPackage</code>
-from BIC version 0.1.0 will deserialize in future versions as long as <code>schema_version</code> is
-compatible. bindgen’s IR is a transient in-memory structure that only lives long enough to
-generate Rust code.</p>
-<hr>
-<h2 id="3-abi-discovery"><a class="header" href="#3-abi-discovery">3. ABI Discovery</a></h2>
-<p>This is where BIC and bindgen diverge most dramatically.</p>
-<h3 id="how-bindgen-discovers-abi"><a class="header" href="#how-bindgen-discovers-abi">How bindgen discovers ABI</a></h3>
-<p>bindgen relies entirely on <strong>libclang’s type layout information</strong>. When libclang parses a
-struct, it knows the size, alignment, and field offsets because it is literally the C compiler
-frontend — it has already computed the layout using the target’s ABI rules.</p>
-<p>bindgen reads these values from libclang’s API and uses them to:</p>
-<ol>
-<li>Generate <code>#[repr(C)]</code> structs with correct field order and padding.</li>
-<li>Emit <strong>layout test functions</strong> — <code>#[test]</code> functions that assert <code>size_of::&lt;Foo&gt;()</code>,
-<code>align_of::&lt;Foo&gt;()</code>, and <code>offset_of!(Foo, field)</code> match the C values. These tests run at
-<code>cargo test</code> time on the target machine.</li>
-</ol>
-<p>The layout tests look like this in generated code:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>#[test]
-fn bindgen_test_layout_point() {
-    assert_eq!(size_of::&lt;point&gt;(), 8usize);
-    assert_eq!(align_of::&lt;point&gt;(), 4usize);
-    assert_eq!(offset_of!(point, x), 0usize);
-    assert_eq!(offset_of!(point, y), 4usize);
-}
-<span class="boring">}</span></code></pre>
-<p>This is a good approach but it has a timing problem: <strong>the verification happens after code
-generation</strong>, when someone runs <code>cargo test</code>. If no one runs the tests (common in CI for
-<code>-sys</code> crates that just vendor pre-generated bindings), layout bugs go undetected. And the
-tests verify the layout on the machine running <code>cargo test</code>, which may differ from the target.</p>
-<h3 id="how-bic-discovers-abi"><a class="header" href="#how-bic-discovers-abi">How BIC discovers ABI</a></h3>
-<p>BIC takes a fundamentally different approach. The <code>probe.rs</code> module implements
-<strong>compiler-assisted probing</strong>:</p>
-<ol>
-<li>BIC generates a temporary C source file that uses <code>sizeof()</code>, <code>_Alignof()</code>, and <code>offsetof()</code>
-to print layout facts for requested types.</li>
-<li>It compiles this file using the same compiler (gcc/clang) and flags that would build the
-real library.</li>
-<li>It executes the resulting binary and parses its output.</li>
-<li>The results are stored as <code>TypeLayout</code> and <code>ProbeSubjectReport</code> in the <code>BindingPackage</code>.</li>
-</ol>
-<p>Here’s what the generated probe source looks like (simplified):</p>
-<pre><code class="language-c">#include &lt;stdio.h&gt;
-#include &lt;stddef.h&gt;
-#include "mylib.h"
-
-int main(void) {
-    printf("L\t%s\t%zu\t%zu\t-\t-\n", "struct point", sizeof(struct point), _Alignof(struct point));
-    printf("F\t%s\t%s\t%zu\t-\n", "struct point", "x", offsetof(struct point, x));
-    printf("F\t%s\t%s\t%zu\t-\n", "struct point", "y", offsetof(struct point, y));
-    return 0;
-}
-</code></pre>
-<p>For enums, the probe also discovers the underlying size and signedness:</p>
-<pre><code class="language-c">printf("L\t%s\t%zu\t%zu\t%zu\t%d\n", "enum color",
-    sizeof(enum color), _Alignof(enum color),
-    sizeof(enum color),
-    ((enum color)-1) &lt; ((enum color)0) ? 1 : 0);
-</code></pre>
-<p>The probe results are structured data:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct ProbeSubjectReport {
-    pub name: String,
-    pub kind: ProbeSubjectKind,       // Type, Record, or Enum
-    pub confidence: ProbeConfidence,   // MeasuredLayout
-    pub record_completeness: Option&lt;RecordCompleteness&gt;,
-    pub enum_underlying_size: Option&lt;u64&gt;,
-    pub enum_is_signed: Option&lt;bool&gt;,
-    pub fields: Vec&lt;ProbedFieldLayout&gt;,
-    pub layout: TypeLayout,           // { name, size, align }
-}
-<span class="boring">}</span></code></pre>
-<p>This matters because the layout facts come from <strong>the actual compiler with the actual flags</strong>,
-not from libclang which may have different defaults. And the facts are captured <strong>at analysis
-time</strong>, not deferred to test time.</p>
-<hr>
-<h2 id="4-symbol-inspection"><a class="header" href="#4-symbol-inspection">4. Symbol Inspection</a></h2>
-<h3 id="bindgen-no-symbol-inspection"><a class="header" href="#bindgen-no-symbol-inspection">bindgen: no symbol inspection</a></h3>
-<p>bindgen does not look at compiled artifacts at all. It reads headers and produces Rust code.
-Whether the functions declared in the header actually exist in any <code>.so</code>, <code>.a</code>, <code>.dylib</code>, or
-<code>.o</code> file is entirely outside its scope. You find out at link time when <code>cargo build</code> fails
-with “undefined reference to <code>foo</code>”.</p>
-<h3 id="bic-first-class-symbol-inventory"><a class="header" href="#bic-first-class-symbol-inventory">BIC: first-class symbol inventory</a></h3>
-<p>BIC’s <code>symbols.rs</code> module (behind the <code>symbols</code> feature flag) reads native artifacts using the
-<code>object</code> crate and produces a <code>SymbolInventory</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct SymbolInventory {
-    pub artifact_path: String,
-    pub format: ArtifactFormat,       // ElfObject, ElfSharedLibrary, MachODylib, CoffObject, ...
-    pub platform: ArtifactPlatform,   // Elf, MachO, Windows
-    pub kind: ArtifactKind,           // Object, StaticLibrary, SharedLibrary, Executable
-    pub capabilities: ArtifactCapabilities,  // { exports_symbols, imports_symbols }
-    pub dependency_edges: Vec&lt;String&gt;,       // DT_NEEDED entries for ELF
-    pub symbols: Vec&lt;SymbolEntry&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>Each <code>SymbolEntry</code> captures:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct SymbolEntry {
-    pub name: String,              // normalized match key
-    pub raw_name: Option&lt;String&gt;,  // original name (e.g., with decorations)
-    pub version: Option&lt;String&gt;,   // ELF symbol versioning (e.g., GLIBC_2.17)
-    pub direction: SymbolDirection, // Exported or Imported
-    pub reexported_via: Vec&lt;String&gt;,
-    pub alias_of: Option&lt;String&gt;,
-    pub function_abi: Option&lt;FunctionAbiHint&gt;,  // parameter_count, return_size, parameter_sizes
-    pub visibility: SymbolVisibility,  // Default, Hidden, Protected, Internal
-    pub is_function: bool,
-    pub binding: SymbolBinding,    // Local, Global, Weak
-    pub size: Option&lt;u64&gt;,         // from ELF symbol table
-    pub section: Option&lt;String&gt;,
-    pub archive_member: Option&lt;String&gt;,  // which .o inside a .a
-}
-<span class="boring">}</span></code></pre>
-<p>The artifact inspection handles:</p>
-<ul>
-<li><strong>ELF</strong>: object files (<code>.o</code>), static libraries (<code>.a</code>, walking archive members), shared
-libraries (<code>.so</code>, including <code>DT_NEEDED</code> dependency detection via <code>readelf -d</code>)</li>
-<li><strong>Mach-O</strong>: object files, dylibs, static archives</li>
-<li><strong>COFF/PE</strong>: object files, DLLs, import libraries (detecting <code>__imp_</code> prefixed symbols)</li>
-</ul>
-<p>For static archives (<code>.a</code>), BIC iterates through each archive member, parses each <code>.o</code> inside,
-deduplicates symbols, and records which member each symbol came from.</p>
-<p>This gives downstream tools a complete picture of what a native artifact actually provides —
-not what a header claims it provides, but what the compiled binary actually exports.</p>
-<hr>
-<h2 id="5-validation"><a class="header" href="#5-validation">5. Validation</a></h2>
-<h3 id="bindgen-no-validation"><a class="header" href="#bindgen-no-validation">bindgen: no validation</a></h3>
-<p>bindgen generates code and hopes for the best. If the header declares <code>void foo(int x)</code> but
-the library was compiled with <code>void foo(int x, int y)</code>, you get undefined behavior at runtime.
-bindgen has no mechanism to detect this.</p>
-<h3 id="bic-three-phase-validation-engine"><a class="header" href="#bic-three-phase-validation-engine">BIC: three-phase validation engine</a></h3>
-<p>BIC’s <code>validate.rs</code> compares a <code>BindingPackage</code> against one or more <code>SymbolInventory</code> values
-through three phases:</p>
-<p><strong>Phase 1 — Provider Discovery</strong>: For each declared function and variable, BIC searches the
-symbol inventories for a matching exported symbol. It considers:</p>
-<ul>
-<li>Direct name matches</li>
-<li>Decorated names (e.g., <code>_foo</code> prefixed symbols, <code>__imp_foo</code> for Windows)</li>
-<li>Weak vs global binding</li>
-<li>Visibility (default, hidden, protected)</li>
-<li>Re-exported symbols</li>
-</ul>
-<p><strong>Phase 2 — Symbol Identity</strong>: For each candidate match, BIC classifies the evidence:</p>
-<ul>
-<li><code>ExactExported</code> — global symbol with default visibility, highest confidence</li>
-<li><code>AbiShapeVerified</code> — exact match with ABI shape confirmation</li>
-<li><code>WeakExported</code> — weak binding (may be overridden)</li>
-<li><code>HiddenProvider</code> — exists but not externally visible</li>
-<li><code>DecoratedCandidate</code> — matched via name decoration normalization</li>
-<li><code>ReexportedCandidate</code> — available through a dependency chain</li>
-<li><code>DuplicateVisibleProviders</code> — multiple libraries export the same symbol</li>
-<li><code>MissingProvider</code> — not found in any inventory</li>
-</ul>
-<p><strong>Phase 3 — ABI Evidence</strong>: When symbol metadata is available, BIC checks ABI-level details:</p>
-<p>For <strong>variables</strong>: compares the declared type’s expected size against the symbol’s size from
-the object file’s symbol table.</p>
-<p>For <strong>functions</strong>: BIC constructs a <code>FunctionAbiHint</code> from the declaration (parameter count,
-return type size, per-parameter sizes) and compares it against any ABI hints from the symbol:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct RoutineAbiEvidence {
-    pub evidence_kind: Option&lt;RoutineAbiEvidenceKind&gt;,
-    pub confidence: Option&lt;RoutineAbiConfidence&gt;,
-    pub expected_parameter_count: Option&lt;usize&gt;,
-    pub observed_parameter_count: Option&lt;usize&gt;,
-    pub expected_return_size: Option&lt;u64&gt;,
-    pub observed_return_size: Option&lt;u64&gt;,
-    pub expected_parameter_sizes: Vec&lt;Option&lt;u64&gt;&gt;,
-    pub observed_parameter_sizes: Vec&lt;Option&lt;u64&gt;&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>The evidence kinds form a completeness ladder:</p>
-<ul>
-<li><code>ParameterCountOnly</code> — only count could be compared</li>
-<li><code>ReturnShapeOnly</code> — only return size could be compared</li>
-<li><code>ParameterCountAndReturnShape</code> — both count and return size verified</li>
-<li><code>ParameterCountAndParameterShapes</code> — count and per-parameter sizes verified</li>
-<li><code>FullyShaped</code> — everything verified (count + return + all parameter sizes)</li>
-<li><code>Mismatch</code> — a verifiable disagreement was found</li>
-</ul>
-<p>The result is a <code>ValidationReport</code> with per-declaration match status and confidence:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct ValidationReport {
-    pub phases: Vec&lt;ValidationPhaseReport&gt;,
-    pub entries: Vec&lt;ValidationEntry&gt;,
-    pub summary: ValidationSummary,
-    pub matches: Vec&lt;SymbolMatch&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>This is not a boolean pass/fail. It’s structured evidence that a downstream build system can
-use to make policy decisions: “proceed only if all critical symbols have High confidence”,
-“warn on WeakMatch”, “fail on AbiShapeMismatch”.</p>
-<hr>
-<h2 id="6-linking"><a class="header" href="#6-linking">6. Linking</a></h2>
-<h3 id="bindgen-not-its-problem"><a class="header" href="#bindgen-not-its-problem">bindgen: not its problem</a></h3>
-<p>bindgen generates <code>extern "C"</code> blocks in Rust. Linking is the responsibility of the build
-system — typically a <code>build.rs</code> that uses <code>pkg-config</code>, <code>cmake</code>, or manual
-<code>cargo:rustc-link-lib</code> directives. bindgen has no opinion about where <code>libfoo.so</code> lives or
-whether it’s compatible.</p>
-<h3 id="bic-structured-link-surface"><a class="header" href="#bic-structured-link-surface">BIC: structured link surface</a></h3>
-<p>BIC models linking as a first-class part of the binding contract. <code>HeaderConfig</code> accepts
-library declarations:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>config
-    .library("z", LinkLibraryKind::Dynamic)
-    .framework("Security")                    // Apple framework
-    .artifact("/usr/lib/libcustom.a")         // concrete path
-    .library_dir("/opt/custom/lib")           // search path
-    .platform_constraint("x86_64-unknown-linux-gnu")
-<span class="boring">}</span></code></pre>
-<p>These declarations flow into <code>BindingLinkSurface</code> inside the <code>BindingPackage</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct BindingLinkSurface {
-    pub libraries: Vec&lt;LinkLibrary&gt;,      // name + static/dynamic preference
-    pub frameworks: Vec&lt;LinkFramework&gt;,   // Apple-style
-    pub artifacts: Vec&lt;LinkArtifact&gt;,     // concrete paths
-    pub library_dirs: Vec&lt;String&gt;,        // search roots
-    pub framework_dirs: Vec&lt;String&gt;,
-    pub ordered_inputs: Vec&lt;LinkInput&gt;,   // declaration order preserved
-    pub preferred_mode: LinkResolutionMode,
-    pub native_surface_kind: NativeSurfaceKind,
-    pub platform_constraints: Vec&lt;String&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>The <code>link_plan.rs</code> module then resolves these declared requirements against available
-inventories:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct ResolvedLinkPlan {
-    pub preferred_mode: LinkResolutionMode,
-    pub platform_constraints: Vec&lt;String&gt;,
-    pub inputs: Vec&lt;LinkInput&gt;,
-    pub requirements: Vec&lt;ResolvedLinkRequirement&gt;,
-    pub transitive_dependencies: Vec&lt;String&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>Each requirement tracks its resolution status:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum RequirementResolution {
-    Unresolved,  // no provider found
-    Resolved,    // exactly one provider matched
-    Ambiguous,   // multiple providers found
-}
-<span class="boring">}</span></code></pre>
-<p>When given symbol inventories (from inspecting the actual <code>.so</code>/<code>.a</code> files), BIC matches
-providers by artifact path, library name pattern, or framework name. It also extracts
-transitive dependencies (via ELF <code>DT_NEEDED</code> entries) so downstream tools know the full
-dependency chain.</p>
-<p>This means a downstream build tool can read the <code>ResolvedLinkPlan</code> and generate the correct
-<code>cargo:rustc-link-lib</code>, <code>cargo:rustc-link-search</code>, and framework flags automatically, with
-confidence that the providers actually exist and export the expected symbols.</p>
-<hr>
-<h2 id="7-code-generation"><a class="header" href="#7-code-generation">7. Code Generation</a></h2>
-<h3 id="how-bindgen-generates-rust"><a class="header" href="#how-bindgen-generates-rust">How bindgen generates Rust</a></h3>
-<p>bindgen’s code generation is its primary purpose. The <code>codegen</code> module walks the IR graph and
-uses the <code>quote</code> crate (quasi-quoting) to construct Rust token streams. Post-processing passes
-run via <code>syn</code> (the Rust syntax tree library) to clean up the output. The result goes through
-either <code>rustfmt</code> or <code>prettyplease</code> for formatting.</p>
-<p>bindgen generates:</p>
-<ul>
-<li><code>#[repr(C)]</code> structs with explicit padding fields where needed</li>
-<li>Native <code>union</code> types (if all fields are <code>Copy</code>) or <code>ManuallyDrop</code>-based wrappers</li>
-<li><code>extern "C" { }</code> blocks with function declarations</li>
-<li>Enum representations in six different styles (constified constants, newtypes, Rust enums, bitfield
-newtypes) configurable per-enum via regex patterns</li>
-<li>Typedef aliases as <code>type</code>, <code>#[repr(transparent)]</code> newtypes, or newtypes with <code>Deref</code> impl</li>
-<li>Bitfield accessor methods (getter + setter for each bitfield)</li>
-<li>Layout test functions</li>
-<li>Optionally: dynamic loading structs (a struct with <code>dlsym</code>-loaded function pointers)</li>
-<li>Optionally: Rust modules mirroring C++ namespaces</li>
-<li>Optionally: wrapper functions for <code>static inline</code> C functions (by generating a C source file
-with non-inline wrappers that the build must compile separately)</li>
-</ul>
-<p>The level of customization is enormous — the <code>Builder</code> has 100+ configuration methods, and
-the <code>ParseCallbacks</code> trait provides 20 hooks for intercepting and modifying the generation
-process at every stage.</p>
-<h3 id="how-bic-generates-rust"><a class="header" href="#how-bic-generates-rust">How BIC generates Rust</a></h3>
-<p>BIC’s code generation is <strong>optional</strong> (behind the <code>codegen</code> feature flag) and intentionally
-minimal. The <code>codegen_rust.rs</code> module is a straightforward <code>RustEmitter</code> that walks
-<code>BindingPackage.items</code> and emits Rust source as a plain <code>String</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub fn emit_rust_ffi(package: &amp;BindingPackage) -&gt; String {
-    RustEmitter::new().emit(package)
-}
-<span class="boring">}</span></code></pre>
-<p>It generates:</p>
-<ul>
-<li><code>pub type</code> aliases for typedefs</li>
-<li><code>pub type EnumName = ::core::ffi::c_int;</code> with <code>pub const</code> for each variant</li>
-<li><code>#[repr(C)] pub struct/union</code> with fields</li>
-<li><code>extern "C" { }</code> blocks for functions (grouped by calling convention)</li>
-<li><code>pub static</code> declarations for external variables</li>
-</ul>
-<p>The code generation uses <code>::core::ffi::*</code> types (not <code>std::os::raw::*</code>), handles deep pointer
-chains, flexible array members (as pointers with comments), opaque structs (<code>[u8; 0]</code>), and
-function pointers with variadic parameters.</p>
-<p>BIC’s codegen is deliberately unsophisticated. It doesn’t generate layout tests, derive macros,
-padding fields, or bitfield accessors. The philosophy is that code generation is a downstream
-concern — BIC’s job is to produce the <code>BindingPackage</code> contract with all the evidence, and
-the consumer (like <code>fol</code>) decides how to generate code from it. The built-in <code>emit_rust_ffi</code>
-is a convenience for simple cases, not the intended production path.</p>
-<hr>
-<h2 id="8-the-full-pipeline-side-by-side"><a class="header" href="#8-the-full-pipeline-side-by-side">8. The Full Pipeline, Side by Side</a></h2>
-<h3 id="bindgens-pipeline"><a class="header" href="#bindgens-pipeline">bindgen’s pipeline</a></h3>
-<pre><code>mylib.h
-  │
-  ▼
-libclang (parsing + layout computation)
-  │
-  ▼
-IR graph (Items connected by ItemId)
-  │
-  ▼
-Analysis passes (derive eligibility, bitfield allocation)
-  │
-  ▼
-Code generation (quote + syn)
-  │
-  ▼
-Formatting (rustfmt or prettyplease)
-  │
-  ▼
-bindings.rs  ← this is the final product
-</code></pre>
-<p>Everything happens in a single invocation. Input: header file. Output: Rust source file. Done.</p>
-<h3 id="bics-pipeline"><a class="header" href="#bics-pipeline">BIC’s pipeline</a></h3>
-<pre><code>mylib.h  +  compiler flags
-  │
-  ▼
-C preprocessor (gcc -E / clang -E)
-  │
-  ▼
-Preprocessed source + captured macros
-  │
-  ▼
-PAC parser (C AST)
-  │
-  ▼
-Extractor (AST → BindingItem)
-  │
-  ▼
-BindingPackage (items + diagnostics + macros + link surface)
-  │
-  ├──► [optional] ABI probe (compile + run sizeof/alignof)
-  │      └──► TypeLayout + field offsets → package.layouts
-  │
-  ├──► [optional] Symbol inspection (read .so/.a/.o/.dylib)
-  │      └──► SymbolInventory
-  │
-  ├──► [optional] Validation (package × inventory)
-  │      └──► ValidationReport (per-item match status + confidence)
-  │
-  ├──► [optional] Link planning (package × inventories)
-  │      └──► ResolvedLinkPlan (provider resolution)
-  │
-  ├──► to_json() → deterministic JSON contract
-  │
-  └──► [optional] emit_rust_ffi() → Rust source
-</code></pre>
-<p>Each stage is independently callable. You can extract without probing. You can validate without
-generating code. You can serialize to JSON without any of the optional steps. Each intermediate
-result is a structured, serializable value.</p>
-<hr>
-<h2 id="9-error-and-diagnostic-model"><a class="header" href="#9-error-and-diagnostic-model">9. Error and Diagnostic Model</a></h2>
-<h3 id="bindgen"><a class="header" href="#bindgen">bindgen</a></h3>
-<p>bindgen uses Rust’s standard <code>Result</code> and <code>panic!</code> for hard errors. Warnings are printed to
-stderr during generation. There’s no structured diagnostic output — you read the terminal. If
-bindgen can’t handle a construct (say, a C++ template), it silently skips it or emits an opaque
-placeholder type.</p>
-<h3 id="bic"><a class="header" href="#bic">BIC</a></h3>
-<p>BIC separates <strong>operational failures</strong> from <strong>analysis findings</strong>:</p>
-<ul>
-<li>
-<p>Hard failures (can’t find the preprocessor, can’t parse the file, can’t read an artifact)
-are returned as <code>Err(LincError)</code> with typed variants:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum LincError {
-    NoHeaders,
-    NoProbeTypes,
-    ProbeCompile { compiler, stderr },
-    ProbeExecution { reason },
-    ProbeOutput { reason },
-    SymbolRead { path, reason },
-    UnsupportedFormat { path, format },
-    SchemaVersion { found, supported },
-    Io(std::io::Error),
-    Json(serde_json::Error),
-}
-<span class="boring">}</span></code></pre>
-</li>
-<li>
-<p>Analysis findings are carried <strong>inside the returned data</strong>, not as exceptions:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct Diagnostic {
-    pub kind: DiagnosticKind,    // PreprocessingFailed, ParseFailed, DeclarationUnsupported, ...
-    pub severity: Severity,      // Warning or Error
-    pub message: String,
-    pub item_name: Option&lt;String&gt;,
-    pub artifact: Option&lt;String&gt;,
-    pub location: Option&lt;(Option&lt;String&gt;, usize)&gt;,
-}
-<span class="boring">}</span></code></pre>
-<p>Diagnostics live in <code>package.diagnostics</code>. Validation mismatches live in
-<code>report.entries</code>. These are data, not control flow. A downstream tool can filter, count,
-or policy-gate on them programmatically.</p>
-</li>
-</ul>
-<hr>
-<h2 id="10-what-each-tool-cannot-do"><a class="header" href="#10-what-each-tool-cannot-do">10. What Each Tool Cannot Do</a></h2>
-<h3 id="bindgen-cannot"><a class="header" href="#bindgen-cannot">bindgen cannot:</a></h3>
-<ul>
-<li>Verify that declared functions exist in the compiled library</li>
-<li>Tell you if the header’s struct layout matches the library’s struct layout on your target
-(until you run <code>cargo test</code>, by which time you’ve already generated and committed the code)</li>
-<li>Model the link surface (which <code>.so</code> provides which symbol, transitive dependencies)</li>
-<li>Produce machine-readable analysis output for other tools to consume</li>
-<li>Work without libclang installed</li>
-</ul>
-<h3 id="bic-cannot"><a class="header" href="#bic-cannot">BIC cannot:</a></h3>
-<ul>
-<li>Handle C++ in any form</li>
-<li>Handle Objective-C</li>
-<li>Produce the level of Rust codegen customization bindgen offers (enum styles, derive control,
-namespace mapping, dynamic loading structs, bitfield accessors)</li>
-<li>Run on Windows as a primary target (COFF/PE parsing exists but is deprioritized)</li>
-<li>Generate bindings for <code>static inline</code> functions</li>
-</ul>
-<hr>
-<h2 id="11-when-to-use-which"><a class="header" href="#11-when-to-use-which">11. When to Use Which</a></h2>
-<p><strong>Use bindgen when:</strong></p>
-<ul>
-<li>You’re binding a C++ library (bindgen is your only real option in the Rust ecosystem)</li>
-<li>You need production-quality Rust codegen with fine-grained control over enum styles, derive
-traits, naming conventions, and module structure</li>
-<li>You’re writing a <code>-sys</code> crate and want a single-command header-to-Rust solution</li>
-<li>You need Objective-C support</li>
-<li>Your CI already has libclang and you don’t care about the dependency</li>
-</ul>
-<p><strong>Use BIC when:</strong></p>
-<ul>
-<li>You’re binding a C library and want to <strong>verify</strong> that the header matches the compiled artifact
-before trusting the bindings</li>
-<li>You’re building a binding pipeline where multiple tools consume the extraction output (BIC
-produces JSON contracts, not just Rust code)</li>
-<li>You need structured link planning — knowing which library provides which symbol, whether
-providers are resolved, and what the transitive dependency chain looks like</li>
-<li>You want to avoid the libclang system dependency</li>
-<li>You want compiler-probed ABI evidence attached to the binding metadata, not deferred to
-test time</li>
-<li>You’re working in a build system (like fol) that generates its own code from structured data
-rather than consuming raw Rust source</li>
-</ul>
-<p><strong>Use both when:</strong></p>
-<ul>
-<li>BIC can validate the binding surface and produce confidence evidence, then bindgen (or a
-custom generator consuming BIC’s JSON) can generate the actual Rust code. BIC occupies the
-verification layer that bindgen doesn’t have.</li>
-</ul>
-<hr>
-<h2 id="12-dependency-and-build-cost"><a class="header" href="#12-dependency-and-build-cost">12. Dependency and Build Cost</a></h2>
-<h3 id="bindgen-1"><a class="header" href="#bindgen-1">bindgen</a></h3>
-<pre><code class="language-toml"># Cargo.toml (build-dependency)
-[build-dependencies]
-bindgen = "0.72"
-</code></pre>
-<p>Transitive deps: <code>clang-sys</code>, <code>cexpr</code>, <code>quote</code>, <code>syn</code>, <code>proc-macro2</code>, <code>regex</code>, <code>itertools</code>,
-<code>bitflags</code>, <code>shlex</code>, <code>rustc-hash</code>, optionally <code>prettyplease</code> and <code>log</code>.</p>
-<p>System requirement: <strong>libclang</strong> (typically 50-200 MB installed). Build times are dominated by
-<code>syn</code> and <code>quote</code> compilation.</p>
-<h3 id="bic-1"><a class="header" href="#bic-1">BIC</a></h3>
-<pre><code class="language-toml"># Cargo.toml
-[dependencies]
-linc = { version = "0.1", features = ["symbols", "codegen"] }
-</code></pre>
-<p>Transitive deps: <code>pac</code> (git), <code>serde</code>, <code>serde_json</code>, optionally <code>object</code> (for symbol
-inspection).</p>
-<p>System requirement: a C compiler (gcc or clang) — which you already have if you’re doing
-C interop. No libclang, no LLVM, no special packages.</p>
-<p>BIC is substantially lighter to build and deploy.</p>
 
                     </main>
 

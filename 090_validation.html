@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Validation - BIC Reference</title>
+        <title>Validation - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,55 +175,18 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="validation"><a class="header" href="#validation">Validation</a></h1>
-<p>Validation compares a <code>BindingPackage</code> against one or more <code>SymbolInventory</code> values.</p>
-<p>This answers a practical question:</p>
-<blockquote>
-<p>do the declarations we extracted line up with what the native artifacts actually provide?</p>
-</blockquote>
+<p>Validation compares a <code>BindingPackage</code> against one or more <code>SymbolInventory</code>
+values.</p>
+<p>It answers a practical question: do the declarations we extracted line up with
+what the native artifacts actually provide?</p>
 <h2 id="api-entry-points"><a class="header" href="#api-entry-points">API Entry Points</a></h2>
-<p>Single artifact:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::validate;
-
-let report = validate(&amp;package, &amp;inventory);
-<span class="boring">}</span></code></pre>
-<p>Multiple artifacts:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use linc::validate_many;
-
-let report = validate_many(&amp;package, &amp;[inv_a, inv_b]);
-<span class="boring">}</span></code></pre>
-<p>Use <code>validate_many</code> whenever the package is expected to resolve across more than one object/archive/shared library.</p>
+<p>Use <code>validate</code> for one artifact and <code>validate_many</code> for several.</p>
 <h2 id="what-validation-looks-at"><a class="header" href="#what-validation-looks-at">What Validation Looks At</a></h2>
-<p>Validation currently focuses on bindable symbol presence and kind, with conservative ABI-shape evidence where the library can prove something honestly.
-It compares:</p>
-<ul>
-<li>extracted functions</li>
-<li>extracted variables</li>
-</ul>
-<p>against:</p>
-<ul>
-<li>normalized symbol names</li>
-<li>raw/decorated symbol spellings</li>
-<li>symbol visibility</li>
-<li>symbol binding strength</li>
-<li>routine parameter-count hints</li>
-<li>provider artifact provenance</li>
-</ul>
-<h2 id="validation-phases"><a class="header" href="#validation-phases">Validation Phases</a></h2>
-<p><code>ValidationReport.phases</code> exposes the current validation pipeline as explicit report data:</p>
-<ul>
-<li><code>ProviderDiscovery</code></li>
-<li><code>SymbolIdentity</code></li>
-<li><code>AbiEvidence</code></li>
-</ul>
-<p>Today, the first two phases complete during normal symbol validation and <code>AbiEvidence</code> remains
-present but incomplete. That is intentional: consumers can now distinguish the current
-symbol-resolution coverage from the deeper ABI-evidence work that is still evolving.</p>
-<h2 id="match-statuses"><a class="header" href="#match-statuses">Match Statuses</a></h2>
-<p>Current statuses are:</p>
+<p>Validation focuses on symbol presence, symbol kind, visibility, binding
+strength, decorated names, and conservative ABI-shape evidence where the
+artifact can prove something honestly.</p>
+<h2 id="common-statuses"><a class="header" href="#common-statuses">Common Statuses</a></h2>
+<p>Current statuses include:</p>
 <ul>
 <li><code>Matched</code></li>
 <li><code>AbiShapeMismatch</code></li>
@@ -236,183 +199,27 @@ symbol-resolution coverage from the deeper ABI-evidence work that is still evolv
 <li><code>WeakMatch</code></li>
 <li><code>DuplicateProviders</code></li>
 </ul>
-<p>Each status tells you something different.</p>
-<h2 id="status-semantics"><a class="header" href="#status-semantics">Status Semantics</a></h2>
-<h3 id="matched"><a class="header" href="#matched"><code>Matched</code></a></h3>
-<p>The declaration name resolved to a visible symbol of the expected kind.</p>
-<p>For variable declarations, <code>Matched</code> may now carry positive ABI-shape evidence when LINC
-can compare an observed symbol size against an inferred expected size.</p>
-<p>For function declarations, <code>Matched</code> may now also carry positive routine ABI evidence when
-the provider inventory exposes conservative routine hints and they agree with the extracted
-declaration. Today that starts with:</p>
-<ul>
-<li>parameter count</li>
-<li>primitive return-size shape where both sides expose a trustworthy size</li>
-<li>by-value parameter-size shape where both sides expose trustworthy sizes</li>
-</ul>
-<h3 id="abishapemismatch"><a class="header" href="#abishapemismatch"><code>AbiShapeMismatch</code></a></h3>
-<p>The declaration resolved to a visible provider of the expected broad kind, but the available
-artifact-side size metadata disagreed with the expected declaration-side size.</p>
-<p>This is intentionally limited today:</p>
-<ul>
-<li>it only applies where artifact metadata exposes a usable size</li>
-<li>it only applies where LINC can infer an expected size conservatively</li>
-<li>routine checks are still conservative: they currently cover parameter count, primitive
-return-size shape, and by-value parameter-size shape, not full calling-convention or
-register-level proof</li>
-</ul>
-<h3 id="missing"><a class="header" href="#missing"><code>Missing</code></a></h3>
-<p>No matching symbol was found and the package did not even declare native link inputs that might reasonably have provided it.</p>
-<h3 id="unresolveddeclaredlinkinputs"><a class="header" href="#unresolveddeclaredlinkinputs"><code>UnresolvedDeclaredLinkInputs</code></a></h3>
-<p>No symbol was found, but the package did declare native link inputs.</p>
-<p>This is a stronger signal than plain missing because it tells you the package expected a provider and the validation step failed to find it.</p>
-<h3 id="decorationmismatch"><a class="header" href="#decorationmismatch"><code>DecorationMismatch</code></a></h3>
-<p>No normalized symbol matched, but a decorated/raw spelling normalized to the declaration name.</p>
-<p>This is the “something probably exists, but the name spelling path does not line up cleanly” status.</p>
-<h3 id="notafunction-and-notavariable"><a class="header" href="#notafunction-and-notavariable"><code>NotAFunction</code> and <code>NotAVariable</code></a></h3>
-<p>A symbol exists, but it has the wrong broad kind for the declaration.</p>
-<h3 id="hidden"><a class="header" href="#hidden"><code>Hidden</code></a></h3>
-<p>A candidate symbol exists, but it is not visible as a usable exported provider.</p>
-<h3 id="weakmatch"><a class="header" href="#weakmatch"><code>WeakMatch</code></a></h3>
-<p>The symbol is present, but only as a weak binding.</p>
-<p>This is often acceptable evidence, but it should not be treated as equivalent to a strong exported provider in every workflow.</p>
-<h3 id="duplicateproviders"><a class="header" href="#duplicateproviders"><code>DuplicateProviders</code></a></h3>
-<p>More than one visible provider satisfies the same declaration across the validated artifact set.</p>
-<p>This is especially important when merging link surfaces from several native inputs.</p>
-<h2 id="provider-artifacts"><a class="header" href="#provider-artifacts">Provider Artifacts</a></h2>
-<p>Each <code>SymbolMatch</code> can record <code>provider_artifacts</code>.</p>
-<p>That list may include:</p>
-<ul>
-<li>plain artifact paths</li>
-<li>archive member provenance such as <code>libfoo.a:bar.o</code></li>
-</ul>
-<p>This is useful for:</p>
-<ul>
-<li>debugging multi-artifact validation</li>
-<li>surfacing duplicate providers</li>
-<li>building later link-resolution heuristics</li>
-</ul>
-<h2 id="richer-report-entries"><a class="header" href="#richer-report-entries">Richer Report Entries</a></h2>
-<p><code>ValidationReport.entries</code> is the richer structured surface.
-Each <code>ValidationEntry</code> preserves:</p>
-<ul>
-<li>the declaration identity (<code>name</code>, <code>item_kind</code>)</li>
-<li>the resulting <code>status</code></li>
-<li>attached <code>ValidationEvidence</code></li>
-</ul>
-<p><code>ValidationEvidence</code> currently keeps:</p>
-<ul>
-<li><code>provider_artifacts</code></li>
-<li><code>raw_symbol_names</code></li>
-<li>observed <code>visibility</code></li>
-<li><code>confidence</code></li>
-<li><code>evidence_kind</code></li>
-<li><code>abi_shape</code> for variable-size evidence</li>
-<li><code>routine_abi</code> for conservative routine-shape evidence</li>
-</ul>
-<p>Routine ABI evidence now carries its own explicit shape classification and confidence ladder so
-consumers can distinguish:</p>
-<ul>
-<li>partial routine evidence such as parameter count only</li>
-<li>stronger routine evidence such as count plus return/parameter shape</li>
-<li>mismatched routine evidence where the symbol exists but the observed routine shape disagrees</li>
-</ul>
-<p>The flattened <code>matches</code> list remains part of the current documented validation
-artifact. It exists because current consumers and tests still use it, not
-because <code>linc</code> is carrying a permanent legacy layer for discarded shapes.</p>
-<h2 id="confidence"><a class="header" href="#confidence">Confidence</a></h2>
-<p>Validation confidence is currently a policy-friendly summary of the available symbol evidence:</p>
-<ul>
-<li><code>High</code>: direct visible provider of the expected kind</li>
-<li><code>Medium</code>: provider exists, but only as a weak symbol</li>
-<li><code>Low</code>: partial or conflicting evidence exists</li>
-<li><code>None</code>: no provider evidence was found</li>
-</ul>
-<h2 id="evidence-kind"><a class="header" href="#evidence-kind">Evidence Kind</a></h2>
-<p><code>evidence_kind</code> is the more structural classification of provider state.
-Current values distinguish:</p>
-<ul>
-<li>exact exported providers</li>
-<li>weak exported providers</li>
-<li>hidden providers</li>
-<li>decorated-name candidates</li>
-<li>re-export candidates inferred from dependency-bearing shared artifacts</li>
-<li>duplicate visible providers</li>
-<li>declared link inputs without a discovered provider</li>
-<li>plain missing providers</li>
-<li>ABI-shape-verified providers</li>
-<li>ABI-shape mismatches</li>
-<li>wrong-kind providers</li>
-</ul>
-<p><code>ReexportedCandidate</code> can now come from either:</p>
-<ul>
-<li>a broad artifact-level dependency signal</li>
-<li>a symbol-local imported entry that carries <code>reexported_via</code></li>
-</ul>
 <h2 id="how-to-read-a-report"><a class="header" href="#how-to-read-a-report">How To Read A Report</a></h2>
-<p>The most important first pass is:</p>
-<ol>
-<li>count <code>Matched</code></li>
-<li>count <code>Missing</code> and <code>UnresolvedDeclaredLinkInputs</code></li>
-<li>inspect <code>DuplicateProviders</code></li>
-<li>inspect <code>DecorationMismatch</code></li>
-</ol>
-<p>That ordering usually tells you whether the problem is:</p>
 <ul>
-<li>missing native inputs</li>
-<li>unexpected symbol spelling</li>
-<li>duplicate/native-surface ambiguity</li>
-<li>visibility or kind mismatch</li>
+<li><code>Matched</code> means the declaration resolved to a visible symbol of the expected
+kind</li>
+<li><code>Missing</code> means no matching symbol was found and the package did not declare
+native link inputs that might reasonably have provided it</li>
+<li><code>UnresolvedDeclaredLinkInputs</code> means the package did declare native inputs,
+but validation still found no provider</li>
+<li><code>DecorationMismatch</code> means a decorated or raw spelling normalized to the
+declaration name</li>
+<li><code>Hidden</code> and <code>WeakMatch</code> should usually be treated more conservatively than a
+strong export</li>
+<li><code>DuplicateProviders</code> usually blocks promotion until the consumer chooses a
+policy</li>
 </ul>
-<h2 id="summary-and-helpers"><a class="header" href="#summary-and-helpers">Summary And Helpers</a></h2>
-<p><code>ValidationReport.summary</code> gives a stable count-oriented surface for policy code.
-It currently tracks totals for:</p>
-<ul>
-<li>matched declarations</li>
-<li>missing declarations</li>
-<li>unresolved declared link inputs</li>
-<li>hidden providers</li>
-<li>weak matches</li>
-</ul>
-<p>For downstream code that wants to reason about trust rather than only status, use the helper
-surface instead of decoding optional fields by hand:</p>
-<ul>
-<li><code>ValidationEvidence::has_layout_backed_confidence()</code></li>
-<li><code>ValidationEntry::has_layout_backed_confidence()</code></li>
-<li><code>ValidationReport::layout_backed_entries()</code></li>
-<li><code>ValidationEntry::{has_resolved_provider_state, has_unresolved_provider_state, has_ambiguous_provider_state}</code></li>
-<li><code>ValidationReport::{resolved_provider_entries, unresolved_provider_entries, ambiguous_provider_entries}</code></li>
-<li>duplicate providers</li>
-<li>decoration mismatches</li>
-<li>kind mismatches</li>
-</ul>
-<p>The report also exposes helper methods such as:</p>
-<ul>
-<li><code>matched()</code></li>
-<li><code>missing()</code></li>
-<li><code>hidden()</code></li>
-<li><code>weak_matches()</code></li>
-<li><code>duplicate_providers()</code></li>
-<li><code>unresolved_declared()</code></li>
-</ul>
-<p>The repository also keeps dedicated validation regression fixtures for ambiguous-provider cases so
-duplicate-provider evidence remains stable across JSON and API evolution.</p>
-<h2 id="what-validation-does-not-prove"><a class="header" href="#what-validation-does-not-prove">What Validation Does Not Prove</a></h2>
-<p>Current validation is symbol-oriented, not full ABI-signature verification.</p>
-<p>A <code>Matched</code> status does not prove:</p>
-<ul>
-<li>function parameter ABI identity</li>
-<li>structure layout compatibility</li>
-<li>calling convention identity beyond the available evidence</li>
-<li>semantic compatibility across versions</li>
-</ul>
-<p>The current ABI-evidence layer is intentionally narrow:</p>
-<ul>
-<li>variable size checks from object metadata</li>
-<li>primitive-type expectations</li>
-<li>layout-backed expectations when <code>BindingPackage.layouts</code> provides the relevant named type size</li>
-</ul>
-<p>Use validation as strong symbol-level evidence, not as a complete ABI theorem.</p>
+<h2 id="provider-evidence"><a class="header" href="#provider-evidence">Provider Evidence</a></h2>
+<p>Provider evidence may include plain artifact paths or archive-member provenance
+such as <code>libfoo.a:bar.o</code>.</p>
+<h2 id="consumer-rule"><a class="header" href="#consumer-rule">Consumer Rule</a></h2>
+<p>Validation findings are structured evidence, not hard execution errors. Treat
+them as policy input for the next stage.</p>
 
                     </main>
 

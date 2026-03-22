@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Readiness Scorecard - BIC Reference</title>
+        <title>Readiness Scorecard - LINC Reference</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "navy";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5fe9980e.js";
+            window.path_to_searchindex_js = "searchindex-90245d7c.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50582716.js"></script>
+        <script src="toc-cb0f06eb.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -137,7 +137,7 @@
                         </button>
                     </div>
 
-                    <h1 class="menu-title">BIC Reference</h1>
+                    <h1 class="menu-title">LINC Reference</h1>
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
@@ -175,151 +175,53 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="readiness-scorecard"><a class="header" href="#readiness-scorecard">Readiness Scorecard</a></h1>
-<p>This chapter summarizes current release readiness by subsystem.</p>
-<p>It is not a semver guarantee by itself.
-It is a concise statement of current confidence based on the present code, fixtures, and tests.</p>
+<p>This chapter summarizes current release readiness by subsystem and ties the
+score directly to the current hardening ladder.</p>
 <h2 id="overall-readiness"><a class="header" href="#overall-readiness">Overall Readiness</a></h2>
-<p>For the current non-Windows scope, LINC should be read as:</p>
+<p>LINC should currently be read as:</p>
 <ul>
-<li>strong for library-first extraction and evidence production</li>
-<li>strong for ELF-oriented validation and link planning</li>
-<li>good for Mach-O inventory and conservative provider analysis</li>
-<li>intentionally conservative, not exhaustive, for final native-linker semantics</li>
-<li>backed by a stress-example ladder that now includes:
-<ul>
-<li>Linux system-header examples</li>
-<li>real-library examples</li>
-<li>plugin/runtime-loader examples</li>
-<li>a combined daemon-style mixed surface</li>
-</ul>
-</li>
-</ul>
-<p>The main remaining open items after the current follow-up cycle are:</p>
-<ul>
-<li>host-header dependence for some Linux system examples</li>
-<li>host-package dependence for most of the real-library ladder beyond the vendored <code>zlib</code> baseline</li>
-<li>downstream deployment/runtime policy for plugin and mixed-subsystem activation paths</li>
+<li>strong on hermetic evidence production</li>
+<li>strong on ELF-first symbol and validation workflows</li>
+<li>useful but more conservative on Mach-O and Windows import-library paths</li>
+<li>meaningfully hardened on vendored and daemon-style fixtures</li>
+<li>still dependent on host availability for the largest OpenSSL and Linux-system
+ladders</li>
 </ul>
 <h2 id="subsystem-scorecard"><a class="header" href="#subsystem-scorecard">Subsystem Scorecard</a></h2>
-<h3 id="header-extraction"><a class="header" href="#header-extraction">Header Extraction</a></h3>
 <ul>
-<li>readiness: high</li>
-<li>basis:
+<li>source-shaped intake: high</li>
+<li>JSON artifact stability: high</li>
+<li>ABI layout evidence: medium-high</li>
+<li>symbol inventories: high for ELF, medium-high for Mach-O, medium for Windows</li>
+<li>validation: medium-high</li>
+<li>link planning: medium-high</li>
+<li>hermetic large-surface confidence: high</li>
+<li>host-dependent large-surface confidence: medium-high</li>
+<li>consumer integration on the documented artifact boundary: high</li>
+</ul>
+<h2 id="canonical-readiness-anchors"><a class="header" href="#canonical-readiness-anchors">Canonical Readiness Anchors</a></h2>
+<p>The release posture should be judged against these anchors first:</p>
 <ul>
-<li>broad unit coverage</li>
-<li>fixture-driven regression coverage</li>
-<li>stable root-level entry points</li>
-<li>stress-cycle recovery coverage for packed typedef record declarations</li>
+<li>vendored zlib</li>
+<li>vendored libpng</li>
+<li>plugin ABI fixture</li>
+<li>combined daemon fixture</li>
+<li>OpenSSL when available</li>
+<li>Linux event-loop analysis when available</li>
 </ul>
-</li>
-</ul>
-<h3 id="json-contract"><a class="header" href="#json-contract">JSON Contract</a></h3>
-<ul>
-<li>readiness: high</li>
-<li>basis:
-<ul>
-<li>schema-version gate</li>
-<li>artifact fixtures</li>
-<li>additive defaulting on evolving fields</li>
-</ul>
-</li>
-</ul>
-<h3 id="abi-layout-evidence"><a class="header" href="#abi-layout-evidence">ABI Layout Evidence</a></h3>
-<ul>
-<li>readiness: medium-high</li>
-<li>basis:
-<ul>
-<li>probed layouts are integrated into scans and validation</li>
-<li>typedef-backed and representation-backed checks exist</li>
-<li>partial bitfield and record evidence is preserved</li>
-<li>failed opaque/incomplete probe requests now degrade into diagnostics instead of discarding the
-rest of the scan</li>
-</ul>
-</li>
-<li>remaining limit:
-<ul>
-<li>this is still evidence-driven ABI checking, not a full universal ABI proof engine</li>
-</ul>
-</li>
-</ul>
-<h3 id="symbol-inventories"><a class="header" href="#symbol-inventories">Symbol Inventories</a></h3>
-<ul>
-<li>readiness: high for ELF, medium-high for Mach-O</li>
-<li>basis:
-<ul>
-<li>export/import distinction</li>
-<li>alias and re-export evidence</li>
-<li>dependency edges</li>
-<li>platform fixtures and regressions</li>
-</ul>
-</li>
-<li>remaining limit:
-<ul>
-<li>Mach-O semantics are intentionally modeled conservatively rather than exhaustively</li>
-</ul>
-</li>
-</ul>
-<h3 id="validation"><a class="header" href="#validation">Validation</a></h3>
-<ul>
-<li>readiness: medium-high</li>
-<li>basis:
-<ul>
-<li>structured phases, entries, summaries, and evidence kinds</li>
-<li>ABI-shape mismatch coverage</li>
-<li>duplicate-provider and unresolved-provider handling</li>
-</ul>
-</li>
-<li>remaining limit:
-<ul>
-<li>validation is not a full platform ABI/linker oracle</li>
-</ul>
-</li>
-</ul>
-<h3 id="link-planning"><a class="header" href="#link-planning">Link Planning</a></h3>
-<ul>
-<li>readiness: medium-high</li>
-<li>basis:
-<ul>
-<li>explicit requirements, providers, and transitive dependencies</li>
-<li>target filtering</li>
-<li>provider provenance</li>
-<li>versioned shared-library filenames now match declared library requirements</li>
-</ul>
-</li>
-<li>remaining limit:
-<ul>
-<li><code>ResolvedLinkPlan</code> is a normalized planning artifact, not a final filesystem-resolved linker
-invocation</li>
-</ul>
-</li>
-</ul>
-<h3 id="consumer-integration"><a class="header" href="#consumer-integration">Consumer Integration</a></h3>
-<ul>
-<li>readiness: high for the documented narrow consumer profile</li>
-<li>basis:
-<ul>
-<li>contract fixtures</li>
-<li>producer-side <code>fol</code> acceptance tests</li>
-<li>explicit gating guidance</li>
-</ul>
-</li>
-</ul>
+<p>If those anchors drift, the scorecard should drop even if many smaller unit
+tests still pass.</p>
 <h2 id="how-to-read-this-scorecard"><a class="header" href="#how-to-read-this-scorecard">How To Read This Scorecard</a></h2>
-<p>High means the subsystem is a reliable contract surface for normal downstream use.</p>
-<p>Medium-high means the subsystem is suitable for serious use, but consumers should still respect the
-documented limitations and keep policy checks explicit.</p>
-<p>This scorecard should be revised whenever:</p>
-<ul>
-<li>platform scope changes</li>
-<li>consumer contract surfaces change</li>
-<li>new regressions widen or narrow the tested boundary</li>
-</ul>
+<p>High means the subsystem is a reliable contract surface for normal downstream
+use. Medium-high means consumers should still respect the documented limits and
+expect some host/platform asymmetry. Medium means the subsystem is useful but
+should not be oversold as equally mature across all supported environments.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="290_release_checklist.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="295_hermeticity_matrix.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -333,7 +235,7 @@ documented limitations and keep policy checks explicit.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="290_release_checklist.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="295_hermeticity_matrix.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
