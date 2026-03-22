@@ -201,6 +201,7 @@ fn inventory_matches_library_name(path: &str, name: &str) -> bool {
         || file_name == format!("lib{}.so", name)
         || file_name == format!("lib{}.dylib", name)
         || file_name == format!("lib{}.tbd", name)
+        || file_name == format!("{name}.dll")
     {
         return true;
     }
