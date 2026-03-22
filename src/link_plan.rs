@@ -207,7 +207,11 @@ fn inventory_matches_library_name(path: &str, name: &str) -> bool {
 
     let so_prefix = format!("lib{}.so.", name);
     let dylib_prefix = format!("lib{}.", name);
-    file_name.starts_with(&so_prefix)
+    let windows_import_lib = format!("{name}.lib");
+    let mingw_import_lib = format!("lib{name}.dll.a");
+    file_name == windows_import_lib
+        || file_name == mingw_import_lib
+        || file_name.starts_with(&so_prefix)
         || (file_name.starts_with(&dylib_prefix) && file_name.ends_with(".dylib"))
         || (file_name.starts_with(&dylib_prefix) && file_name.ends_with(".tbd"))
 }
@@ -530,6 +534,85 @@ mod tests {
         assert_eq!(
             plan.transitive_dependencies,
             vec!["/usr/lib/libc++.1.dylib".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_link_plan_matches_windows_import_library_names() {
+        let mut package = BindingPackage::new();
+        package
+            .link
+            .ordered_inputs
+            .push(LinkInput::Library(LinkLibrary {
+                name: "demo".into(),
+                kind: LinkLibraryKind::Default,
+                source: LinkRequirementSource::Declared,
+            }));
+
+        let inventories = vec![SymbolInventory {
+            artifact_path: "demo.lib".into(),
+            format: ArtifactFormat::CoffImportLibrary,
+            platform: ArtifactPlatform::Windows,
+            kind: ArtifactKind::ImportLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: false,
+                imports_symbols: true,
+            },
+            dependency_edges: vec!["KERNEL32.dll".into()],
+            symbols: Vec::new(),
+        }];
+
+        let plan = resolve_link_plan_with_inventories(&package, &inventories);
+        assert_eq!(plan.requirements.len(), 1);
+        assert_eq!(
+            plan.requirements[0].resolution,
+            RequirementResolution::Resolved
+        );
+        assert_eq!(
+            plan.requirements[0].providers[0].artifact_path,
+            "demo.lib"
+        );
+        assert_eq!(plan.transitive_dependencies, vec!["KERNEL32.dll".to_string()]);
+    }
+
+    #[test]
+    fn resolve_link_plan_matches_mingw_import_library_names() {
+        let mut package = BindingPackage::new();
+        package
+            .link
+            .ordered_inputs
+            .push(LinkInput::Library(LinkLibrary {
+                name: "ssl".into(),
+                kind: LinkLibraryKind::Default,
+                source: LinkRequirementSource::Declared,
+            }));
+
+        let inventories = vec![SymbolInventory {
+            artifact_path: "/mingw64/lib/libssl.dll.a".into(),
+            format: ArtifactFormat::CoffImportLibrary,
+            platform: ArtifactPlatform::Windows,
+            kind: ArtifactKind::ImportLibrary,
+            capabilities: ArtifactCapabilities {
+                exports_symbols: false,
+                imports_symbols: true,
+            },
+            dependency_edges: vec!["libcrypto-3-x64.dll".into()],
+            symbols: Vec::new(),
+        }];
+
+        let plan = resolve_link_plan_with_inventories(&package, &inventories);
+        assert_eq!(plan.requirements.len(), 1);
+        assert_eq!(
+            plan.requirements[0].resolution,
+            RequirementResolution::Resolved
+        );
+        assert_eq!(
+            plan.requirements[0].providers[0].artifact_path,
+            "/mingw64/lib/libssl.dll.a"
+        );
+        assert_eq!(
+            plan.transitive_dependencies,
+            vec!["libcrypto-3-x64.dll".to_string()]
         );
     }
 
