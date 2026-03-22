@@ -139,6 +139,23 @@ fn openssl_example_is_deterministic_when_available() {
 }
 
 #[test]
+fn openssl_example_resolves_expected_link_surface_when_available() {
+    if openssl::openssl_environment().is_err() {
+        return;
+    }
+
+    let result = openssl::analyze_openssl().expect("openssl analysis");
+    let plan = linc::resolve_link_plan(&result.package);
+
+    assert!(plan.inputs.iter().any(
+        |input| matches!(input, linc::ir::LinkInput::Library(library) if library.name == "ssl")
+    ));
+    assert!(plan.inputs.iter().any(
+        |input| matches!(input, linc::ir::LinkInput::Library(library) if library.name == "crypto")
+    ));
+}
+
+#[test]
 fn libpng_vendored_example_is_code_driven_and_consumable() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/full_apps/external/libpng/header");
     let include_dir = root.join("include");
